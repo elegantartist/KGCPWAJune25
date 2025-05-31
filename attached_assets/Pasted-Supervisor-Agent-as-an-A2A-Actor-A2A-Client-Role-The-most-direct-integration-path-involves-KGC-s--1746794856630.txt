@@ -1,0 +1,22 @@
+Supervisor Agent as an A2A Actor:
+
+A2A Client Role: The most direct integration path involves KGC's supervisor agent adopting the role of an A2A Client. In this capacity, the supervisor can discover other specialized A2A agents (both internal to the KGC ecosystem or external third-party agents) and delegate specific tasks or request information from them. This allows the supervisor to leverage the unique capabilities of other agents to augment its own functionalities.   
+A2A Server Role (Optional): Depending on KGC's broader strategy, the supervisor agent, or a dedicated proxy agent within the KGC system, could also function as an A2A Server. This would involve defining specific KGC capabilities that can be exposed to other authorized A2A agents. To do so, KGC would need to publish its own AgentCard detailing these callable skills, its A2A endpoint, and authentication requirements. While the primary focus of the user query seems to be on KGC consuming services from other agents, exposing some of KGC's unique (low-risk) information processing capabilities via A2A could be a future consideration.   
+Discovery and Interaction Mechanism:
+
+To initiate collaboration, the KGC supervisor agent (as an A2A Client) would first need to discover suitable partner agents. This is achieved by fetching and parsing the Agent Cards of potential A2A Servers. These Agent Cards could be located at pre-configured URLs, discovered through a (private or public) agent registry, or provided through other means.   
+Once a suitable agent and its relevant skill are identified, the supervisor agent would initiate an A2A Task by sending a request (e.g., tasks/send or tasks/sendSubscribe) to the target agent's A2A endpoint. This request would contain the necessary context, which might be derived from user input to KGC, data retrieved by the supervisor using its existing MCP-based tools, or information from previous A2A interactions.   
+Managing A2A Tasks and Sessions within KGC's Workflow:
+
+The KGC supervisor agent must be enhanced to manage the full lifecycle of A2A tasks it initiates:
+
+It needs to track the state of each A2A task, including submitted, working, input-required, completed, failed, and canceled. This requires robust internal state management within the supervisor.   
+For multi-turn conversations or sequences of related interactions with another agent (e.g., iterative refinement of a request), the supervisor agent would need to generate and manage sessionIDs to ensure contextual continuity across these interactions. The A2A protocol allows the client to set an optional sessionId when creating a task, or the server can create one if not provided.   
+Comprehensive error handling for A2A tasks is critical. The supervisor must be ableto interpret failed states and any associated JSON-RPC error messages returned by the A2A server. Based on the error, it might trigger fallback mechanisms (e.g., trying a different agent, using an internal MCP tool, or simplifying the request), or it may need to inform the user of the inability to complete the request.   
+Internal vs. External Agents:
+
+KGC may interact with two broad categories of A2A agents:
+
+Internal Agents: These could be other specialized agents developed within the KGC organization or a trusted partner network. Communication with internal agents might operate under a more controlled security and trust model.
+External Agents: These are third-party A2A agents offering services over the internet. Interacting with external agents introduces greater complexity regarding trust, security validation, data privacy, and regulatory considerations, particularly concerning Software of Unknown Provenance (SOUP).
+By becoming an A2A client, the KGC supervisor agent evolves significantly. It transitions from primarily being an orchestrator of tools (accessed via MCP) to an orchestrator of other agents (communicating via A2A). This substantially expands its operational scope and the sophistication required of its decision-making logic. The supervisor will now need to determine when a task is best handled by an internal tool versus delegation to another agent, select an appropriate agent from potentially many, formulate the A2A task request effectively, interpret the (potentially complex and less deterministic) A2A response or artifact, and manage A2A-specific failure modes and interaction patterns like the input-required state. This shift implies a need for more advanced planning, reasoning, and state management capabilities within the KGC supervisor agent.

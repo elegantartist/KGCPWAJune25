@@ -1,0 +1,98 @@
+# Node modules
+node_modules
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+
+# Build directories
+dist
+build
+.next
+.nuxt
+.cache
+
+# Development files
+.git
+.github
+.gitignore
+.gitlab-ci.yml
+.editorconfig
+.eslintignore
+.eslintrc
+.prettierignore
+.prettierrc
+*.md
+LICENSE
+*.log
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Replit specific
+.replit
+replit.nix
+.config
+.upm
+
+# Docker files
+Dockerfile
+.dockerignore
+docker-compose.yml
+docker-compose.*.yml
+
+# Test directories
+__tests__
+test
+tests
+coverage
+
+# Temp directories
+temp
+tmp
+.tmp
+
+# IDE specific files
+.idea
+.vscode
+*.swp
+*.swo
+
+# MacOS specific files
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+
+# Windows specific files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Package files
+*.7z
+*.csv
+*.dat
+*.dmg
+*.gz
+*.iso
+*.jar
+*.rar
+*.tar
+*.zip
+*.com
+*.class
+*.dll
+*.exe
+*.o
+*.seed
+*.so
+*.swo
+*.swp
+*.swn
+*.swm
+*.out
+*.pid

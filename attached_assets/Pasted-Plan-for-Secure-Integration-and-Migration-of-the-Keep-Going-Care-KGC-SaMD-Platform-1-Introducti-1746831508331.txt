@@ -1,0 +1,804 @@
+Plan for Secure Integration and Migration of the 'Keep Going Care' (KGC) SaMD Platform
+1. Introduction
+1.A. Purpose of the Report
+This report outlines a comprehensive plan to integrate robust authentication and data security features into the existing 'Keep Going Care' (KGC) Software as a Medical Device (SaMD) platform. The plan encompasses the migration of the application from its current Replit development environment to a resilient hybrid hosting infrastructure, ensuring compliance with the Australian Privacy Principles (APPs) and SaMD Class 1 non-diagnostic regulatory requirements. Furthermore, it addresses optimization for user devices, provisions for administrative oversight, and preparations for an initial controlled rollout in Australia.
+1.B. Scope of the Plan
+The scope of this plan covers the KGC SaMD platform, which includes its chatbot functionality and associated features. Key activities within this scope include:
+Migration: Transitioning the KGC application from Replit to a hybrid hosting model. The frontend (Progressive Web Application - PWA) will be hosted on a Unix-based server managed via Crazy Domains for the keepgoingcare.com domain, while the backend, artificial intelligence (AI) components, and database will be hosted on Amazon Web Services (AWS).
+Authentication and Security Integration: Implementing a comprehensive authentication framework and stringent data security measures across the platform.
+Compliance: Ensuring the platform adheres to the Australian Privacy Principles (APPs) as mandated by the Privacy Act 1988 1 and meets the requirements for a Class 1 non-diagnostic SaMD as per the Therapeutic Goods Administration (TGA).3
+Optimization: Optimizing the platform for seamless user experience on both desktop and mobile devices, leveraging PWA capabilities.
+Administration: Providing administrative tools for system health monitoring and user management.
+Rollout: Preparing for and executing an initial pilot rollout to 20 doctors and 100 patients in Australia, based on detailed KGC project specifications.
+1.C. KGC Platform Overview
+The 'Keep Going Care' (KGC) platform is a Software as a Medical Device (SaMD) designed to support patients and doctors through an interactive chatbot and supplementary features. Its primary function is to provide non-diagnostic support and information, aiming to enhance patient engagement and facilitate communication within the healthcare journey.
+1.D. Key Objectives
+The overarching objectives of this plan are to transform the KGC platform into a:
+Secure System: Implementing state-of-the-art security measures to protect sensitive patient and doctor information.
+Compliant Platform: Adhering strictly to Australian privacy laws and medical device regulations.
+Scalable Solution: Architecting the platform on a robust infrastructure capable of handling future growth in user base and features.
+User-Friendly Experience: Ensuring the platform is intuitive and accessible across various devices for all user groups.
+Operationally Sound Environment: Establishing processes for reliable deployment, monitoring, and maintenance.
+2. Current State Analysis and Migration Prerequisites
+2.A. Replit Platform Limitations for Production SaMD
+The Replit platform, while excellent for rapid prototyping, education, and collaborative development, presents significant limitations for hosting a production-grade SaMD like KGC, particularly one handling sensitive health information.5
+Scalability: Replit's hosting infrastructure is generally suited for small projects and is not designed for large-scale, high-traffic applications that a successful SaMD would become.5 Production environments require robust architecture, database management, and efficient backend handling to scale effectively under real-world workloads.
+Security: While Replit provides a cloud hosting environment, production applications necessitate dedicated infrastructure, containerization, security hardening, and ongoing monitoring beyond what Replit typically offers for prototypes.5 A SaMD requires enterprise-grade security.
+Data Persistence: The file system available in Replit Deployments is not persistent and resets with each deployment.6 This is unsuitable for a platform requiring reliable storage of user data, application state, and logs. External datastores are recommended even within Replit for persistence 6, signaling its limitations for integrated, persistent storage in production.
+Compliance: Replit is not inherently designed to meet the stringent compliance requirements of SaMD or healthcare regulations like the APPs. Dedicated infrastructure with auditable controls and specific security configurations is necessary.
+Large Project Migration Challenges: Replit imposes size limits on deployments (e.g., 8 GB for Reserved and Autoscale Deployments, 1 GB for Static Deployments).6 Users have reported difficulties downloading large projects (e.g., >6GB ZIP files failing) or experiencing instability with large repositories.7 These issues can complicate the migration process for a mature application.
+These limitations underscore the necessity of migrating KGC to a more robust, secure, and compliant production environment. The nature of SaMD, handling sensitive health data and impacting user well-being, demands an infrastructure that prioritizes security, reliability, and regulatory adherence – capabilities that extend beyond Replit's primary focus as a development and prototyping tool.
+2.B. Target Hybrid Hosting Architecture
+To address the limitations of Replit and meet the production requirements of KGC, a hybrid hosting architecture is proposed:
+Frontend (PWA): The React-based Progressive Web Application will be hosted on a Unix-based shared hosting environment, managed via Crazy Domains for the existing keepgoingcare.com domain.
+Backend, AI, and Database: These components (Node.js backend, Python-based AI services, PostgreSQL database) will be deployed on Amazon Web Services (AWS).
+Rationale: This hybrid approach allows KGC to leverage its existing domain and associated web presence managed by Crazy Domains, which may be suitable for serving static PWA assets. Simultaneously, it utilizes AWS for its robust, scalable, and secure infrastructure, which is well-suited for backend services, AI workloads, and databases that handle sensitive data and require high availability and compliance capabilities. AWS offers a wide range of services that can be configured to meet specific security and regulatory standards.8
+Connectivity: The frontend PWA hosted on Crazy Domains will communicate with the AWS-hosted backend via secure API calls (HTTPS). This will involve configuring API Gateway on AWS with a custom domain, secured by SSL/TLS certificates.
+This architecture separates concerns, allowing each part of the application to reside in an environment optimized for its needs, while ensuring secure communication pathways between them.
+2.C. Data and Application Migration Strategy from Replit
+The migration from Replit to the target hybrid architecture will involve several key steps:
+Code Export:
+The primary method for exporting code from Replit will be to utilize its built-in Git integration to push the codebase to a central Git repository (e.g., GitHub).11
+For very large projects or if direct Git integration proves problematic due to size or connectivity issues 7, Replit's "Download as ZIP" feature can be used, though it may fail for excessively large repositories.7
+Alternatively, community-developed CLI tools like replit-exporter can facilitate bulk downloads of Replit projects, including environment variables and configuration data, which can be particularly useful if multiple Repls constitute the KGC platform or if large files are involved.12 Secure Copy Protocol (scp) can also be used for transferring large files if SSH access to the Replit environment is available.13
+Repository Management:
+Primary Repository: GitHub is recommended as the central version control system due to its widespread adoption, robust feature set, and integration capabilities with CI/CD tools and AWS. Alternatives like GitLab and Bitbucket also offer comprehensive features.14
+Handling Large Files (Git LFS): If the KGC application includes large binary assets (e.g., machine learning models, extensive multimedia content for the chatbot) that exceed typical Git repository file size limits (GitHub limits range from 2GB to 5GB per file depending on the plan 19), Git Large File Storage (LFS) must be implemented.19 Git LFS stores large files externally, replacing them with small pointer files in the Git repository, thus keeping the main repository size manageable.20 This is crucial as Replit itself has deployment size limitations 6 and users report issues with large file transfers.7 AWS CodeCommit is an alternative for Git hosting within AWS, stating no limit on repository or file sizes, but notes Git's inherent performance limitations with very large, frequently changing files.22 Given the potential for large AI models, Git LFS with GitHub is a more conventional and flexible approach.
+Setup for Git LFS:
+Install the Git LFS client locally.
+In the project root, run git lfs install to initialize LFS and set up hooks.
+Track large file types (e.g., git lfs track "*.bin", git lfs track "models/**") by adding entries to the .gitattributes file.
+Commit .gitattributes and then add and commit the large files.
+Database Migration:
+Export from Replit: If KGC currently uses Replit's built-in database (often SQLite for simple projects or Replit Database, a key-value store 6), the data must be exported. This may involve writing custom scripts to extract data into a standard format like CSV or JSON.
+Schema Definition for PostgreSQL: Define the schema for the target AWS PostgreSQL database. This may involve mapping from the Replit database structure if it differs.
+Data Transformation: Scripts may be needed to transform the exported data to fit the new PostgreSQL schema.
+Import into AWS PostgreSQL: Use PostgreSQL import tools (e.g., psql \copy, pgAdmin, or AWS Database Migration Service (DMS) for more complex migrations) to load the transformed data into the RDS PostgreSQL instance.
+Configuration Migration:
+Identify all environment variables, API keys, and other configuration settings used in the Replit environment.
+These configurations must be securely transferred and stored in the new AWS environment. AWS Secrets Manager or AWS Systems Manager Parameter Store are recommended for managing sensitive information like API keys and database credentials.23 For non-sensitive configurations, environment variables in Lambda, EC2, or ECS can be used.
+Testing Post-Migration:
+Thoroughly test all application functionalities in a staging environment that mirrors the production setup before going live. This includes testing the PWA, backend APIs, AI components, database connectivity, and user authentication flows.
+The migration from a development-focused platform like Replit to a production-grade hybrid environment requires careful planning and execution. The use of robust version control with Git LFS for large assets, a structured database migration process, and secure configuration management are fundamental to this transition. Given that Replit's file system is not persistent for deployments 6 and its limitations with large files 6, moving to AWS for backend and database components is a critical step for ensuring data integrity, scalability, and reliability for the KGC SaMD.
+3. Authentication and Authorization Framework
+A robust Authentication and Authorization framework is paramount for the KGC platform, given its nature as a SaMD handling sensitive health information. AWS Cognito will serve as the cornerstone for managing user identities and access control.
+3.A. User Roles and Access Control
+Clearly defined user roles with granular permissions are essential to enforce the principle of least privilege.
+Defined Roles:
+Patient: Access to their own data, chatbot interaction, features relevant to their care.
+Doctor: Access to their assigned patients' data, tools for managing patient interactions, specific features for clinical support (non-diagnostic).
+Administrator: System-wide management capabilities, user account management (doctors, potentially patient query resolution), system health monitoring, audit log access.
+Permissions Matrix: A detailed matrix will be developed to map specific actions and data access rights to each role. This matrix will be implemented using AWS Cognito groups and IAM policies where appropriate (e.g., for controlling access to AWS resources by backend services based on the authenticated user's role).
+Table 3.A.1: KGC User Roles and Core Permissions Matrix
+Feature/Data Module
+Patient Access
+Doctor Access (Assigned Patients)
+Doctor Access (Other Patients)
+Administrator Access
+Account Management
+
+
+
+
+
+
+
+
+View Own Profile
+Read/Write
+N/A
+N/A
+Read (All Users)
+Edit Own Profile
+Read/Write
+N/A
+N/A
+Write (All Users)
+Reset Own Password
+Yes
+Yes
+N/A
+Initiate for Users
+Manage MFA Settings
+Yes (Optional)
+Yes (Mandatory)
+N/A
+View Status
+Chatbot Interaction
+
+
+
+
+
+
+
+
+Initiate/Respond to Chatbot
+Yes
+View/Monitor
+No Access
+Monitor (Audit)
+View Chat History (Own)
+Yes
+Yes
+No Access
+View (Audit)
+Patient Data (PHI)
+
+
+
+
+
+
+
+
+View Own Health Data
+Read
+Read
+No Access
+Read (Audit/Support)
+Input Health Data
+Write
+Write (Notes)
+No Access
+No Direct Write
+Doctor-Specific Features
+
+
+
+
+
+
+
+
+View Patient List
+N/A
+Read
+N/A
+Read All
+Patient Management Tools
+N/A
+Read/Write
+N/A
+Configure
+Admin Functions
+
+
+
+
+
+
+
+
+User Account Management
+N/A
+N/A
+N/A
+Full Control
+System Configuration
+N/A
+N/A
+N/A
+Full Control
+View Audit Logs
+N/A
+Limited (Own Actions)
+N/A
+Full Access
+System Health Dashboard
+N/A
+N/A
+N/A
+Full Access
+
+Note: N/A = Not Applicable. This matrix is a high-level representation and will be further detailed.
+3.B. Multi-Factor Authentication (MFA)
+MFA adds a critical layer of security, significantly reducing the risk of unauthorized access due to compromised credentials.
+Implementation:
+Doctors and Administrators: MFA will be mandatory. This is crucial as these roles have access to sensitive patient data and/or system controls.
+Patients: MFA will be strongly recommended and offered as an option. User education on the benefits of MFA will be provided.
+Supported Methods: AWS Cognito supports various MFA methods, including:
+Time-based One-Time Passwords (TOTP) using authenticator apps (e.g., Google Authenticator, Authy).24 This is generally preferred over SMS due to higher security.
+SMS-based OTPs.24 While convenient, SMS MFA is susceptible to SIM swapping attacks and should be offered with awareness of its risks.25
+Email-based OTPs can also be configured, particularly with Cognito's Essentials or Plus feature plans.26
+Recovery Mechanisms:
+Cognito provides mechanisms for account recovery if a user loses access to their MFA device.24
+Best practices for recovery include ensuring that recovery methods (e.g., verified email or phone) are distinct from the primary MFA factor to avoid a single point of compromise.24
+The generation, storage, and validation of any system-generated recovery codes (if implemented beyond Cognito's standard flows) must be highly secure. However, Cognito's built-in mechanisms are generally preferred.
+Administrators will have a defined process for assisting users with account recovery, following strict identity verification procedures.
+Users should be educated on securing their recovery information.
+The enforcement of MFA, especially for privileged accounts, is a standard security practice and aligns with the need to protect sensitive health information under APP 11.28
+3.C. Passwordless Authentication Options
+To enhance user experience and potentially security, passwordless authentication methods will be explored and implemented.
+FIDO2/WebAuthn: This standard allows users to authenticate using biometrics (fingerprint, facial recognition) or hardware security keys (e.g., YubiKey).29
+Implementation will leverage AWS Cognito's custom authentication flows, utilizing Lambda triggers (DefineAuthChallenge, CreateAuthChallenge, VerifyAuthChallengeResponse) to integrate with the FIDO2/WebAuthn APIs in the browser.29
+FIDO2 credentials (public keys) will be stored securely, for instance, in an Amazon DynamoDB table, linked to the user's Cognito identity.29
+This solution supports both username-based FIDO2 sign-in and "usernameless" sign-in with discoverable credentials (passkeys), though the latter has specific requirements regarding Cognito username configuration (opaque UUIDs are preferred).29
+Magic Links: As a fallback or alternative passwordless method, magic links can be implemented.30
+Users enter their email address, and a unique, time-limited, single-use sign-in link is emailed to them.
+This also uses Cognito custom authentication flows, with Lambda triggers managing link generation, email sending, and link validation. While Cognito has been introducing more native support for passwordless methods, custom authentication flows provide greater control over the user experience and integration details.32
+3.D. Session Management
+Secure session management is vital to protect authenticated user sessions from hijacking or unauthorized use.
+Tokens: AWS Cognito issues JSON Web Tokens (JWTs) – ID tokens, access tokens, and refresh tokens – upon successful authentication.33 These tokens will be used to manage sessions.
+ID tokens contain user profile information.
+Access tokens authorize API calls to the backend.
+Secure Storage and Transmission:
+For the PWA, tokens will be stored securely. If cookies are used for web-based admin portals or specific flows, they must have the HttpOnly and Secure flags set to prevent cross-site scripting (XSS) attacks from accessing the token and to ensure they are only transmitted over HTTPS.34 For PWAs, storing tokens in memory or using the browser's secure storage mechanisms with appropriate safeguards is common.
+Token Expiration and Refresh:
+ID and access tokens will have relatively short expiry times.
+Refresh tokens, which have longer expiry times, will be used to obtain new ID and access tokens without requiring the user to re-authenticate. Refresh tokens must be stored securely and handled with care.
+Step-up Authentication: For particularly sensitive actions within the application (e.g., a doctor accessing detailed patient history, an administrator changing critical system settings), step-up authentication will be implemented.33
+This involves requiring the user to re-verify their identity or provide an additional factor of authentication before proceeding with the high-privilege action, even if they have an active session.
+This can be achieved using AWS Cognito in conjunction with API Gateway and Lambda. A Lambda authorizer can check if an API action requires elevated privilege and if a valid step-up session exists (e.g., by checking a DynamoDB table that stores step-up session status). If not, the user is prompted to step-up.36
+3.E. Unique Identity Number (UIN) System
+A UIN system will be designed to uniquely identify each user within the KGC platform while upholding privacy and security.
+Design Principles:
+Uniqueness: Each Patient, Doctor, and Administrator will be assigned a system-generated, unique, non-sequential, and non-guessable UIN.
+Purpose: UINs are strictly for internal identification and linking data within the KGC system (e.g., linking a patient's record to their chatbot interactions and the doctors assigned to them).39
+Not for Authentication: UINs will not be used as usernames, passwords, or for any part of the authentication process.39 Login will be via email/password, FIDO2, or magic links.
+Privacy (APP Compliance): UINs, when associated with an individual, constitute personal information and must be protected according to the APPs. Their use will be limited to what is necessary for the platform's functionality.
+Security: Access to UINs and the systems that map UINs to identifiable user data will be strictly controlled.
+Linking Roles: The UIN system will facilitate the secure linkage of data across different user roles. For example, a patient's UIN will be used to associate their health records and chatbot logs, and a doctor's UIN will be used to manage their access to their assigned patients' data.
+Generation and Storage: UINs will be generated by the backend system upon user registration and stored in the PostgreSQL database alongside user profile information.
+Considerations from UID Best Practices:
+Systematic assignment and maintenance of accurate records.40
+Implementation of robust security measures to protect the UIN database.40
+While the KGC UIN is internal, principles of voluntary enrollment and user control over data (as suggested for national UID systems 41) align with APP requirements for consent and access.
+The design of the UIN system must prevent it from becoming a de facto government-related identifier, which has specific restrictions under APP 9.1 It will be an internal KGC identifier only.
+4. Data Security and Privacy by Design
+Adopting a "privacy by design" approach is fundamental to KGC's architecture, ensuring that data protection is an integral part of the system from its inception.42 This section details the strategies for data classification, encryption, anonymization, PWA offline security, and data lifecycle management.
+4.A. Data Classification and Handling
+All data within the KGC platform will be classified to ensure appropriate handling and security measures are applied.
+Data Categories:
+Sensitive Health Information (SHI): This includes patient medical history, symptoms reported via chatbot, treatment details, doctor's notes, and any data that falls under the definition of "health information" as per the Privacy Act. This is a subset of "sensitive information" under the APPs and requires the highest level of protection.
+Personally Identifiable Information (PII): This includes names, contact details (email, phone), dates of birth, UINs, and any other information that can identify an individual. For patients and doctors, much of their PII will overlap with SHI.
+System/Operational Data: This includes application logs, audit trails, performance metrics, and aggregated/anonymized data used for analytics. While some logs might contain incidental PII (which should be minimized), the primary focus here is on system integrity and availability.
+Handling Procedures:
+Based on classification, specific handling procedures will be defined. For SHI and PII, these procedures will align strictly with the APPs, particularly regarding collection (APP 3), use and disclosure (APP 6), security (APP 11), access (APP 12), and correction (APP 13).1
+Access controls (Section 3.A) will be enforced based on data classification and user role.
+Data minimization principles will be applied: only collect SHI/PII that is reasonably necessary for KGC's functions.42
+Table 4.A.1: KGC Data Classification and Handling Summary
+Data Category
+Examples
+Sensitivity Level
+Key APPs Involved
+Primary Security Measures
+Sensitive Health Info (SHI)
+Medical history, symptoms, chatbot conversations, doctor notes, test results
+Very High
+APP 3, 6, 11, 12, 13
+AES-256 encryption (at rest & in transit), strict access controls, audit trails, data minimization, consent management
+Personal Identifiable Info (PII)
+Name, email, phone, DoB, UIN, IP address (if logged and identifiable)
+High
+APP 3, 5, 6, 11, 12, 13
+AES-256 encryption (at rest & in transit), access controls, audit trails, data minimization, notification of collection
+System/Operational Data
+Application logs, performance metrics, non-identifiable usage statistics
+Medium to Low
+APP 1, 11
+Secure storage, access controls, log sanitization (if PII present), regular review
+Anonymized/De-identified Data
+Aggregated usage patterns for analytics, de-identified health trends
+Low
+N/A (if properly de-identified)
+Secure storage, re-identification risk assessment, controls on data environment
+
+4.B. Encryption Strategies
+Comprehensive encryption is non-negotiable for protecting KGC data.
+Data at Rest: All SHI and PII stored in AWS services will be encrypted.
+AWS PostgreSQL (RDS):
+AWS RDS offers built-in encryption at rest using AWS Key Management Service (KMS) to manage the encryption keys.44 This encrypts the underlying storage for the database instance, backups, read replicas, and snapshots. This is a form of Transparent Data Encryption (TDE).
+For an additional layer of security for specific highly sensitive fields within the database (e.g., specific medical conditions, notes), application-level encryption can be implemented. This involves encrypting the data within the Node.js backend application using AES-256 (e.g., via the crypto module 45) before it is written to the database, and decrypting it after retrieval. The choice between exclusive TDE and a hybrid approach (TDE + application-level) depends on the granularity of control needed over encryption keys and access to decrypted data.48 Application-level encryption provides stronger separation, as the database itself never sees the plaintext of these specific fields, but it can complicate querying and indexing.49
+PostgreSQL itself has an extension pgcrypto that supports AES-256 encryption at the column level.50 However, managing keys with pgcrypto can be complex, and AWS RDS encryption with KMS is generally preferred for ease of management and integration.
+AWS S3 (for AI models, backups, large files):
+Server-Side Encryption (SSE) will be enabled for all S3 buckets storing KGC data. Options include SSE-S3 (AES-256 managed by S3), SSE-KMS (AES-256 with keys managed by AWS KMS), or SSE-C (customer-provided keys, less likely for this use case). SSE-KMS offers a good balance of security and manageability.
+Key Management: AWS KMS will be the central service for creating, managing, and controlling the use of encryption keys for RDS, S3, and potentially application-level encryption. This provides auditable key usage and helps meet compliance requirements.
+Data in Transit: All data transmitted between components of the KGC system and with users will be encrypted.
+Frontend (PWA on Crazy Domains) to Backend (AWS API Gateway): All communication will be over HTTPS/TLS.
+A custom domain (e.g., api.keepgoingcare.com) will be configured for the API Gateway endpoint.
+An SSL/TLS certificate for this custom domain will be provisioned using AWS Certificate Manager (ACM).51
+DNS records (e.g., in AWS Route 53 or managed at Crazy Domains if preferred, pointing to the API Gateway custom domain) will resolve the custom domain to the API Gateway endpoint.51
+API Gateway itself supports TLS termination.
+Internal AWS Communication: Communication between AWS services (e.g., API Gateway to Lambda, Lambda to RDS) will utilize AWS private networking capabilities (VPCs) and IAM roles for secure service-to-service authentication, with TLS encrypted by default for many AWS service endpoints.
+WebSockets (Chatbot): If the chatbot uses WebSockets for real-time communication between the React frontend and the Node.js backend:
+Secure WebSockets (WSS) protocol will be used, which is WebSocket over TLS.
+For enhanced privacy of chat messages, end-to-end encryption (E2EE) will be implemented. This means messages are encrypted on the client-side (React PWA) before being sent over WSS, and decrypted only on the recipient's client-side. The Node.js backend would relay the encrypted messages without being able to decrypt them.
+Libraries like react-e2ee 53 or direct use of the Web Crypto API (SubtleCrypto) can be used on the frontend for this. This typically involves:
+Generating an RSA key pair on each client.
+Exchanging public keys securely (e.g., via the backend upon session initiation).
+For each message: generating a symmetric AES key, encrypting the message with AES, encrypting the AES key with the recipient's RSA public key, and sending both the encrypted message and the encrypted AES key.53
+The recipient decrypts the AES key with their RSA private key, then decrypts the message with the AES key.
+WebSocket libraries for Node.js like ws or socket.io can be used on the backend to manage WSS connections.54 Note that Socket.IO itself does not provide E2EE natively.54
+The decision between database-level encryption (like RDS TDE) and application-level encryption involves trade-offs. TDE is easier to implement and protects data if the underlying storage is compromised, but database administrators with access to the database instance can still see plaintext data.49 Application-level encryption protects data even from privileged database users but adds complexity to the application and can make querying and indexing on encrypted fields challenging.48 For sensitive health data, a defense-in-depth strategy combining RDS TDE with selective application-level encryption for the most critical SHI fields offers a robust solution.
+4.C. Data Anonymization/De-identification for Analytics
+To derive insights and improve the KGC platform, data analytics may be performed. However, this must be done in a privacy-preserving manner.
+Principle: The OAIC strongly recommends using de-identified data for analytics wherever possible. Successfully de-identified data is not considered personal information under the Privacy Act, meaning the APPs generally do not apply to its use for analytics.1
+Techniques: A combination of de-identification techniques may be employed 56:
+Removal of Direct Identifiers: Names, UINs, specific contact details.
+Pseudonymization: Replacing identifiers with pseudonyms. The link between the pseudonym and the original identifier must be securely stored and managed if re-identification is ever permissible and lawful.
+Generalization: Reducing the precision of data (e.g., converting exact age to age ranges, specific postcodes to broader regions).
+Aggregation: Summarizing data into statistics (e.g., number of users with a certain symptom, average interaction time).
+Masking: Obscuring parts of data (e.g., XXXXX1234 for a partial identifier).
+Risk of Re-identification: A critical step is assessing and minimizing the risk of re-identification, especially when combining different de-identified datasets or linking with external data.42 The OAIC's De-Identification Decision-Making Framework provides guidance.42
+Compliance with APPs:
+If data cannot be effectively de-identified for analytics and still contains personal (including sensitive health) information, its use for analytics would be a secondary purpose under APP 6. This would generally require user consent, or fall under specific exceptions (e.g., permitted health situations for research, which involves HREC approval and strict conditions like impracticability of consent and de-identification not serving the purpose).1
+Clear notification must be provided to users about potential secondary uses of their data for analytics (APP 1, APP 5).42
+Process:
+Identify data required for analytics.
+Conduct a PIA to assess privacy risks associated with the analytics project.42
+Apply appropriate de-identification techniques to a copy of the production data.
+Store the de-identified dataset in a separate, secure environment for analytics.
+Regularly review the effectiveness of de-identification techniques.
+For KGC, analytics on chatbot interaction patterns, feature usage, and aggregated, de-identified patient-reported outcomes could be valuable. However, extreme care must be taken with health information due to its sensitivity.42
+4.D. PWA Offline Data Security (IndexedDB)
+The KGC PWA may store some data offline in IndexedDB to enhance user experience (e.g., cached chatbot messages, draft inputs). This offline data, if sensitive, must be secured.
+Encryption of Offline Data: Any SHI or PII stored in IndexedDB for offline access must be encrypted.34
+The Web Crypto API (window.crypto.subtle) will be used for client-side encryption.62 AES-GCM (Galois/Counter Mode) is recommended as it provides both encryption and authentication, ensuring confidentiality and integrity of the stored data.62
+Client-Side Key Management: Securely managing encryption keys on the client-side is challenging but crucial.
+Avoid Hardcoding Keys: Keys must never be hardcoded in JavaScript.65
+Key Derivation: Encryption keys can be derived from a user's password or a strong passphrase using a key derivation function like PBKDF2 (Password-Based Key Derivation Function 2), also available via Web Crypto API. The derived key would be held in memory only for the duration of the session. This means data is only decryptable when the user is logged in and provides their credential.
+Wrapped Keys: If keys need to be stored (e.g., a master key for encrypting multiple data items), they must themselves be encrypted (wrapped) using a key derived from user credentials or managed through secure mechanisms. SubtleCrypto.wrapKey() and unwrapKey() can be used for this.63
+Storage of Wrapped Keys: Wrapped keys could potentially be stored in IndexedDB or secure cookie mechanisms, but raw, unwrapped keys should not persist in localStorage or sessionStorage.34
+Service Worker Security Best Practices: Service workers, essential for PWA offline capabilities, must be secured 34:
+HTTPS Only: Service workers must be served over HTTPS (except for localhost development).66
+Limited Scope: Restrict the service worker's scope to the minimum necessary path.66
+Input Sanitization: Sanitize any data handled or cached by the service worker.34
+Cache Control: Avoid caching sensitive API responses or user credentials in CacheStorage.66 Implement strategies for cache invalidation and clearing.
+Secure Data Synchronization: When the PWA comes online, any offline data synchronized with the backend must be transmitted over HTTPS and validated on the server.34
+The principle of data minimization also applies to offline storage: only cache data that is essential for offline functionality.34
+4.E. Data Lifecycle Management
+Managing data throughout its lifecycle is a core component of privacy by design and APP compliance.
+Data Minimization (APP 3): As previously stated, KGC will only collect personal and health information that is reasonably necessary for its defined functions and activities.1 The purpose of collection will be clearly communicated to users (APP 5).
+Data Quality (APP 10): Reasonable steps will be taken to ensure that personal information collected, used, or disclosed is accurate, up-to-date, and complete.1 Users (patients and doctors) will have mechanisms to review and request corrections to their information (APP 13).
+Data Retention Policies: Clear policies will define how long different categories of data (SHI, PII, system logs) are retained. These policies will be based on legal requirements (e.g., health record retention periods in Australia), business needs, and the principle of not keeping data longer than necessary.
+Secure Disposal/De-identification (APP 11.2): When personal information is no longer needed for any purpose for which it may be used or disclosed under the APPs, and it's not required by law to be retained, KGC must take reasonable steps to destroy the information or ensure it is de-identified.28
+For SHI/PII in the PostgreSQL database, this could involve secure deletion procedures or applying de-identification techniques before archiving.
+Backups containing deleted data will also be managed according to the retention policy, ensuring they are eventually overwritten or destroyed.
+This holistic approach to data security and privacy, embedded throughout the system's design and operation, is essential for building trust with users and meeting regulatory obligations.
+5. Compliance and Regulatory Adherence
+Ensuring KGC complies with relevant Australian regulations is a primary objective. This involves adherence to the Australian Privacy Principles and the TGA's requirements for SaMD.
+5.A. Australian Privacy Principles (APPs) Compliance
+The KGC platform must be designed and operated in strict accordance with the 13 Australian Privacy Principles (APPs) under the Privacy Act 1988.1
+APP 1: Open and Transparent Management of Personal Information:
+A clear, comprehensive, and easily accessible Privacy Policy will be developed and made available on the KGC website and within the PWA.1
+This policy will detail: KGC's identity and contact details; the types of personal information (including sensitive health information) collected and held; how and why it's collected; how it's used and disclosed (primary and secondary purposes); how individuals can access and correct their information; how individuals can make a privacy complaint; and whether information is likely to be disclosed to overseas recipients (and if so, where).1
+APP 2: Anonymity and Pseudonymity:
+While APP 2 requires giving individuals the option to deal anonymously or pseudonymously, this is generally impracticable for a healthcare application where correct identification is crucial for providing care and maintaining accurate records.1 The Privacy Policy will explain why anonymity/pseudonymity is not generally available for core platform services.
+APP 3: Collection of Solicited Personal Information:
+KGC will only collect personal information (including sensitive health information) that is reasonably necessary for its functions and activities (e.g., providing chatbot support, facilitating doctor-patient communication).1
+Sensitive information (like health information) will only be collected with explicit user consent, unless a specific exception applies (which is unlikely for KGC's core services).1 Consent mechanisms will be clear and auditable.
+APP 4: Dealing with Unsolicited Personal Information:
+Procedures will be in place to determine if unsolicited personal information received could have been collected under APP 3. If not, and it's not contained in a Commonwealth record, it must be destroyed or de-identified as soon as practicable, if lawful and reasonable to do so.1
+APP 5: Notification of the Collection of Personal Information:
+At or before the time of collection (or as soon as practicable after), users will be provided with a collection notice (or directed to the relevant sections of the Privacy Policy) detailing: the purposes of collection; consequences if information is not provided; usual disclosures (e.g., to their nominated doctor); any cross-border disclosures; and how to access/correct information or make complaints.1
+APP 6: Use or Disclosure of Personal Information:
+Personal information will only be used or disclosed for the primary purpose for which it was collected (e.g., patient data used for their interaction with the chatbot and for their doctor to review).1
+Secondary uses or disclosures (e.g., for de-identified analytics, research if applicable) will only occur with explicit consent or if otherwise permitted by the APPs (e.g., a permitted health situation for research, requiring HREC approval).1
+APP 7: Direct Marketing:
+KGC will not use or disclose personal information for direct marketing purposes without explicit consent. If consent is given for sensitive information, it must be clear. An easy opt-out mechanism will always be provided.1 Given KGC's nature, direct marketing is unlikely to be a core function.
+APP 8: Cross-border Disclosure of Personal Information:
+If any personal information is to be disclosed to overseas recipients (e.g., if using AWS regions outside Australia, or third-party services hosted overseas), KGC will take reasonable steps to ensure the overseas recipient does not breach the APPs.1 This typically involves contractual clauses and due diligence.
+Preference will be given to using AWS infrastructure located within Australia (e.g., Sydney, Melbourne regions) to minimize cross-border data flows.69 The Privacy Policy will state if data is stored or processed overseas.
+APP 9: Adoption, Use or Disclosure of Government Related Identifiers (GRIs):
+KGC will not adopt, use, or disclose GRIs (e.g., Medicare numbers, DVA numbers) as its own identifiers for individuals, except as permitted or required by law.1 The internal KGC UIN (Section 3.E) is distinct from GRIs.
+APP 10: Quality of Personal Information:
+KGC will take reasonable steps to ensure the personal information it collects, uses, or discloses is accurate, up-to-date, and complete.1 Users will be able to review and request corrections to their information.
+APP 11: Security of Personal Information:
+KGC will take reasonable steps to protect personal information from misuse, interference, loss, and unauthorized access, modification, or disclosure.1 This includes the encryption strategies (Section 4.B), access controls (Section 3.A), MFA (Section 3.B), and other security measures outlined in this plan.
+A data breach response plan will be in place to comply with the Notifiable Data Breaches (NDB) scheme.1
+APP 12: Access to Personal Information:
+Individuals (patients, doctors) will have the right to request access to the personal information KGC holds about them.1 Access will be provided in a reasonable timeframe and format, unless a specific exception under the APPs applies.
+APP 13: Correction of Personal Information:
+Individuals can request correction of their personal information if they believe it is inaccurate, out-of-date, incomplete, irrelevant, or misleading.1 KGC will take reasonable steps to correct the information if appropriate.
+Privacy Impact Assessment (PIA): A PIA will be conducted for the KGC platform, especially focusing on the new hosting environment, data flows, and handling of sensitive health information.2 The PIA will identify potential privacy impacts and recommend mitigation strategies. This is an iterative process and should be revisited as the platform evolves.42
+Privacy by Design: Privacy considerations will be embedded into the entire system development lifecycle, from design and architecture through to deployment and maintenance.42
+Table 5.A.1: APP Compliance Checklist for KGC (Illustrative Excerpt)
+APP #
+Principle
+KGC Implementation Strategy
+Key KGC Features/Processes
+Responsible
+Status
+APP 1
+Open & Transparent Management
+Develop & publish comprehensive Privacy Policy. Internal data handling procedures & training.
+Website Privacy Policy link, In-app link, Staff training module
+Legal/Compliance, Dev Team
+To Be Developed
+APP 3
+Collection (Solicited)
+Collect only necessary SHI/PII. Obtain explicit consent for SHI. Justify collection purpose.
+Patient registration form, Chatbot data input fields, Doctor input fields, Consent checkboxes
+Dev Team, UX/UI
+Design Phase
+APP 5
+Notification
+Provide clear collection notices at point of collection (or link to policy).
+Registration screen notice, Chatbot initiation message
+Dev Team, UX/UI
+Design Phase
+APP 6
+Use & Disclosure
+Use data only for primary purpose (care support). Obtain consent for secondary uses (e.g., de-identified analytics). Limit disclosure to authorized roles (e.g., patient's doctor).
+Backend logic for data access, Consent management feature, Role-based access control
+Dev Team
+Design/Implementation
+APP 8
+Cross-Border Disclosure
+Preferentially use AWS Australia regions. If OS disclosure needed, implement contractual safeguards & notify users via Privacy Policy.
+AWS infrastructure setup, Privacy Policy update
+Infrastructure Team, Legal/Compliance
+Design Phase
+APP 11
+Security
+Implement encryption (at rest, transit), access controls, MFA, secure coding, regular audits, NDB plan.
+All technical components, Security policies & procedures
+Dev Team, Security Team, Compliance
+Ongoing
+APP 12
+Access
+Provide mechanism for users to request access to their data (e.g., via profile screen or support request).
+User profile screen, Support process
+Dev Team, Support Team
+Design/Implementation
+APP 13
+Correction
+Provide mechanism for users to request correction of inaccurate data.
+User profile editing, Support process
+Dev Team, Support Team
+Design/Implementation
+
+5.B. SaMD Class I Non-Diagnostic Requirements (TGA)
+KGC, as a SaMD intended for the Australian market, must comply with the Therapeutic Goods Administration (TGA) regulations.
+Classification: Based on the description (chatbot and features for non-diagnostic support), KGC likely falls under Class I SaMD (non-measuring, non-sterile), provided it does not provide direct diagnoses, screen for conditions in a way that directly informs clinical decisions, or monitor conditions where inaccurate information could lead to immediate danger.3 It's crucial to confirm that KGC's intended purpose and features align with TGA's guidance on excluded or exempt software (e.g., simple clinical decision support or reference information might be exempt/excluded).4 Assuming it is regulated as Class I SaMD:
+Essential Principles: KGC must comply with the applicable Essential Principles outlined in Schedule 1 of the Therapeutic Goods (Medical Devices) Regulations 2002.3 These principles cover aspects like:
+Use not compromising health and safety (Principle 1).
+Design and construction conforming to safety principles (Principle 2).
+Suitability for intended purpose (Principle 3).
+Long-term safety (Principle 4).
+Transport and storage stability (Principle 5 - less relevant for pure software).
+Benefits outweighing risks (Principle 6).
+Chemical, physical, biological properties (Principle 7 - specific clauses related to software integrity, cybersecurity).
+Infection and microbial contamination (Principle 8 - less relevant for pure software unless interacting with hardware).
+Construction and environmental properties (Principle 9 - including IT environment, security, network compatibility).
+Devices with measuring function (Principle 10 - likely not applicable).
+Protection against radiation (Principle 11 - likely not applicable).
+Devices connected to energy source (Principle 12 - relevant for software reliability, electrical safety if hardware involved).
+Information provided with the device (Principle 13 - labeling, instructions for use (IFU)).
+Clinical evidence (Principle 14 - proportionate to risk; for Class I non-diagnostic, may involve usability testing, literature review, evidence of intended function).
+Documentation and Evidence:
+Essential Principles Checklist: The manufacturer (KGC organization) must document how the device complies with each applicable Essential Principle, providing supporting evidence.71 The TGA provides a template checklist.73
+Technical Documentation: Comprehensive technical documentation must be maintained, demonstrating safety and performance. This includes design specifications, architecture diagrams, risk management files, verification and validation testing results (including software validation), cybersecurity considerations, usability evaluations, and the IFU.4
+Declaration of Conformity: The manufacturer must prepare and sign a Declaration of Conformity, stating that the device complies with the applicable Essential Principles and regulatory requirements.71 The sponsor requires this for the ARTG application. Specific details required include manufacturer name/address (matching labeling), Class I classification, GMDN code, standards applied, and confirmation of QMS procedures.75
+Quality Management System (QMS): While a full TGA conformity assessment review of QMS documentation (like ISO 13485) is typical for higher-risk devices 3, Class I manufacturers still need appropriate QMS procedures in place covering design, development, risk management, testing, deployment, and post-market surveillance.75 This ensures consistent quality and safety.
+Australian Register of Therapeutic Goods (ARTG): KGC must be included in the ARTG before it can be lawfully supplied in Australia.3 This involves the Australian sponsor submitting an application, including the manufacturer's Declaration of Conformity. For self-certified Class I devices, Manufacturer's Evidence (ME) submission to TGA is not typically required upfront, but the DoC and technical documentation must be available.71
+Post-Market Surveillance: The manufacturer must have a system for monitoring the device's performance and safety after launch, including collecting user feedback, tracking issues, and reporting adverse events to the TGA as required.3
+5.C. Admin Oversight and System Health Monitoring
+Effective administrative oversight and system monitoring are crucial for maintaining security, compliance, and operational stability.
+Admin Dashboard: A dedicated administrative interface will be developed, accessible only to users with the Administrator role. This dashboard will provide:
+User Management: Ability to create, view, modify, and disable Doctor and Administrator accounts. Functionality to assist with patient account issues (e.g., password resets, MFA issues) following strict verification protocols.
+System Logs: Access to relevant application and system logs for troubleshooting and auditing purposes. Logs containing PII/SHI must have access restricted and be handled according to APP 11.
+Audit Trails: Comprehensive, immutable audit logs tracking significant actions performed by all users (especially Doctors and Admins) and system events (e.g., logins, data access, configuration changes).
+System Health Metrics: Display key performance indicators (KPIs) for platform health, such as server response times, database connection status, API error rates, and resource utilization (CPU, memory).
+Monitoring Infrastructure:
+AWS CloudWatch: Leverage CloudWatch for monitoring AWS resources (RDS, API Gateway, Lambda, EC2/ECS). This includes metrics, logs (CloudWatch Logs), and alarms.23
+Application Performance Monitoring (APM): Consider integrating an APM tool (e.g., Datadog, New Relic, or AWS X-Ray 23) for deeper insights into backend performance and tracing requests.
+Frontend Monitoring: Implement basic frontend error tracking and performance monitoring.
+Custom Logging: Implement structured logging within the Node.js backend and React frontend to capture relevant application events and errors, feeding into CloudWatch Logs or another centralized logging system. Ensure logs do not contain excessive sensitive information.
+Alerting: Configure alerts based on monitoring data to notify the administrative and technical teams of critical issues:
+System Errors: High API error rates, database failures, Lambda function timeouts.
+Security Events: Failed login spikes, potential unauthorized access attempts (leveraging Cognito advanced security features if enabled 38), critical alerts from AWS GuardDuty.23
+Performance Degradation: High latency, high resource utilization thresholds breached.
+Compliance Alerts: e.g., Audit log failures.
+This comprehensive monitoring and oversight capability is essential for proactive management, rapid incident response, and demonstrating ongoing compliance.
+6. Deployment and Go-Live Plan
+The transition to the new architecture and the introduction of KGC to users will follow a structured deployment and rollout plan.
+6.A. Phased Rollout Strategy (Initial 20 Doctors, 100 Patients)
+A controlled pilot phase is crucial to validate the platform in a real-world setting before a wider launch.
+Pilot Objectives:
+Test end-to-end functionality and stability of the migrated platform.
+Evaluate usability and gather feedback from both doctors and patients on the PWA interface, chatbot interaction, and overall workflow.
+Validate security measures and compliance adherence (APPs, SaMD requirements) in practice.
+Assess the effectiveness of support processes and documentation.
+Measure initial user engagement and identify any critical issues or required enhancements.
+Pilot Group: Target 20 doctors and approximately 100 patients (associated with those doctors) in Australia. Selection criteria should ensure a representative sample where possible.
+Onboarding and Training: Develop clear onboarding materials and provide training sessions (potentially virtual) for the pilot doctors and instructions for patients.
+Feedback Mechanisms: Implement multiple channels for feedback collection:
+In-app feedback forms or surveys.
+Direct interviews or focus group sessions with doctors and patients post-pilot.
+Dedicated support channel for pilot users.
+Monitoring and KPIs: Track key metrics during the pilot:
+System Uptime (Frontend and Backend).
+API Response Times and Error Rates.
+Active Users (Daily/Weekly).
+Chatbot Interaction Volume and Completion Rates.
+Number and Type of Support Tickets Raised.
+Qualitative Feedback Themes.
+Go/No-Go Criteria: Define clear criteria based on KPIs and feedback to decide whether the platform is ready for a broader rollout. This might include specific uptime targets, maximum critical bug counts, and positive usability ratings.
+Table 6.A.1: KGC Pilot Phase Timeline and Milestones (Illustrative)
+Week
+Key Activities
+Focus Areas
+Milestones
+KPIs to Track
+Pre-Pilot (Weeks -4 to -1)
+Finalize pilot build, Prepare infrastructure (Staging/Prod), Develop training materials, Recruit pilot users
+Technical readiness, User preparation
+Staging env validated, Training complete, Users confirmed
+N/A
+Week 1
+Pilot launch, User onboarding, Initial system monitoring
+Onboarding experience, System stability
+All pilot users onboarded, System stable
+Uptime, Login success rate, # Onboarding issues
+Weeks 2-3
+Active usage period, Intensive monitoring, Initial feedback collection (surveys)
+Core functionality, Usability, Performance
+Users actively using platform, Initial feedback received
+Active users, Feature usage, API performance, Survey responses
+Week 4
+Continued usage, Deeper feedback collection (interviews), Bug fixing
+User satisfaction, Issue identification
+Interviews conducted, Critical bugs addressed
+Qualitative feedback themes, # Open bugs, Support ticket volume
+Post-Pilot (Weeks 5-6)
+Data analysis, Feedback synthesis, Develop final report, Go/No-Go decision
+Pilot outcomes, Readiness assessment
+Pilot report finalized, Go/No-Go decision made
+Final KPI summary, Decision documented
+
+This phased approach minimizes risk, allows for iterative improvement based on real user feedback, and ensures the platform is robust and compliant before wider exposure.
+6.B. Continuous Integration/Continuous Deployment (CI/CD) Pipeline
+Automated CI/CD pipelines are essential for reliable, repeatable, and efficient deployment of updates to both the frontend and backend components of KGC.
+CI/CD Tool Selection: A platform like GitHub Actions, GitLab CI/CD, CircleCI 23, or AWS native tools (CodePipeline, CodeBuild, CodeDeploy 78) will be used. The choice depends on existing team familiarity and desired integration features. GitHub Actions is a strong candidate if GitHub is used for source control.
+Frontend Deployment Pipeline (React PWA to Crazy Domains):
+Trigger: On push/merge to main or release branch in GitHub.
+Source: Checkout code from GitHub repository.
+Build: Install Node.js, run npm install, run linters/formatters, execute unit tests (npm test), create production build (npm run build). Artifact: Static build files (build/ directory).
+Deploy: Securely transfer the contents of the build directory to the designated webroot on the Crazy Domains shared hosting server using SFTP or rsync.79
+Credentials: SFTP/SSH credentials (host, username, password/key) provided by Crazy Domains 81 must be stored securely as secrets within the CI/CD platform (e.g., GitHub Secrets).
+Tools: Use SFTP/rsync commands directly or utilize CI/CD platform plugins/actions (e.g., actions/upload-artifact followed by an SFTP/rsync action like SamKirkland/FTP-Deploy-Action or a custom script).
+Backend Deployment Pipeline (Node.js/Python to AWS):
+Trigger: On push/merge to main or release branch in GitHub.
+Source: Checkout code from GitHub repository.
+Infrastructure (IaC): Define all AWS resources (API Gateway, Lambda, RDS, Cognito, S3, IAM Roles, etc.) using Infrastructure as Code (IaC) – preferably AWS Cloud Development Kit (CDK) or CloudFormation.23 This ensures consistency and auditability. The pipeline can include a stage to deploy infrastructure changes using cdk deploy or CloudFormation updates. This is fundamental for maintaining a controlled and compliant AWS environment, avoiding manual configuration errors.
+Build: Install dependencies (Node.js/Python), transpile code if necessary, package application artifacts (e.g., Lambda deployment packages).
+Test: Run unit tests, integration tests against a staging database/environment.
+Deploy (Staging): Deploy application artifacts to a staging environment in AWS using AWS CodeDeploy, CDK, or CloudFormation updates.
+(Optional) Manual Approval: Gate deployment to production pending manual review/approval.
+Deploy (Production): Deploy application artifacts to the production environment in AWS.
+Managing Hybrid Deployments:
+Orchestration: The CI/CD tool must manage the sequence or parallel execution of frontend and backend pipelines. A common strategy is to have separate pipelines triggered independently or a master pipeline that orchestrates both.23
+Versioning: Implement consistent versioning for both frontend and backend to manage dependencies and ensure compatibility between API changes and PWA features.
+Rollback: Define automated or manual rollback procedures for both Crazy Domains (e.g., restoring previous file versions) and AWS (e.g., CodeDeploy rollbacks, CloudFormation stack rollback).
+Environment Configuration: Use environment-specific configuration files or CI/CD environment variables (managed securely) for different stages (dev, staging, prod).
+Table 6.B.1: KGC CI/CD Pipeline Stages (High-Level Example using GitHub Actions)
+Pipeline
+Stage
+Tools Used
+Key Actions
+Artifacts/Output
+Frontend (React PWA)
+Source
+GitHub Actions
+Checkout code
+Source code
+
+
+Build
+Node/npm, Jest
+Install deps, Lint, Test, Build (npm run build)
+Static files (build/)
+
+
+Deploy (Staging)
+SFTP/rsync Action, GitHub Secrets
+Upload build/ to Staging server
+Staging frontend updated
+
+
+Deploy (Prod)
+SFTP/rsync Action, GitHub Secrets
+Upload build/ to Prod server (keepgoingcare.com)
+Production frontend updated
+Backend (Node.js/AWS)
+Source
+GitHub Actions
+Checkout code
+Source code
+
+
+IaC Apply (if changed)
+AWS CDK/CloudFormation, AWS Credentials (OIDC)
+Deploy infrastructure changes
+Updated AWS resources
+
+
+Build
+Node/npm
+Install deps, Package Lambda code
+Lambda deployment package(s)
+
+
+Test
+Jest, Staging DB
+Run unit & integration tests
+Test results
+
+
+Deploy (Staging)
+AWS CodeDeploy/CDK, AWS Credentials (OIDC)
+Deploy Lambda package(s) to Staging env
+Staging backend updated
+
+
+Manual Approval (Prod)
+GitHub Actions
+Wait for manual approval
+Approval status
+
+
+Deploy (Prod)
+AWS CodeDeploy/CDK, AWS Credentials (OIDC)
+Deploy Lambda package(s) to Production env
+Production backend updated
+
+The security of CI/CD credentials (SFTP, AWS IAM roles/keys) is paramount. Using secure secret storage and adopting least privilege principles (e.g., OIDC for GitHub Actions to assume IAM roles in AWS 23) is critical to prevent unauthorized deployments or access. The hybrid nature necessitates careful coordination to ensure the frontend and backend are deployed in a compatible state.
+6.C. AWS Support and Ongoing Maintenance Plan
+Maintaining a reliable, secure, and performant platform requires ongoing support and maintenance, particularly for the AWS infrastructure.
+AWS Support Plan Selection:
+Given KGC is a SaMD handling sensitive data, with an initial rollout to real users and potentially a team with junior AWS skills, the AWS Business Support plan is strongly recommended.83
+Justification: While the Developer plan ($29/mo or 3% usage) offers email support during business hours, the Business plan ($100/mo minimum or tiered % usage 83) provides 24x7 access via phone, chat, and email, with significantly faster response times for critical issues (e.g., <1 hour for "Business-critical system down").83 This rapid access to AWS expertise is invaluable for resolving production incidents quickly, mitigating risks associated with downtime or security issues in a healthcare context. The cost represents a necessary investment in operational stability and risk management for a SaMD platform.84
+Access to support is via the AWS Support Center in the Management Console.83
+Incident Response and Disaster Recovery (DR):
+Shared Responsibility: It is crucial to understand the AWS Shared Responsibility Model.9 AWS secures the underlying cloud infrastructure ("security of the cloud"), but KGC is responsible for securing everything deployed in the cloud (data, applications, configurations, access management). Misunderstanding this division of responsibility can lead to significant security gaps.
+Incident Response Plan (IRP): Develop a formal IRP detailing procedures for handling security incidents (e.g., data breaches, unauthorized access), service outages, and data loss. This plan must align with the Notifiable Data Breaches (NDB) scheme under the Privacy Act.1 The plan should define roles, communication channels (internal and external), containment steps, eradication, recovery, and post-incident analysis.
+Disaster Recovery (DR):
+Backup: Implement automated backups for the AWS RDS PostgreSQL database (using RDS automated snapshots) and any critical data stored in S3. Define backup retention periods according to data policies.
+High Availability (HA): Design the AWS backend for HA by deploying critical components (e.g., RDS, EC2/ECS if used) across multiple Availability Zones (AZs) within the chosen AWS region (e.g., Sydney). Configure API Gateway and Load Balancers for cross-AZ failover.
+Recovery Testing: Regularly test DR procedures (e.g., restoring the database from a snapshot to a test environment, simulating an AZ failure). Untested DR plans are unreliable; regular testing builds confidence and identifies weaknesses, which is critical for a healthcare application where data availability is paramount.
+Regular Maintenance: Schedule and perform regular maintenance activities:
+Patching: Apply OS patches (if using EC2), database patches (RDS managed patching), and update application dependencies (Node.js, React, Python libraries) after thorough testing in staging.
+Security Reviews: Periodically review security configurations (IAM policies, security groups, Cognito settings, firewall rules). Conduct vulnerability scans and potentially penetration tests.
+Certificate Management: Monitor and renew SSL/TLS certificates (e.g., ACM managed renewal) before expiration.
+Dependency Updates: Regularly update third-party libraries and frameworks used in the frontend and backend to patch security vulnerabilities.
+Engaging AWS Partners (Optional):
+For a startup or small business potentially lacking deep AWS or compliance expertise, engaging an AWS Partner in Australia specializing in SaaS, healthcare, security, or compliance can provide significant value.86
+Partners like Cloud Assembly 87 or Itoc 88 offer services like architectural reviews, security assessments (e.g., APRA CPS 234 alignment 86), migration assistance, DevOps implementation, and managed services tailored for startups and regulated industries. This can accelerate deployment, ensure best practices are followed, and provide ongoing operational support.
+Table 6.C.1: KGC Incident Response Plan - Key Contacts and Actions (Template)
+Incident Type
+Severity Level
+Immediate Actions
+Key Personnel & Contact
+Communication Plan
+Data Breach (Potential SHI/PII)
+Critical
+1. Isolate affected system(s). <br> 2. Assemble Incident Response Team (IRT). <br> 3. Engage AWS Support (Business Plan). <br> 4. Preserve evidence (logs, snapshots). <br> 5. Begin assessment (scope, impact).
+IRT Lead: <br> Technical Lead: <br> Compliance Officer: <br> AWS Support: Via Console/Phone <br> Legal Advisor: [Contact Info]
+Internal: Secure channel update to stakeholders. <br> External: Assess NDB requirements (OAIC notification), Affected user notification (if required), Media statement (if necessary).
+Service Outage (API Gateway/Backend)
+High/Critical (depending on impact)
+1. Verify outage via monitoring tools. <br> 2. Check AWS Health Dashboard. <br> 3. Engage AWS Support. <br> 4. Investigate root cause (logs, metrics). <br> 5. Initiate recovery/failover procedures.
+Technical Lead: <br> Admin On-Call: <br> AWS Support: Via Console/Phone
+Internal: Status updates to team/support. <br> External: Status page update (if applicable), User communication if prolonged outage.
+Database Unavailability (RDS)
+Critical
+1. Verify via monitoring. <br> 2. Check AWS Health Dashboard/RDS Events. <br> 3. Engage AWS Support. <br> 4. Initiate RDS failover (if Multi-AZ). <br> 5. Consider Point-in-Time Recovery if failover fails or data corruption suspected.
+Technical Lead: <br> DBA (if applicable): <br> AWS Support: Via Console/Phone
+Internal: Status updates. <br> External: User communication if prolonged.
+Security Vulnerability Identified
+Medium/High
+1. Assess severity and exploitability. <br> 2. Plan remediation (patching, configuration change). <br> 3. Test fix in staging. <br> 4. Deploy fix via CI/CD pipeline. <br> 5. Verify fix.
+Security Team/Lead: <br> Technical Lead:
+Internal: Report vulnerability, track remediation.
+
+7. Conclusion and Recommendations
+This report details a strategic plan for enhancing the 'Keep Going Care' (KGC) SaMD platform by integrating robust authentication and data security measures, migrating it to a scalable hybrid cloud architecture, and ensuring compliance with Australian regulatory requirements. The successful execution of this plan is critical for establishing KGC as a trusted, secure, and effective tool for patients and doctors in Australia.
+Key Conclusions:
+Migration is Necessary: The current Replit environment is unsuitable for a production SaMD due to limitations in scalability, security, persistence, and compliance capabilities.5 Migration to the proposed hybrid architecture (Crazy Domains + AWS) is essential.
+Security and Privacy are Paramount: Handling sensitive health information necessitates a "privacy by design" approach, incorporating strong authentication (MFA, passwordless options), comprehensive encryption (at rest and in transit), granular access controls, secure offline data handling, and rigorous adherence to the Australian Privacy Principles.1
+Compliance is Multi-faceted: KGC must meet both APP requirements for data privacy and TGA regulations for Class I SaMD, including adherence to Essential Principles and maintaining appropriate documentation.1
+Robust Infrastructure and Operations are Key: Leveraging AWS for backend services provides scalability and security features, but requires careful configuration (IaC recommended 23), ongoing maintenance, proactive monitoring, and a well-defined incident response plan. The AWS Business Support plan is a crucial component for operational resilience.83
+Automation Enhances Reliability: Implementing CI/CD pipelines for both frontend and backend deployments will streamline releases, reduce manual errors, and ensure consistent application of configurations and security practices.23
+Recommendations:
+Prioritize Security Implementation: Implement all planned security measures (MFA, encryption, access controls, secure coding practices, PWA offline encryption) rigorously from the outset. Conduct thorough security testing, including vulnerability scanning and potentially penetration testing, before the pilot launch.
+Adopt Infrastructure as Code (IaC): Utilize AWS CDK or CloudFormation to define and manage all AWS infrastructure components. This is critical for consistency, auditability, and compliance.23
+Conduct a Comprehensive PIA: Perform a detailed Privacy Impact Assessment before migrating data or launching the pilot, addressing all data flows and processing activities to ensure APP compliance.42
+Validate SaMD Classification and Compliance: Formally document the intended use and confirm KGC's classification as Class I non-diagnostic SaMD with the TGA guidelines. Complete the Essential Principles checklist and prepare the Declaration of Conformity diligently.4
+Invest in AWS Business Support: Subscribe to the AWS Business Support plan to ensure timely access to expert technical assistance, mitigating risks associated with production incidents.83
+Execute a Controlled Pilot: Proceed with the planned phased rollout, focusing on gathering user feedback, validating technical stability, and confirming compliance in a real-world setting before considering a wider launch.
+Establish Strong Governance: Implement clear policies and procedures for data handling, security incident response, disaster recovery, and ongoing maintenance. Ensure staff are adequately trained on these procedures and their responsibilities under the APPs.2
+Consider AWS Partner Engagement: Evaluate engaging an experienced AWS partner in Australia, particularly for initial architecture validation, security hardening, and potentially ongoing support, given the team's current skill level.87
+By adhering to this comprehensive plan, KGC can successfully transition to a secure, compliant, and scalable platform, positioning it for a successful launch and future growth in the Australian healthcare market. Continuous monitoring, regular review of security posture and compliance adherence, and adaptation to evolving threats and regulations will be essential for long-term success.
+Works cited
+Australian Privacy Principles guidelines | OAIC, accessed on May 6, 2025, https://www.oaic.gov.au/privacy/australian-privacy-principles/australian-privacy-principles-guidelines
+Introduction to the Australian Privacy Principles : r/Feroot - Reddit, accessed on May 6, 2025, https://www.reddit.com/r/Feroot/comments/1jvez5s/introduction_to_the_australian_privacy_principles/
+Understanding TGA Regulations for Medical Devices in Australia - Arena Solutions, accessed on May 6, 2025, https://www.arenasolutions.com/resources/glossary/australia-medical-device-regulations/
+Understanding Australia's Regulatory Framework For SaMD - Med Device Online, accessed on May 6, 2025, https://www.meddeviceonline.com/doc/understanding-australia-s-regulatory-framework-for-samd-0001
+Replit to Production Services - Sourcetoad, accessed on May 6, 2025, https://sourcetoad.com/replit-to-production-help/
+Troubleshooting Common Deployment Issues - Replit Docs, accessed on May 6, 2025, https://docs.replit.com/cloud-services/deployments/troubleshooting
+Advice for downloading large (~25Gb) Repl? : r/replit - Reddit, accessed on May 6, 2025, https://www.reddit.com/r/replit/comments/1hv3155/advice_for_downloading_large_25gb_repl/
+Australia AWS Compliance Center - Financial Services for Cloud, accessed on May 6, 2025, https://aws.amazon.com/financial-services/security-compliance/compliance-center/au/
+Australia Data Privacy - Amazon Web Services (AWS), accessed on May 6, 2025, https://aws.amazon.com/compliance/australia-data-privacy/
+Security and compliance for Australian organizations - AWS Prescriptive Guidance, accessed on May 6, 2025, https://docs.aws.amazon.com/prescriptive-guidance/latest/essential-eight-maturity/australian-sec-compliance.html
+Is there a way to import Replit INTO GitHub? - Stack Overflow, accessed on May 6, 2025, https://stackoverflow.com/questions/75679103/is-there-a-way-to-import-replit-into-github
+hackermondev/replit-exporter: Simple tool to bulk download all repls from your Replit account - GitHub, accessed on May 6, 2025, https://github.com/hackermondev/replit-exporter
+FAQ - Replit Docs, accessed on May 6, 2025, https://docs.replit.com/faq
+Top GitHub Competitors & Alternatives 2025 | Gartner Peer Insights, accessed on May 6, 2025, https://www.gartner.com/reviews/market/devops-platforms/vendor/github/product/github/alternatives
+Top 5 GitHub Alternatives: Find the Right Development Platform - Assembla, accessed on May 6, 2025, https://get.assembla.com/blog/top-github-alternatives/
+The Top 10 GitHub Alternatives (2025) - WeAreDevelopers, accessed on May 6, 2025, https://www.wearedevelopers.com/magazine/top-github-alternatives
+Top 11 GitHub Alternatives for Hosting Projects | SPEC INDIA, accessed on May 6, 2025, https://www.spec-india.com/blog/github-alternatives
+Top 7 GitHub Alternatives You Should Know (2024), accessed on May 6, 2025, https://snappify.com/blog/best-github-alternatives
+About Git Large File Storage - GitHub Docs, accessed on May 6, 2025, https://docs.github.com/repositories/working-with-files/managing-large-files/about-git-large-file-storage
+Git Large File Storage (LFS) | GitLab Docs, accessed on May 6, 2025, https://docs.gitlab.com/topics/git/lfs/
+Git LFS Repositories - Sonatype Help, accessed on May 6, 2025, https://help.sonatype.com/en/git-lfs-repositories.html
+What is AWS CodeCommit? - AWS CodeCommit, accessed on May 6, 2025, https://docs.aws.amazon.com/codecommit/latest/userguide/welcome.html
+CI/CD with AWS: faster deployments, lower costs, and stronger ..., accessed on May 6, 2025, https://circleci.com/blog/ci-cd-with-aws/
+Adding MFA to a user pool - Amazon Cognito, accessed on May 6, 2025, https://docs.aws.amazon.com/cognito/latest/developerguide/user-pool-settings-mfa.html
+AWS Cognito Configuration - Ensuring Strong Security and Regulatory Compliance, accessed on May 6, 2025, https://moldstud.com/articles/p-aws-cognito-configuration-ensuring-strong-security-and-regulatory-compliance
+Essentials plan features - Amazon Cognito, accessed on May 6, 2025, https://docs.aws.amazon.com/cognito/latest/developerguide/feature-plans-features-essentials.html
+Passwords, account recovery, and password policies - Amazon Cognito, accessed on May 6, 2025, https://docs.aws.amazon.com/cognito/latest/developerguide/managing-users-passwords.html
+Australian Privacy Principles quick reference | OAIC, accessed on May 6, 2025, https://www.oaic.gov.au/privacy/australian-privacy-principles/australian-privacy-principles-quick-reference
+amazon-cognito-passwordless-auth/FIDO2.md at main · aws ..., accessed on May 6, 2025, https://github.com/aws-samples/amazon-cognito-passwordless-auth/blob/main/FIDO2.md
+Passwordless Authentication with Amazon Cognito - AWS, accessed on May 6, 2025, https://aws.amazon.com/awstv/watch/e6726250f68/
+Authentication flows - Amazon Cognito - AWS Documentation, accessed on May 6, 2025, https://docs.aws.amazon.com/cognito/latest/developerguide/amazon-cognito-user-pools-authentication-flow-methods.html
+aws-samples/amazon-cognito-passwordless-auth - GitHub, accessed on May 6, 2025, https://github.com/aws-samples/amazon-cognito-passwordless-auth
+How authentication works with Amazon Cognito, accessed on May 6, 2025, https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-how-to-authenticate.html
+PWA Security: Best Practices and Strategies for Developers, accessed on May 6, 2025, https://www.searchmyexpert.com/resources/progressive-web-app/security-aspects-progressive-web-app
+Securing Tokens In A Progressive Web App, accessed on May 6, 2025, https://www.mckennaconsultants.com/securing-tokens-in-a-progressive-web-app/
+aws-samples/step-up-auth: How to implement Step-up Authentication using Amazon Cognito - GitHub, accessed on May 6, 2025, https://github.com/aws-samples/step-up-auth
+Implement step-up authentication with Amazon Cognito, Part 1: Solution overview - AWS, accessed on May 6, 2025, https://aws.amazon.com/blogs/security/implement-step-up-authentication-with-amazon-cognito-part-1-solution-overview/
+How to use Amazon Cognito user pool advanced security features - YouTube, accessed on May 6, 2025, https://www.youtube.com/watch?v=yPfuDTkCSKs
+www.aits.uillinois.edu, accessed on May 6, 2025, https://www.aits.uillinois.edu/UserFiles/Servers/Server_474/File/UINBestPractices.pdf
+Unique Identification Number - Gepard PIM, accessed on May 6, 2025, https://gepard.io/glossary/what-is-uid
+unique identity (uid) system strategic plan 2021 to 2025, accessed on May 6, 2025, http://idu.gov.tl/wp-content/uploads/2021/08/Unique-ID-Strategy-Consolidated-Final_240521_-English1878.pdf
+Guide to data analytics and the Australian Privacy Principles | OAIC, accessed on May 6, 2025, https://www.oaic.gov.au/privacy/privacy-guidance-for-organisations-and-government-agencies/more-guidance/guide-to-data-analytics-and-the-australian-privacy-principles
+Introduction to the Australian Privacy Principles - Feroot Security, accessed on May 6, 2025, https://www.feroot.com/blog/australian-privacy-principles-app-introduction/
+PostgreSQL: What You Need to Know | Articles - NetLib Security, accessed on May 6, 2025, https://netlibsecurity.com/articles/postgresql-what-you-need-to-know/
+AES-256 in NodeJS | SSOJet, accessed on May 6, 2025, https://ssojet.com/encryption-decryption/aes-256-in-nodejs
+Encrypt and Decrypt Data in Node.js using aes-256-cbc - DEV Community, accessed on May 6, 2025, https://dev.to/jobizil/encrypt-and-decrypt-data-in-nodejs-using-aes-256-cbc-2l6d
+Encryption and Hashing | NestJS - A progressive Node.js framework, accessed on May 6, 2025, https://docs.nestjs.com/security/encryption-and-hashing
+Data Encryption by Application vs Data Encryption in Database - Information Security Stack Exchange, accessed on May 6, 2025, https://security.stackexchange.com/questions/213146/data-encryption-by-application-vs-data-encryption-in-database
+Databases vs. encryption - EDB, accessed on May 6, 2025, https://www.enterprisedb.com/blog/databases-vs-encryption
+how can i use aes-256 encrypt in postgrepsql? - Stack Overflow, accessed on May 6, 2025, https://stackoverflow.com/questions/65245444/how-can-i-use-aes-256-encrypt-in-postgrepsql
+AWS Route53: Building a Recognizable Backend Endpoint ..., accessed on May 6, 2025, https://www.serverlessguru.com/blog/aws-route53-building-a-easily-recognizable-endpoint-for-your-backend-application-using-route53-acm-api-gateway-custom-domain
+Adding a Custom Domain to AWS API Gateway - Ready, Set, Cloud!, accessed on May 6, 2025, https://www.readysetcloud.io/blog/allen.helton/adding-a-custom-domain-to-aws-api-gateway/
+Arjis2020/react-e2ee: A End-to-end encryption library for ... - GitHub, accessed on May 6, 2025, https://github.com/Arjis2020/react-e2ee
+8 best WebSocket libraries for Node - Ably Realtime, accessed on May 6, 2025, https://ably.com/blog/websocket-libraries-for-node
+WebSockets tutorial: How to go real-time with Node and React - LogRocket Blog, accessed on May 6, 2025, https://blog.logrocket.com/websocket-tutorial-real-time-node-react/
+What is Data Anonymization? A Practical Guide - K2view, accessed on May 6, 2025, https://www.k2view.com/what-is-data-anonymization/
+Data Anonymization: A Guide for Developers | Tonic.ai, accessed on May 6, 2025, https://www.tonic.ai/guides/data-anonymization-a-guide-for-developers
+Data Anonymization for Responsible Use of Sensitive Data - Snowflake, accessed on May 6, 2025, https://www.snowflake.com/trending/data-anonymization-sensitive-data/
+What is Data Anonymization | Pros, Cons & Common Techniques - Imperva, accessed on May 6, 2025, https://www.imperva.com/learn/data-security/anonymization/
+What is Data Anonymization? Techniques, Tools, and Best Practices Explained | DataCamp, accessed on May 6, 2025, https://www.datacamp.com/blog/what-is-data-anonymization
+Data Anonymisation: Essential Australian Compliance Guide - Sprintlaw, accessed on May 6, 2025, https://sprintlaw.com.au/articles/data-anonymisation-essential-australian-compliance-guide/
+SubtleCrypto: encrypt() method - Web APIs | MDN, accessed on May 6, 2025, https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto/encrypt
+SubtleCrypto - Web APIs - MDN Web Docs, accessed on May 6, 2025, https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto
+SubtleCrypto - Web APIs, accessed on May 6, 2025, https://udn.realityripple.com/docs/Web/API/SubtleCrypto
+Protecting User Data: Encryption and Secure Storage in Frontend - DEV Community, accessed on May 6, 2025, https://dev.to/outstandingvick/protecting-user-data-encryption-and-secure-storage-in-frontend-53ak
+Intro to Service Workers: Best Practices & Threat Mitigation - DEV Community, accessed on May 6, 2025, https://dev.to/austinwdigital/intro-to-service-workers-best-practices-threat-mitigation-59a3
+Best Practices for PWA Security - PixelFreeStudio Blog, accessed on May 6, 2025, https://blog.pixelfreestudio.com/best-practices-for-pwa-security/
+A Practical Guide to the Australian Privacy Principles - GDPR Local, accessed on May 6, 2025, https://gdprlocal.com/a-practical-guide-to-the-australian-privacy-principles/
+AWS strengthens ties with Australian Government in new cloud agreement, accessed on May 6, 2025, https://www.cloudcomputing-news.net/news/aws-strengthens-ties-with-australian-government-in-new-cloud-agreement/
+TGA Software Guidance: Regulations and Exclusions - MedEnvoy, accessed on May 6, 2025, https://medenvoyglobal.com/blog/tga-software-guidance-regulations-and-exclusions/
+Australia TGA Approval: Leveraging CE Certification and FDA Clearance - MedEnvoy, accessed on May 6, 2025, https://medenvoyglobal.com/australia-medical-device-approval-alternative-pathways/
+Complying with the Essential Principles on the safety and performance of medical devices, accessed on May 6, 2025, https://www.tga.gov.au/resources/guidance/complying-essential-principles-safety-and-performance-medical-devices
+Essential Principles checklist | Therapeutic Goods Administration ..., accessed on May 6, 2025, https://www.tga.gov.au/resources/resource/checklists/essential-principles-checklist
+Update on TGA Essential Principles Checklist - MedEnvoy, accessed on May 6, 2025, https://medenvoyglobal.com/blog/update-on-tga-essential-principles-checklist/
+Guidance for Declaration of Conformity for Class I non-sterile non ..., accessed on May 6, 2025, https://www.tga.gov.au/sites/default/files/guidance-declaration-conformity-class-i-non-sterile-non-measuring-and-class-1-vitro-diagnostic-ivd-medical-devices.pdf
+Completing a Declaration of Conformity for Class 1 medical devices, accessed on May 6, 2025, https://www.tga.gov.au/resources/guidance/completing-declaration-conformity-class-1-medical-devices
+Security best practices for Amazon Cognito user pools, accessed on May 6, 2025, https://docs.aws.amazon.com/cognito/latest/developerguide/user-pool-security-best-practices.html
+Set up a CI/CD pipeline by using AWS CodePipeline and AWS CDK - AWS Documentation, accessed on May 6, 2025, https://docs.aws.amazon.com/prescriptive-guidance/latest/patterns/set-up-a-ci-cd-pipeline-by-using-aws-codepipeline-and-aws-cdk.html
+Rsync : Synchronize local with shared hosting | Welcome to Abdul Malik Ikhsan's Blog, accessed on May 6, 2025, https://samsonasik.wordpress.com/2013/01/26/rsync-synchronize-local-with-shared-hosting/
+SFTP - CI/CD, Delivery, Deploy, DevOps with Buddy, accessed on May 6, 2025, https://buddy.works/actions/sftp
+Where Do I Find the Credentials to Connect to SFTP in WordPress Hosting? - CrazyDomains.com, accessed on May 6, 2025, https://www.crazydomains.com/help/article/where-do-i-find-the-credentials-to-connect-to-sftp-in-wordpress-hosting
+Benefits of IaC with CI/CD Pipelines - RapidScale, accessed on May 6, 2025, https://rapidscale.net/resources/blog/aws/benefits-of-infrastructure-as-code-iac-with-ci-cd-pipelines
+Pricing for AWS Support Plans | Starting at $29 Per Month | AWS ..., accessed on May 6, 2025, https://aws.amazon.com/premiumsupport/pricing/
+AWS Support Plans [FULL Comparison] - YouTube, accessed on May 6, 2025, https://www.youtube.com/watch?v=90hZLxthkXo
+Contact AWS Support by phone | AWS re:Post, accessed on May 6, 2025, https://repost.aws/knowledge-center/aws-phone-support
+Cevo Australia - Find an AWS Partner, accessed on May 6, 2025, https://partners.amazonaws.com/partners/001E000000NaBHiIAN/Cevo%20Australia
+Cloud Assembly - Find an AWS Partner, accessed on May 6, 2025, https://partners.amazonaws.com/partners/0018a00001kOXMdAAO/
+Itoc - Find an AWS Partner, accessed on May 6, 2025, https://partners.amazonaws.com/partners/001E000000Rp5FkIAJ/
+Top 50 AWS Partners in Australia - May 2025 | Ranking - SuperbCompanies, accessed on May 6, 2025, https://superbcompanies.com/categories/aws-partners-in-australia/
+Business Transformed | Australia & New Zealand - AWS, accessed on May 6, 2025, https://aws.amazon.com/awsishow/transform/aus/

@@ -1,0 +1,14 @@
+AVAILABLE FEATURES (ONLY RECOMMEND THESE):
+1. Home - Main dashboard with easy access buttons for chat, daily self-scores your “Keep Going” button
+2. Daily Self-Scores - Where you recording how you feel you are going on your healthy lifestyle journey, essential for communicating your progress with your doctor who modifies your Care Plan Directives that guide us between your consultations. Your daily self-scores earn you money to spend on healthy experiences such as gym, pilates, yoga and health spas, healthy dining experiences and more!
+3. Motivational Image Processing (MIP) - Upload and enhance your chosen motivational image, integrated with the "Keep Going" button
+4. Inspiration Machine D - Provides meal inspiration ideas aligned with your personal care plan CPDs and preferences
+5. Diet Logistics - Provides a link for grocery and prepared meals delivery options aligned with your personal care plan CPDs and preferences
+6. Inspiration Machine E&W - Provides exercise and wellness inspiration ideas aligned with your personal care plan CPDs, abilities and preferences
+7. E&W Support - Assists you to search for local gyms, personal trainers, yoga, and pilates studios to enhance your exercise and wellness experiences
+8. MBP Wiz - Finds best prices on medications via Chemist Warehouse with pharmacy location information
+9. Journaling - Record thoughts, track progress, and document health experiences. Can be useful for you and your doctor to discuss your medication compliance and adherence
+10. Progress Milestones - KGC achievement badges are awarded for maintaining consistent health scores over time. Check out this feature to understand how you can earn $100 and more for your Keep Going Care efforts
+11. Food Database - Provides nutritional information and food recommendations based on Food Standards Australia including the FoodSwitch label scanning app used to learn more about your food choices
+12. Chatbot - KGC AI assistant for answering questions and providing guidance
+13. Health Snapshots - Provides visual progress summaries and adherence tracking of your daily self-scores

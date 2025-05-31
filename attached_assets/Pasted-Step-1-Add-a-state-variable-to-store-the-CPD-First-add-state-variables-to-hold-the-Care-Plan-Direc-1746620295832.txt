@@ -1,0 +1,93 @@
+Step 1: Add a state variable to store the CPD
+First, add state variables to hold the Care Plan Directive content and a loading state:
+
+const [carePlanDirective, setCarePlanDirective] = useState<string>('');
+const [loadingCPD, setLoadingCPD] = useState<boolean>(true);
+Step 2: Create a useEffect hook to fetch the active CPD
+Add a useEffect hook that fetches the active Care Plan Directive for the user when the component mounts:
+
+// Fetch care plan directives on component mount
+useEffect(() => {
+  const fetchCarePlanDirectives = async () => {
+    try {
+      setLoadingCPD(true);
+      const response = await fetch(`/api/users/${userId}/care-plan-directives/active`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch care plan directives');
+      }
+      const data = await response.json();
+      // Find the diet directive
+      const dietDirective = data.find((directive: any) => 
+        directive.category.toLowerCase() === 'diet' || 
+        directive.category.toLowerCase() === 'nutrition' ||
+        directive.category.toLowerCase() === 'meal plan'
+      );
+      if (dietDirective) {
+        // Always display the doctor's exact Diet CPD text in the UI
+        setCarePlanDirective(dietDirective.directive);
+      } else {
+        setCarePlanDirective('Your doctor has not yet provided any Diet care plan directives. Please check back later.');
+      }
+    } catch (error) {
+      console.error('Error fetching care plan directives:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load care plan directives",
+        variant: "destructive"
+      });
+      setCarePlanDirective('Could not load Diet care plan directives. Please try again later.');
+    } finally {
+      setLoadingCPD(false);
+    }
+  };
+  fetchCarePlanDirectives();
+}, [userId, toast]);
+Step 3: Add a card component to display the CPD
+Add a card component to display the CPD with a loading state:
+
+{/* Doctor's CPD for Diet */}
+{loadingCPD ? (
+  <Card className="mb-6">
+    <CardContent className="p-4">
+      <div className="flex items-center">
+        <Loader2 className="h-5 w-5 animate-spin text-primary mr-2" />
+        <p>Loading doctor's recommendations...</p>
+      </div>
+    </CardContent>
+  </Card>
+) : (
+  <Card className="mb-6 border-l-4 border-l-primary">
+    <CardContent className="p-4">
+      <p className="text-sm font-medium text-muted-foreground mb-1">Doctor's recommendations:</p>
+      <p className="whitespace-pre-line">{carePlanDirective}</p>
+    </CardContent>
+  </Card>
+)}
+Step 4: Include the CPD in search params
+Optionally, include the CPD as context in your search parameters to make recipe search more personalized:
+
+// Handle search button click
+const handleSearch = () => {
+  // Build search parameters based on current selections
+  const searchParams = {
+    userId: userId,
+    query: searchQuery,
+    cuisine: selectedCuisine,
+    includedIngredients: selectedIngredients,
+    excludedIngredients: [], // Could be added as a feature
+    useCPD: true, // Flag to use Care Plan Directive as context
+    additionalContext: {
+      doctorCPD: carePlanDirective // Include doctor's exact CPD text
+    }
+  };
+  // Execute the search
+  recipeSearchMutation.mutate(searchParams);
+};
+Step 5: Update your API endpoint
+In your server routes, process this information to provide more relevant Diet content:
+
+if (req.body.useCPD && req.body.additionalContext?.doctorCPD) {
+  // Add CPD to the search context for the AI
+  prompt += `\nDoctor's Diet Recommendations: ${req.body.additionalContext.doctorCPD}\n\nPlease ensure recipes are compatible with the doctor's recommendations above.`;
+}
+These steps recreate the process used in the Inspiration Machine E&W. You can adapt these patterns to integrate doctor CPDs in the Inspiration Machine D component as well.

@@ -1,0 +1,296 @@
+import React, { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { UserPlus, Users, MessageCircle, ThumbsUp, Send, Bell } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { createHapticFeedback } from "@/lib/soundEffects";
+
+interface FriendProfile {
+  id: number;
+  name: string;
+  avatar?: string;
+  status: "online" | "offline";
+  lastActive?: string;
+  healthGoal: string;
+}
+
+interface SocialUpdate {
+  id: number;
+  userId: number;
+  userName: string;
+  userAvatar?: string;
+  content: string;
+  timestamp: Date;
+  likes: number;
+  comments: number;
+  hasLiked: boolean;
+}
+
+const SocialCheckins: React.FC = () => {
+  const [message, setMessage] = useState("");
+  
+  const friends: FriendProfile[] = [
+    {
+      id: 1,
+      name: "Sarah Johnson",
+      avatar: undefined,
+      status: "online",
+      healthGoal: "30-day Mediterranean diet challenge"
+    },
+    {
+      id: 2,
+      name: "Mike Chen",
+      avatar: undefined,
+      status: "offline",
+      lastActive: "3 hours ago",
+      healthGoal: "Running 5K three times a week"
+    },
+    {
+      id: 3,
+      name: "Lisa Rodriguez",
+      avatar: undefined,
+      status: "online",
+      healthGoal: "Maintaining blood pressure medication schedule"
+    },
+    {
+      id: 4,
+      name: "David Thompson",
+      avatar: undefined,
+      status: "offline",
+      lastActive: "Yesterday",
+      healthGoal: "Tracking daily hydration goals"
+    }
+  ];
+  
+  const updates: SocialUpdate[] = [
+    {
+      id: 1,
+      userId: 1,
+      userName: "Sarah Johnson",
+      userAvatar: undefined,
+      content: "Just completed day 15 of my Mediterranean diet challenge! Feeling great and energy levels are up. 💪 #HealthJourney",
+      timestamp: new Date(Date.now() - 3600000), // 1 hour ago
+      likes: 5,
+      comments: 2,
+      hasLiked: true
+    },
+    {
+      id: 2,
+      userId: 3,
+      userName: "Lisa Rodriguez",
+      userAvatar: undefined,
+      content: "Hit my step goal for the 7th day in a row! Who else is tracking their daily steps?",
+      timestamp: new Date(Date.now() - 7200000), // 2 hours ago
+      likes: 3,
+      comments: 1,
+      hasLiked: false
+    },
+    {
+      id: 3,
+      userId: 2,
+      userName: "Mike Chen",
+      userAvatar: undefined,
+      content: "Finally found a morning routine that works with my medication schedule. Consistency is key!",
+      timestamp: new Date(Date.now() - 86400000), // 1 day ago
+      likes: 8,
+      comments: 4,
+      hasLiked: false
+    }
+  ];
+  
+  const formatTime = (date: Date) => {
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+    
+    if (diffMins < 60) {
+      return `${diffMins} min ago`;
+    } else if (diffHours < 24) {
+      return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+    } else if (diffDays < 7) {
+      return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+    } else {
+      return date.toLocaleDateString();
+    }
+  };
+  
+  const handleSendMessage = () => {
+    if (!message.trim()) return;
+    
+    createHapticFeedback();
+    // In a real app, this would send a message
+    setMessage("");
+  };
+  
+  const toggleLike = (updateId: number) => {
+    createHapticFeedback();
+    // In a real app, this would toggle like status
+  };
+
+  return (
+    <div className="space-y-6">
+      <Card className="bg-[#fdfdfd] border-[#2E8BC0]/20">
+        <CardHeader>
+          <CardTitle className="text-[#676767] flex items-center">
+            <UserPlus className="w-6 h-6 text-[#2E8BC0] mr-2" />
+            <span>Social Check-ins</span>
+          </CardTitle>
+          <CardDescription className="text-[#a4a4a4]">
+            Connect with friends and support each other's health journeys
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Tabs defaultValue="feed" className="w-full">
+            <TabsList className="grid w-full grid-cols-3 mb-4">
+              <TabsTrigger value="feed" className="text-[#676767]">
+                <MessageCircle className="h-4 w-4 mr-2" />
+                Activity Feed
+              </TabsTrigger>
+              <TabsTrigger value="friends" className="text-[#676767]">
+                <Users className="h-4 w-4 mr-2" />
+                Friends
+              </TabsTrigger>
+              <TabsTrigger value="notifications" className="text-[#676767]">
+                <Bell className="h-4 w-4 mr-2" />
+                Notifications
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="feed" className="space-y-4">
+              {/* Post input */}
+              <Card className="border-[#2E8BC0]/20">
+                <CardContent className="p-4">
+                  <div className="flex gap-3">
+                    <Avatar>
+                      <AvatarFallback className="bg-[#2E8BC0] text-white">ME</AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1">
+                      <Input 
+                        placeholder="Share an update about your health journey..." 
+                        className="border-[#2E8BC0]/20 mb-2"
+                        value={message}
+                        onChange={(e) => setMessage(e.target.value)}
+                      />
+                      <Button 
+                        className="bg-[#2E8BC0] hover:bg-[#267cad]"
+                        onClick={handleSendMessage}
+                      >
+                        <Send className="h-4 w-4 mr-2" />
+                        Share Update
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              {/* Feed posts */}
+              {updates.map(update => (
+                <Card key={update.id} className="border-[#2E8BC0]/20">
+                  <CardContent className="p-4">
+                    <div className="flex gap-3">
+                      <Avatar>
+                        <AvatarFallback className="bg-[#2E8BC0] text-white">
+                          {update.userName.split(' ').map(n => n[0]).join('')}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1">
+                        <div className="flex justify-between items-center mb-1">
+                          <h3 className="font-medium text-[#676767]">{update.userName}</h3>
+                          <span className="text-sm text-[#a4a4a4]">{formatTime(update.timestamp)}</span>
+                        </div>
+                        <p className="text-[#676767] mb-3">{update.content}</p>
+                        <div className="flex gap-3">
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            className={cn(
+                              "text-[#676767]",
+                              update.hasLiked && "text-[#2E8BC0] font-medium"
+                            )}
+                            onClick={() => toggleLike(update.id)}
+                          >
+                            <ThumbsUp className={cn(
+                              "h-4 w-4 mr-1",
+                              update.hasLiked ? "fill-[#2E8BC0] text-[#2E8BC0]" : "text-[#676767]"
+                            )} />
+                            {update.likes}
+                          </Button>
+                          <Button variant="ghost" size="sm" className="text-[#676767]">
+                            <MessageCircle className="h-4 w-4 mr-1" />
+                            {update.comments}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </TabsContent>
+
+            <TabsContent value="friends" className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {friends.map(friend => (
+                  <Card key={friend.id} className="border-[#2E8BC0]/20">
+                    <CardContent className="p-4">
+                      <div className="flex items-start gap-3">
+                        <Avatar>
+                          <AvatarFallback className="bg-[#2E8BC0] text-white">
+                            {friend.name.split(' ').map(n => n[0]).join('')}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1">
+                          <div className="flex justify-between items-center mb-1">
+                            <h3 className="font-medium text-[#676767]">{friend.name}</h3>
+                            <Badge className={friend.status === 'online' ? 'bg-green-500' : 'bg-[#a4a4a4]'}>
+                              {friend.status === 'online' ? 'Online' : 'Offline'}
+                            </Badge>
+                          </div>
+                          {friend.status === 'offline' && friend.lastActive && (
+                            <p className="text-xs text-[#a4a4a4] mb-1">Last active: {friend.lastActive}</p>
+                          )}
+                          <p className="text-sm text-[#676767] mb-2">
+                            <span className="font-medium">Goal:</span> {friend.healthGoal}
+                          </p>
+                          <div className="flex gap-2">
+                            <Button size="sm" className="bg-[#2E8BC0] hover:bg-[#267cad]">
+                              <MessageCircle className="h-4 w-4 mr-1" />
+                              Message
+                            </Button>
+                            <Button size="sm" variant="outline" className="border-[#2E8BC0]/20 text-[#2E8BC0]">
+                              <Bell className="h-4 w-4 mr-1" />
+                              Check In
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="notifications">
+              <Card className="border-[#2E8BC0]/20">
+                <CardContent className="p-4 text-center py-8">
+                  <Bell className="h-12 w-12 mx-auto text-[#2E8BC0] mb-3" />
+                  <h3 className="text-lg font-medium text-[#676767] mb-2">All Caught Up!</h3>
+                  <p className="text-[#a4a4a4] max-w-md mx-auto">
+                    You have no new notifications. Check back later for updates from your friends and health journey milestones.
+                  </p>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+export default SocialCheckins;
