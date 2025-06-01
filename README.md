@@ -40,6 +40,14 @@ Keep Going Care is a **Class I Software as a Medical Device (SaMD)** designed fo
 - **Session timeouts** (5 min doctors, 30 min patients)
 - **Emergency monitoring** with safety keyword detection
 
+## 📚 Documentation
+
+Comprehensive documentation is available in the `/docs` folder:
+
+- **[Architecture](docs/architecture/)** - System design and technical specifications
+- **[Deployment](docs/deployment/)** - AWS and production deployment guides  
+- **[Development](docs/development/)** - Contributing guidelines and development processes
+
 ## 🚀 Technology Stack
 
 ### Frontend
