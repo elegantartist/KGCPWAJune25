@@ -1686,7 +1686,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return true;
           });
           
-          console.log(`Filtered from ${analyses.length} to ${filteredAnalyses.length} videos based on dietary preferences and allergies`);
+
           
           // Sort by health score (if available) to prioritize healthier options
           filteredAnalyses.sort((a: RecipeSearchResult & { nutritionalAnalysis?: any }, b: RecipeSearchResult & { nutritionalAnalysis?: any }) => {
@@ -4567,7 +4567,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/sync", async (req, res) => {
     try {
       // Log the sync request
-      console.log('[Connectivity] Processing sync request');
+
       
       // Return success response
       res.status(200).json({
@@ -4894,7 +4894,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Log the message to the console for now
       // In production, we would store these logs in the database
-      console.log(`[SW Log][${type}][${timestamp}] ${message}`);
+
       
       // For integration with the Supervisor Agent, you could:
       // 1. Store logs in the database
@@ -4905,7 +4905,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (type === 'error') {
         // If this is an error, we could notify the Supervisor Agent
         // This would integrate with the MCP system
-        console.log('[Supervisor Agent] Received error from service worker, evaluating response...');
+
       }
       
       res.status(200).json({ received: true });
@@ -5754,11 +5754,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Test SMS sending endpoint (admin only)
   app.post("/api/admin/test-sms", async (req, res) => {
     try {
-      console.log("=== SMS TEST STARTED ===");
-      console.log("Environment check:");
-      console.log("TWILIO_ACCOUNT_SID:", process.env.TWILIO_ACCOUNT_SID ? 'Set' : 'Missing');
-      console.log("TWILIO_AUTH_TOKEN:", process.env.TWILIO_AUTH_TOKEN ? 'Set' : 'Missing');
-      console.log("TWILIO_PHONE_NUMBER:", process.env.TWILIO_PHONE_NUMBER ? process.env.TWILIO_PHONE_NUMBER : 'Missing');
+
       
       const { SMSService } = await import('./services/smsService.js');
       
@@ -5766,7 +5762,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const testPhoneNumber = '0433509441';
       const testCode = Math.floor(100000 + Math.random() * 900000).toString();
       
-      console.log(`Testing SMS to ${testPhoneNumber} with verification code: ${testCode}`);
+
       
       const result = await SMSService.sendVerificationCode(
         testPhoneNumber,
