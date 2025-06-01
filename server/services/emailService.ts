@@ -115,6 +115,6 @@ Anthrocyt AI Pty Ltd | Australia`;
     from: 'welcome@keepgoingcare.com',
     subject,
     text: content,
-    html: emailService['convertToHtml'](content)
+    html: emailService['convertToHtml'](content) as string
   });
 }

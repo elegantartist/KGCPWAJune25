@@ -2976,72 +2976,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // SMS verification now handled through active doctor/patient login endpoints
 
   // All legacy doctor setup endpoints removed - authentication now uses SMS verification in login flow
-          setupCompleted: true 
-        }
-      });
-
-      return res.json({
-        success: true,
-        message: "Doctor setup completed successfully",
-        doctor: {
-          id: updatedDoctor.id,
-          name: updatedDoctor.name,
-          email: updatedDoctor.email,
-          username: updatedDoctor.username
-        }
-      });
-    } catch (error) {
-      console.error("Setup completion error:", error);
-      return res.status(500).json({ success: false, error: "Server error" });
-    }
-  });
-
-  // Resend welcome email with updated template
-  app.post("/api/doctor-auth/resend-welcome", async (req, res) => {
-    try {
-      const { email, doctorName } = req.body;
-      
-      if (!email || !doctorName) {
-        return res.status(400).json({ success: false, error: "Email and doctor name required" });
-      }
-
-      // Get existing doctor
-      const doctor = await db
-        .select()
-        .from(users)
-        .where(eq(users.email, email));
-
-      if (doctor.length === 0) {
-        return res.status(404).json({ success: false, error: "Doctor not found" });
-      }
-
-      // Generate new setup token
-      const DoctorAuthService = (await import('./services/doctorAuthService')).DoctorAuthService;
-      const setupToken = DoctorAuthService.generateAccessToken(doctor[0].id, doctor[0].email, doctor[0].phoneNumber || '');
-      
-      console.log(`Generated new setup token for doctor ${doctor[0].id} (${email})`);
-
-      // Send updated welcome email
-      const emailResult = await DoctorAuthService.sendWelcomeEmail(email, doctorName, setupToken);
-
-      if (emailResult.success) {
-        console.log(`Updated welcome email sent successfully to ${email}`);
-        return res.json({ 
-          success: true, 
-          message: "Updated welcome email sent successfully"
-        });
-      } else {
-        console.error(`Failed to send updated email to ${email}:`, emailResult.message);
-        return res.status(500).json({ 
-          success: false, 
-          error: emailResult.message || "Failed to send email"
-        });
-      }
-    } catch (error) {
-      console.error("Resend welcome email error:", error);
-      return res.status(500).json({ success: false, error: "Server error" });
-    }
-  });
   
   // Add patient
   app.post("/api/admin/patients", async (req, res) => {
@@ -4093,8 +4027,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  const httpServer = createServer(app);
-  const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
+  // WebSocket server setup will be added at the end
   
   wss.on('connection', (ws) => {
     console.log('WebSocket client connected');
