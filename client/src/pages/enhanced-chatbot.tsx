@@ -184,7 +184,7 @@ const EnhancedChatbot: React.FC = () => {
   // Get a random response for the current connectivity level
   const getConnectivityLevelResponse = (): string => {
     const level = isOffline ? ConnectivityLevel.OFFLINE : ConnectivityLevel.FULL;
-    const responses = MOCK_RESPONSES[level] || MOCK_RESPONSES[ConnectivityLevel.FULL];
+    const responses = CONNECTIVITY_RESPONSES[level] || CONNECTIVITY_RESPONSES[ConnectivityLevel.FULL];
     return responses[Math.floor(Math.random() * responses.length)];
   };
   

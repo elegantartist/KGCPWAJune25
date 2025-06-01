@@ -115,30 +115,10 @@ export class MemStorage implements IStorage {
     this.favoriteCurrentId = 1;
     this.interactionCurrentId = 1;
     
-    // Add a default user and some health metrics for demo purposes
-    const defaultUser: User = {
-      id: this.userCurrentId++,
-      name: "Bill Smith",
-      email: "bill.smith@keepgoingcare.com",
-      joinedDate: new Date("2025-03-22T11:43:27"),
-      username: "billsmith",
-      password: "password123"
-    };
-    this.users.set(defaultUser.id, defaultUser);
+    // Note: MemStorage is for testing only - production uses DatabaseStorage
+    // No default users created in memory storage
     
-    // Create some sample health metrics
-    const dates = [
-      new Date("2025-03-23"),
-      new Date("2025-03-27"),
-      new Date("2025-03-31")
-    ];
-    
-    // Create metrics for each date (newest to oldest)
-    const metrics: InsertHealthMetric[] = [
-      { userId: defaultUser.id, medicationScore: 7, dietScore: 7.2, exerciseScore: 6.1 },
-      { userId: defaultUser.id, medicationScore: 5.2, dietScore: 5.1, exerciseScore: 5.5 },
-      { userId: defaultUser.id, medicationScore: 5, dietScore: 5, exerciseScore: 5 }
-    ];
+    // Memory storage does not pre-populate test data in production
     
     metrics.forEach((metric, index) => {
       const healthMetric: HealthMetric = {
