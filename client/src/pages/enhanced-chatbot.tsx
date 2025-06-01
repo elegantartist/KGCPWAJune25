@@ -10,7 +10,7 @@ import { ConnectivityBanner } from "@/components/ui/connectivity-banner";
 import { useConnectivity } from "@/hooks/useConnectivity";
 
 // Sample response templates for different connectivity levels
-const MOCK_RESPONSES = {
+const CONNECTIVITY_RESPONSES = {
   [ConnectivityLevel.OFFLINE]: [
     "I'm currently in offline mode, but I can still help with basic information. Remember to track your health scores daily for better insights when you're back online.",
     "I'm working in offline mode right now. I can provide general health advice based on previously cached information.",

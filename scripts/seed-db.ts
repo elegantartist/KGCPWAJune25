@@ -38,22 +38,11 @@ async function main() {
       .from(users)
       .where(eq(users.email, 'admin@keepgoingcare.com'));
 
-    // Create admin user if it doesn't exist
+    // Admin users should be created through proper admin onboarding process
     if (!adminUser) {
-      console.log('Creating admin user...');
-      await db.insert(users).values({
-        name: 'Admin User',
-        email: 'admin@keepgoingcare.com',
-        roleId: 1, // Admin role
-        username: 'admin',
-        password: 'adminpassword', // This should be hashed in a real scenario
-        uin: 'ADM-1000000',
-        isActive: true,
-        joinedDate: new Date()
-      });
-      console.log('Admin user created successfully');
+      console.log('No admin user found. Admin users should be created through the proper admin onboarding process.');
     } else {
-      console.log('Admin user already exists, skipping creation');
+      console.log('Admin user exists');
     }
 
     // Check if default doctor exists
@@ -62,23 +51,11 @@ async function main() {
       .from(users)
       .where(eq(users.email, 'doctor@keepgoingcare.com'));
 
-    // Create default doctor if it doesn't exist
+    // Doctors should be added through proper doctor onboarding process
     if (!defaultDoctor) {
-      console.log('Creating default doctor...');
-      const [doctor] = await db.insert(users).values({
-        name: 'Dr. John Smith',
-        email: 'doctor@keepgoingcare.com',
-        roleId: 2, // Doctor role
-        username: 'drsmith',
-        password: 'doctorpassword', // This should be hashed in a real scenario
-        uin: 'DOC-2000000',
-        phoneNumber: '+61412345678',
-        isActive: true,
-        joinedDate: new Date()
-      }).returning();
-      console.log('Default doctor created successfully');
+      console.log('No default doctor found. Doctors should be added through the proper doctor onboarding process.');
     } else {
-      console.log('Default doctor already exists, skipping creation');
+      console.log('Default doctor exists');
     }
 
     // Check if default patient exists

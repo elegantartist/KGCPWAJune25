@@ -1328,7 +1328,7 @@ export default function AdminDashboard() {
                               uin: patient.uin,
                               email: patient.email,
                               isActive: patient.isActive,
-                              isAdminTesting: true // Add flag that this is admin testing the patient view
+                              // Admin viewing patient dashboard for testing purposes
                             };
                             // Clear session storage data that might be persisted
                             sessionStorage.clear();
