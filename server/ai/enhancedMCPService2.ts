@@ -1,5 +1,4 @@
-/**
- * Enhanced MCP Service with Privacy Protection and Multi-AI Evaluation
+a * Enhanced MCP Service with Privacy Protection and Multi-AI Evaluation
  * 
  * This service implements the Memory-Context-Planning architecture with:
  * 1. Robust privacy protection via the Privacy Protection Agent
