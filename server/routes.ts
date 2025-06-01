@@ -5746,64 +5746,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ============================================================================
-  // SMS TESTING ENDPOINT (Admin Only)
-  // Test SMS functionality with Twilio integration
-  // ============================================================================
 
-  // Test SMS sending endpoint (admin only)
-  app.post("/api/admin/test-sms", async (req, res) => {
-    try {
-
-      
-      const { SMSService } = await import('./services/smsService.js');
-      
-      // Test sending to admin phone number
-      const testPhoneNumber = '0433509441';
-      const testCode = Math.floor(100000 + Math.random() * 900000).toString();
-      
-
-      
-      const result = await SMSService.sendVerificationCode(
-        testPhoneNumber,
-        testCode,
-        'Admin Test'
-      );
-      
-      console.log("SMS Result:", result);
-      
-      if (result.success) {
-        console.log("✅ SMS test successful!");
-        res.json({
-          success: true,
-          message: `SMS test successful! Verification code ${testCode} sent to ${testPhoneNumber}`,
-          messageId: result.messageId
-        });
-      } else {
-        console.log("❌ SMS test failed:", result.error);
-        res.status(500).json({
-          success: false,
-          message: 'SMS test failed',
-          error: result.error
-        });
-      }
-      
-    } catch (error) {
-      console.error("❌ SMS test error:", error);
-      console.error("Error details:", {
-        message: error.message,
-        code: error.code,
-        status: error.status,
-        moreInfo: error.moreInfo
-      });
-      res.status(500).json({
-        success: false,
-        message: "Failed to test SMS service",
-        error: error.message,
-        details: error.code || 'Unknown error'
-      });
-    }
-  });
 
 
 

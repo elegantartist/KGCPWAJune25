@@ -645,62 +645,6 @@ export default function AdminDashboard() {
             </Card>
           </div>
 
-          {/* SMS Testing Section */}
-          <Card className="mb-4">
-            <CardHeader>
-              <CardTitle className="text-[#2E8BC0] flex items-center">
-                <MessageSquare className="h-5 w-5 mr-2" />
-                SMS Service Testing
-              </CardTitle>
-              <CardDescription>
-                Test Twilio SMS integration with verification code to admin phone (0433509441)
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center space-x-4">
-                <Button
-                  onClick={async () => {
-                    try {
-                      const response = await fetch('/api/admin/test-sms', {
-                        method: 'POST',
-                        headers: {
-                          'Content-Type': 'application/json',
-                        },
-                      }).then(res => res.json());
-                      
-                      if (response.success) {
-                        toast({
-                          title: "SMS Test Successful! 📱",
-                          description: `Verification code sent to 0433509441. Message ID: ${response.messageId}`,
-                        });
-                      } else {
-                        toast({
-                          title: "SMS Test Failed",
-                          description: response.error || "Unknown error occurred",
-                          variant: "destructive",
-                        });
-                      }
-                    } catch (error) {
-                      toast({
-                        title: "SMS Test Error",
-                        description: "Failed to send test SMS. Check console for details.",
-                        variant: "destructive",
-                      });
-                      console.error('SMS test error:', error);
-                    }
-                  }}
-                  className="bg-[#2E8BC0] hover:bg-[#2E8BC0]/90"
-                >
-                  <MessageSquare className="h-4 w-4 mr-2" />
-                  Send Test SMS
-                </Button>
-                <div className="text-sm text-gray-600">
-                  This will send a verification code to the admin phone number for testing
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Card>
               <CardHeader>
