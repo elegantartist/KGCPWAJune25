@@ -79,3 +79,42 @@ export class EmailService {
 }
 
 export const emailService = new EmailService();
+
+export async function sendDoctorWelcomeEmail(email: string, name: string): Promise<{ success: boolean; message?: string }> {
+  const subject = 'Welcome to Keep Going Care - Doctor Portal Access';
+  
+  const content = `Dear Dr ${name},
+
+Welcome to Keep Going Care, your comprehensive digital healthcare platform.
+
+Your doctor account has been successfully created. You can now access the KGC platform to manage your patients and their care plans.
+
+**Getting Started:**
+• Access your dashboard to view and manage patients
+• Use SMS verification for secure login
+• Review patient progress and care plan directives
+• Utilise our AI-powered health assistant for patient support
+
+**Platform Features:**
+• Secure patient management
+• Real-time health tracking
+• AI-powered care recommendations
+• Comprehensive reporting tools
+
+If you have any questions or need assistance, our support team is available to help.
+
+Best regards,
+The Keep Going Care Team
+
+---
+Keep Going Care - Class I Software as Medical Device (SaMD)
+Anthrocyt AI Pty Ltd | Australia`;
+
+  return await emailService.sendEmail({
+    to: email,
+    from: 'welcome@keepgoingcare.com',
+    subject,
+    text: content,
+    html: emailService['convertToHtml'](content)
+  });
+}

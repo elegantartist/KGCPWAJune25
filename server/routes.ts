@@ -2870,8 +2870,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Add doctor with secure token-based authentication
   app.post("/api/admin/doctors", async (req, res) => {
     try {
-      // Import authentication services
-      const { generateDoctorSetupToken } = await import('./services/authTokenService');
+      // Import email service
       const { sendDoctorWelcomeEmail } = await import('./services/emailService');
       
       // Validate input data - only name, email, phoneNumber required
@@ -2910,8 +2909,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
         .returning();
       
-      // Generate secure setup token
-      const setupToken = generateDoctorSetupToken(doctor.id, doctor.email, doctor.phoneNumber || '');
+      // Setup token is now handled by SMS verification during doctor onboarding
       
       // Log admin activity
       await db.insert(adminActivityLog).values({
@@ -2922,19 +2920,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         details: { 
           doctorName: doctor.name, 
           doctorEmail: doctor.email,
-          setupTokenGenerated: true
+          setupMethod: 'sms_verification'
         }
       });
 
-      // Send secure welcome email with setup link using DoctorAuthService
+      // Send welcome email to doctor
       let emailResult = { success: false, error: 'Email not attempted' };
       try {
-        const { DoctorAuthService } = await import('./services/doctorAuthService');
-        const emailSent = await DoctorAuthService.sendWelcomeEmail(doctor.email, doctor.name, setupToken);
+        const emailSent = await sendDoctorWelcomeEmail(doctor.email, doctor.name);
         
         if (emailSent.success) {
           emailResult = { success: true, error: '' };
-          console.log(`Secure welcome email sent successfully to ${doctor.email}`);
+          console.log(`Welcome email sent successfully to ${doctor.email}`);
         } else {
           emailResult = { 
             success: false, 
@@ -2974,97 +2971,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Doctor Setup Authentication Endpoints
+  // Legacy authentication endpoints removed - now using SMS-based authentication
 
-  // Validate setup token endpoint
-  app.post("/api/doctor-setup/validate-token", async (req, res) => {
-    try {
-      const { token } = req.body;
-      
-      if (!token) {
-        return res.status(400).json({ valid: false, error: "Token is required" });
-      }
-
-      const { validateSetupToken } = await import('./services/authTokenService');
-      const validation = validateSetupToken(token);
-      
-      if (!validation.valid) {
-        return res.status(400).json({ 
-          valid: false, 
-          error: validation.error || "Invalid or expired token" 
-        });
-      }
-
-      // Get doctor information
-      const doctor = await db
-        .select()
-        .from(users)
-        .where(eq(users.id, validation.payload!.doctorId));
-
-      if (doctor.length === 0) {
-        return res.status(404).json({ valid: false, error: "Doctor not found" });
-      }
-
-      return res.json({
-        valid: true,
-        doctor: {
-          id: doctor[0].id,
-          name: doctor[0].name,
-          email: doctor[0].email,
-          phoneNumber: doctor[0].phoneNumber
-        }
-      });
-    } catch (error) {
-      console.error("Token validation error:", error);
-      return res.status(500).json({ valid: false, error: "Server error" });
-    }
-  });
-
-  // Send SMS verification code
-  app.post("/api/doctor-setup/send-verification", async (req, res) => {
-    try {
-      const { token } = req.body;
-      
-      const { validateSetupToken, generateVerificationCode } = await import('./services/authTokenService');
-      const SMSService = await import('./services/smsService');
-      
-      const validation = validateSetupToken(token);
-      if (!validation.valid) {
-        return res.status(400).json({ success: false, error: "Invalid token" });
-      }
-
-      const doctor = await db
-        .select()
-        .from(users)
-        .where(eq(users.id, validation.payload!.doctorId));
-
-      if (doctor.length === 0) {
-        return res.status(404).json({ success: false, error: "Doctor not found" });
-      }
-
-      if (!doctor[0].phoneNumber) {
-        return res.status(400).json({ success: false, error: "No phone number on file" });
-      }
-
-      // Generate verification code
-      const verificationCode = generateVerificationCode(doctor[0].id, doctor[0].phoneNumber);
-      
-      // Send SMS
-      const smsResult = await SMSService.SMSService.sendVerificationCode(
-        doctor[0].phoneNumber,
-        verificationCode,
-        doctor[0].name
-      );
-
-      return res.json({
-        success: smsResult.success,
-        error: smsResult.error
-      });
-    } catch (error) {
-      console.error("SMS verification error:", error);
-      return res.status(500).json({ success: false, error: "Server error" });
-    }
-  });
+  // SMS verification now handled through active doctor/patient login endpoints
 
   // Verify SMS code
   app.post("/api/doctor-setup/verify-code", async (req, res) => {
