@@ -4027,7 +4027,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // WebSocket server setup will be added at the end
+  // Create HTTP server and add WebSocket support
+  const httpServer = createServer(app);
+  const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
   
   wss.on('connection', (ws) => {
     console.log('WebSocket client connected');
