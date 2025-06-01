@@ -1142,20 +1142,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         maxCookingTime: req.body.maxCookingTime ? parseInt(req.body.maxCookingTime) : undefined
       };
       
-      console.log('Processing recipe search with filters:', JSON.stringify(filters));
+
       
       // Search for recipes
       const recipeResults = await searchRecipes(filters);
       
       if (!recipeResults || !recipeResults.results || recipeResults.results.length === 0) {
-        console.log('No recipes found for query:', recipeResults?.query || 'unknown');
+
         return res.status(404).json({ 
           message: "No recipes found matching your criteria. Try broadening your search.",
           query: recipeResults?.query || 'unknown'
         });
       }
       
-      console.log(`Found ${recipeResults.results.length} recipes for query: ${recipeResults.query}`);
+
       
       // Return basic results without analysis to speed up initial response
       return res.json({ 
@@ -1417,12 +1417,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let doctorCPD = '';
       if (req.body.additionalContext && req.body.additionalContext.doctorCPD) {
         doctorCPD = req.body.additionalContext.doctorCPD;
-        console.log(`Using client-provided Care Plan Directive: ${doctorCPD.substring(0, 50)}...`);
+
       }
       
       try {
         const directives = await storage.getActiveCarePlanDirectives(userId);
-        console.log(`Found ${directives.length} active CPDs for user ${userId}`);
+
         
         // Extract dietary instructions from directives
         const dietCPDs = directives.filter(cpd => 
@@ -1511,8 +1511,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
         }
-        console.log('Extracted CPD dietary terms:', cpdDietaryTerms);
-        console.log('Detected user allergies:', userAllergies);
+
       } catch (error) {
         console.warn('Error getting CPDs for video search:', error);
         // Continue without CPDs if there was an error
@@ -1546,7 +1545,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         useCPDs: true // Flag to indicate CPDs should be considered in search
       };
       
-      console.log('Final video search filters:', JSON.stringify(filters));
+
       
       // Search for cooking videos
       const videoResults = await searchCookingVideos(filters);
@@ -1562,7 +1561,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (process.env.OPENAI_API_KEY) {
         try {
-          console.log("Attempting to enhance recipes with OpenAI analysis");
+
           
           // Get first 5 results to analyze with OpenAI (to avoid too many API calls)
           const resultsToAnalyze = videoResults.videos.slice(0, 5);
