@@ -6072,7 +6072,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const [patient] = await db
         .select()
         .from(users)
-        .where(and(eq(users.email, email), eq(users.roleId, 1)));
+        .where(and(eq(users.email, email), eq(users.roleId, 3)));
       
       if (!patient) {
         return res.status(404).json({ message: "Patient not found" });
@@ -6090,34 +6090,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid verification code" });
       }
       
-      // Code is valid - clean up
+      // Code is valid - clean up and update last login
       await VerificationCodeStorageService.deleteCode(patient.id, email, 'sms');
-
-      // Find patient
-      const patient = await db
-        .select()
-        .from(users)
-        .where(and(eq(users.email, email), eq(users.roleId, 3)))
-        .limit(1);
-
-      if (patient.length === 0) {
-        return res.status(404).json({ message: "Patient not found" });
-      }
-
-      // Update last login
+      
       await db
         .update(users)
         .set({ lastLogin: new Date() })
-        .where(eq(users.id, patient[0].id));
-
-      // Clean up verification code
-      patientSmsVerificationCodes.delete(email);
+        .where(eq(users.id, patient.id));
 
       // Set session with timeout tracking
       if (!req.session) {
         req.session = {};
       }
-      req.session.patientId = patient[0].id;
+      req.session.patientId = patient.id;
       req.session.userRole = 'patient';
       req.session.lastActivity = Date.now();
 
@@ -6125,9 +6110,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         success: true, 
         message: "Login successful",
         patient: {
-          id: patient[0].id,
-          name: patient[0].name,
-          email: patient[0].email
+          id: patient.id,
+          name: patient.name,
+          email: patient.email
         }
       });
       
@@ -6249,41 +6234,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Complete account setup
+  // Complete account setup (passwordless)
   app.post("/api/doctor/setup/complete", async (req, res) => {
     try {
-      const { token, password } = req.body;
+      const { token } = req.body;
       
-      if (!token || !password) {
-        return res.status(400).json({ message: "Token and password are required" });
+      if (!token) {
+        return res.status(400).json({ message: "Setup token is required" });
       }
       
-      const tokenData = DoctorAuthService.verifyAccessToken(token);
+      const { validateSetupToken } = await import('./services/authTokenService');
+      const tokenValidation = await validateSetupToken(token);
       
-      if (!tokenData) {
-        return res.status(401).json({ message: "Invalid or expired setup token" });
+      if (!tokenValidation.valid) {
+        return res.status(401).json({ message: tokenValidation.error || "Invalid or expired setup token" });
       }
-      
-      // Validate password strength
-      const passwordValidation = DoctorAuthService.validatePasswordStrength(password);
-      
-      if (!passwordValidation.valid) {
-        return res.status(400).json({ message: passwordValidation.message });
-      }
-      
-      // Hash password
-      const hashedPassword = await DoctorAuthService.hashPassword(password);
       
       // Get doctor
-      const doctor = await storage.getUser(tokenData.doctorId);
+      const doctor = await storage.getUser(tokenValidation.doctorId);
       
       if (!doctor) {
         return res.status(404).json({ message: "Doctor not found" });
       }
       
-      // Log successful setup (in production, update database with hashed password)
-      console.log(`✅ Doctor ${doctor.name} (${doctor.email}) account setup completed successfully`);
-      console.log(`Password hash created for security compliance`);
+      // Mark account as active and update last login
+      await db
+        .update(users)
+        .set({ 
+          isActive: true,
+          lastLogin: new Date()
+        })
+        .where(eq(users.id, doctor.id));
+      
+      // Log successful setup completion
+      console.log(`✅ Doctor ${doctor.name} (${doctor.email}) passwordless account setup completed successfully`);
       
       res.json({ 
         success: true, 
