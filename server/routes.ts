@@ -3,6 +3,8 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { sessionTimeoutMiddleware, updateSessionActivity } from "./sessionTimeout";
 import session from 'express-session';
+import { RedisStore } from 'connect-redis';
+import { Redis } from 'ioredis';
 import path from "path";
 import fs from "fs";
 import { 
@@ -150,13 +152,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(200).send("pong");
   });
 
-  // Configure Express Session with MemoryStore for development
+  // Configure Express Session with Redis for production and MemoryStore for development
   const NODE_ENV = process.env.NODE_ENV || 'development';
+  const { VerificationCodeStorageService } = await import('./services/verificationCodeStorageService');
   
-  console.warn('Using in-memory store for Express sessions (Development Mode). NOT FOR PRODUCTION.');
+  let sessionStore: session.Store;
+
+  // Conditionally initialize session store based on environment
+  if (NODE_ENV === 'production' && VerificationCodeStorageService.getRedisClient()) {
+      console.log('Using Redis for Express sessions (Production Mode).');
+      sessionStore = new RedisStore({ 
+        client: VerificationCodeStorageService.getRedisClient() as any,
+        ttl: 24 * 60 * 60 // 24 hours in seconds
+      });
+  } else {
+      console.warn('Using in-memory store for Express sessions (Development Mode). NOT FOR PRODUCTION.');
+      sessionStore = new session.MemoryStore();
+  }
 
   app.use(
     session({
+      store: sessionStore,
       secret: process.env.SESSION_SECRET || 'a-very-secret-string-for-dev',
       resave: false,
       saveUninitialized: false,
@@ -3120,81 +3136,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Complete doctor setup with password
-  app.post("/api/doctor-setup/complete", async (req, res) => {
-    try {
-      const { token, password, username } = req.body;
-      
-      const { validateSetupToken } = await import('./services/authTokenService');
-      const bcrypt = await import('bcrypt');
-      
-      const validation = await validateSetupToken(token);
-      if (!validation.valid) {
-        return res.status(400).json({ success: false, error: "Invalid token" });
-      }
 
-      // Validate password requirements
-      if (!password || password.length < 16) {
-        return res.status(400).json({ 
-          success: false, 
-          error: "Password must be at least 16 characters long" 
-        });
-      }
-
-      // Check if username already exists
-      if (username) {
-        const existingUsername = await db
-          .select()
-          .from(users)
-          .where(eq(users.username, username));
-        
-        if (existingUsername.length > 0) {
-          return res.status(409).json({ success: false, error: "Username already in use" });
-        }
-      }
-
-      // Hash password
-      const hashedPassword = await bcrypt.hash(password, 12);
-      
-      // Update doctor with credentials and activate account
-      const [updatedDoctor] = await db
-        .update(users)
-        .set({
-          username: username || validation.payload!.email,
-          password: hashedPassword,
-          isActive: true,
-          lastLogin: new Date()
-        })
-        .where(eq(users.id, validation.payload!.doctorId))
-        .returning();
-
-      // Log admin activity
-      await db.insert(adminActivityLog).values({
-        adminId: 1,
-        activityType: 'doctor_setup_completed',
-        entityType: 'user',
-        entityId: updatedDoctor.id,
-        details: { 
-          doctorEmail: updatedDoctor.email,
-          setupCompleted: true 
-        }
-      });
-
-      return res.json({
-        success: true,
-        message: "Doctor setup completed successfully",
-        doctor: {
-          id: updatedDoctor.id,
-          name: updatedDoctor.name,
-          email: updatedDoctor.email,
-          username: updatedDoctor.username
-        }
-      });
-    } catch (error) {
-      console.error("Setup completion error:", error);
-      return res.status(500).json({ success: false, error: "Server error" });
-    }
-  });
 
   // Resend welcome email with updated template
   app.post("/api/doctor-auth/resend-welcome", async (req, res) => {
@@ -6261,7 +6203,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { validateSetupToken } = await import('./services/authTokenService');
       const tokenValidation = await validateSetupToken(token);
       
-      if (!tokenValidation.valid) {
+      if (!tokenValidation.valid || !tokenValidation.doctorId) {
         return res.status(401).json({ message: tokenValidation.error || "Invalid or expired setup token" });
       }
       
