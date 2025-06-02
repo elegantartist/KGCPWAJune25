@@ -8,9 +8,11 @@ import { VerificationCodeStorageService } from './verificationCodeStorageService
 // JWT secret for doctor authentication tokens - validation happens at runtime
 const getJWTSecret = (): string => {
   const secret = process.env.JWT_SECRET;
-  if (!secret) {
+  if (!secret || secret.trim() === '') {
+    console.error('JWT_SECRET environment variable not found or empty');
     throw new Error('CRITICAL SECURITY ERROR: JWT_SECRET environment variable must be set for production deployment');
   }
+  console.log('JWT_SECRET loaded successfully for token generation');
   return secret;
 };
 const TOKEN_EXPIRY = '24h';
