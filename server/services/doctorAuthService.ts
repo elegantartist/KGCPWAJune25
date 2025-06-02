@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
+import { Redis } from 'ioredis';
 import { storage } from '../storage';
 import { SMSService } from './smsService';
 import { emailService } from './emailService';
@@ -8,6 +9,10 @@ import { emailService } from './emailService';
 const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secure-jwt-secret-key-2024';
 const TOKEN_EXPIRY = '24h';
 const VERIFICATION_CODE_EXPIRY = 10 * 60 * 1000; // 10 minutes in milliseconds
+
+// Redis client for persistent verification code storage
+const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
+const redisClient = new Redis(REDIS_URL);
 
 export interface DoctorToken {
   doctorId: number;
@@ -25,8 +30,7 @@ export interface VerificationCode {
   attempts: number;
 }
 
-// In-memory storage for verification codes (in production, use Redis)
-const verificationCodes = new Map<string, VerificationCode>();
+// Verification codes now stored in Redis for persistence across server restarts
 
 export class DoctorAuthService {
   /**
@@ -79,17 +83,18 @@ export class DoctorAuthService {
     try {
       // Generate 6-digit verification code
       const code = Math.floor(100000 + Math.random() * 900000).toString();
-      const expiresAt = new Date(Date.now() + VERIFICATION_CODE_EXPIRY);
-
-      // Store verification code
-      const verificationKey = `${phone}-${doctorId}`;
-      verificationCodes.set(verificationKey, {
+      
+      // Store verification code in Redis with TTL
+      const redisKey = `2fa:doctor:${doctorId}:${phone}`;
+      const verificationData = {
         code,
         phone,
         doctorId,
-        expiresAt,
         attempts: 0
-      });
+      };
+      
+      const ttlSeconds = Math.floor(VERIFICATION_CODE_EXPIRY / 1000);
+      await redisClient.setex(redisKey, ttlSeconds, JSON.stringify(verificationData));
 
       // Send SMS
       const smsResult = await SMSService.sendVerificationCode(phone, code);
@@ -117,48 +122,53 @@ export class DoctorAuthService {
   /**
    * Verify SMS code
    */
-  static verifyCode(phone: string, doctorId: number, code: string): { success: boolean, message: string } {
-    const verificationKey = `${phone}-${doctorId}`;
-    const storedVerification = verificationCodes.get(verificationKey);
+  static async verifyCode(phone: string, doctorId: number, code: string): Promise<{ success: boolean, message: string }> {
+    try {
+      const redisKey = `2fa:doctor:${doctorId}:${phone}`;
+      const storedData = await redisClient.get(redisKey);
 
-    if (!storedVerification) {
+      if (!storedData) {
+        return {
+          success: false,
+          message: 'No verification code found or code has expired. Please request a new code.'
+        };
+      }
+
+      const verificationData = JSON.parse(storedData);
+
+      // Check attempts (rate limiting)
+      if (verificationData.attempts >= 3) {
+        await redisClient.del(redisKey);
+        return {
+          success: false,
+          message: 'Too many failed attempts. Please request a new code.'
+        };
+      }
+
+      // Verify code
+      if (verificationData.code === code) {
+        await redisClient.del(redisKey);
+        return {
+          success: true,
+          message: 'Phone number verified successfully'
+        };
+      } else {
+        // Increment attempts and re-store in Redis with same TTL
+        verificationData.attempts++;
+        const ttl = await redisClient.ttl(redisKey);
+        if (ttl > 0) {
+          await redisClient.setex(redisKey, ttl, JSON.stringify(verificationData));
+        }
+        return {
+          success: false,
+          message: `Invalid verification code. ${3 - verificationData.attempts} attempts remaining.`
+        };
+      }
+    } catch (error) {
+      console.error('Redis error during code verification:', error);
       return {
         success: false,
-        message: 'No verification code found. Please request a new code.'
-      };
-    }
-
-    // Check expiry
-    if (new Date() > storedVerification.expiresAt) {
-      verificationCodes.delete(verificationKey);
-      return {
-        success: false,
-        message: 'Verification code has expired. Please request a new code.'
-      };
-    }
-
-    // Check attempts (rate limiting)
-    if (storedVerification.attempts >= 3) {
-      verificationCodes.delete(verificationKey);
-      return {
-        success: false,
-        message: 'Too many failed attempts. Please request a new code.'
-      };
-    }
-
-    // Verify code
-    if (storedVerification.code === code) {
-      verificationCodes.delete(verificationKey);
-      return {
-        success: true,
-        message: 'Phone number verified successfully'
-      };
-    } else {
-      // Increment attempts
-      storedVerification.attempts++;
-      return {
-        success: false,
-        message: `Invalid verification code. ${3 - storedVerification.attempts} attempts remaining.`
+        message: 'Internal error during verification. Please try again.'
       };
     }
   }

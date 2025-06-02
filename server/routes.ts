@@ -6221,7 +6221,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Invalid or expired setup token" });
       }
       
-      const result = DoctorAuthService.verifyCode(tokenData.phone, tokenData.doctorId, verificationCode);
+      const result = await DoctorAuthService.verifyCode(tokenData.phone, tokenData.doctorId, verificationCode);
       
       if (result.success) {
         res.json({ success: true, message: result.message });
