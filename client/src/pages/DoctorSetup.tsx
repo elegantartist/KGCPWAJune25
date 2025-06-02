@@ -36,7 +36,7 @@ export default function DoctorSetup() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   
-  const [step, setStep] = useState<'validating' | 'phone-verification' | 'password-setup' | 'complete'>('validating');
+  const [step, setStep] = useState<'validating' | 'phone-verification' | 'complete'>('validating');
   const [doctorInfo, setDoctorInfo] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>('');
@@ -162,8 +162,7 @@ export default function DoctorSetup() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          token, 
-          password: data.password 
+          token
         })
       });
 
