@@ -10,9 +10,30 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secure-jwt-secret-key-2
 const TOKEN_EXPIRY = '24h';
 const VERIFICATION_CODE_EXPIRY = 10 * 60 * 1000; // 10 minutes in milliseconds
 
-// Redis client for persistent verification code storage
+// Redis client for persistent verification code storage with fallback
 const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
-const redisClient = new Redis(REDIS_URL);
+let redisClient: Redis | null = null;
+let useRedis = false;
+
+try {
+  redisClient = new Redis(REDIS_URL);
+  
+  redisClient.on('connect', () => {
+    console.log('Redis connected successfully for verification codes');
+    useRedis = true;
+  });
+  
+  redisClient.on('error', (err) => {
+    console.warn('Redis connection failed, using in-memory fallback:', err.message);
+    useRedis = false;
+  });
+} catch (error) {
+  console.warn('Redis initialization failed, using in-memory fallback');
+  useRedis = false;
+}
+
+// Fallback in-memory storage when Redis unavailable
+const fallbackVerificationCodes = new Map<string, { code: string; phone: string; doctorId: number; expiresAt: Date; attempts: number }>();
 
 export interface DoctorToken {
   doctorId: number;
@@ -83,18 +104,35 @@ export class DoctorAuthService {
     try {
       // Generate 6-digit verification code
       const code = Math.floor(100000 + Math.random() * 900000).toString();
+      const expiresAt = new Date(Date.now() + VERIFICATION_CODE_EXPIRY);
       
-      // Store verification code in Redis with TTL
-      const redisKey = `2fa:doctor:${doctorId}:${phone}`;
+      // Store verification code (Redis with fallback to in-memory)
+      const verificationKey = `${phone}-${doctorId}`;
       const verificationData = {
         code,
         phone,
         doctorId,
+        expiresAt,
         attempts: 0
       };
       
-      const ttlSeconds = Math.floor(VERIFICATION_CODE_EXPIRY / 1000);
-      await redisClient.setex(redisKey, ttlSeconds, JSON.stringify(verificationData));
+      if (useRedis && redisClient) {
+        try {
+          const redisKey = `2fa:doctor:${doctorId}:${phone}`;
+          const ttlSeconds = Math.floor(VERIFICATION_CODE_EXPIRY / 1000);
+          await redisClient.setex(redisKey, ttlSeconds, JSON.stringify({
+            code,
+            phone,
+            doctorId,
+            attempts: 0
+          }));
+        } catch (error) {
+          console.warn('Redis storage failed, using fallback:', error);
+          fallbackVerificationCodes.set(verificationKey, verificationData);
+        }
+      } else {
+        fallbackVerificationCodes.set(verificationKey, verificationData);
+      }
 
       // Send SMS
       const smsResult = await SMSService.sendVerificationCode(phone, code);
@@ -124,21 +162,56 @@ export class DoctorAuthService {
    */
   static async verifyCode(phone: string, doctorId: number, code: string): Promise<{ success: boolean, message: string }> {
     try {
-      const redisKey = `2fa:doctor:${doctorId}:${phone}`;
-      const storedData = await redisClient.get(redisKey);
+      const verificationKey = `${phone}-${doctorId}`;
+      let storedVerification: any = null;
+      let isFromRedis = false;
 
-      if (!storedData) {
+      // Try Redis first if available
+      if (useRedis && redisClient) {
+        try {
+          const redisKey = `2fa:doctor:${doctorId}:${phone}`;
+          const storedData = await redisClient.get(redisKey);
+          if (storedData) {
+            storedVerification = JSON.parse(storedData);
+            isFromRedis = true;
+          }
+        } catch (redisError) {
+          console.warn('Redis retrieval failed, checking fallback storage:', redisError);
+        }
+      }
+
+      // Fallback to in-memory storage
+      if (!storedVerification) {
+        const fallbackData = fallbackVerificationCodes.get(verificationKey);
+        if (fallbackData) {
+          // Check expiry for fallback storage
+          if (new Date() > fallbackData.expiresAt) {
+            fallbackVerificationCodes.delete(verificationKey);
+            return {
+              success: false,
+              message: 'Verification code has expired. Please request a new code.'
+            };
+          }
+          storedVerification = fallbackData;
+          isFromRedis = false;
+        }
+      }
+
+      if (!storedVerification) {
         return {
           success: false,
-          message: 'No verification code found or code has expired. Please request a new code.'
+          message: 'No verification code found. Please request a new code.'
         };
       }
 
-      const verificationData = JSON.parse(storedData);
-
       // Check attempts (rate limiting)
-      if (verificationData.attempts >= 3) {
-        await redisClient.del(redisKey);
+      if (storedVerification.attempts >= 3) {
+        if (isFromRedis && redisClient) {
+          const redisKey = `2fa:doctor:${doctorId}:${phone}`;
+          await redisClient.del(redisKey);
+        } else {
+          fallbackVerificationCodes.delete(verificationKey);
+        }
         return {
           success: false,
           message: 'Too many failed attempts. Please request a new code.'
@@ -146,26 +219,40 @@ export class DoctorAuthService {
       }
 
       // Verify code
-      if (verificationData.code === code) {
-        await redisClient.del(redisKey);
+      if (storedVerification.code === code) {
+        // Success - clean up
+        if (isFromRedis && redisClient) {
+          const redisKey = `2fa:doctor:${doctorId}:${phone}`;
+          await redisClient.del(redisKey);
+        } else {
+          fallbackVerificationCodes.delete(verificationKey);
+        }
         return {
           success: true,
           message: 'Phone number verified successfully'
         };
       } else {
-        // Increment attempts and re-store in Redis with same TTL
-        verificationData.attempts++;
-        const ttl = await redisClient.ttl(redisKey);
-        if (ttl > 0) {
-          await redisClient.setex(redisKey, ttl, JSON.stringify(verificationData));
+        // Increment attempts
+        storedVerification.attempts++;
+        
+        if (isFromRedis && redisClient) {
+          const redisKey = `2fa:doctor:${doctorId}:${phone}`;
+          const ttl = await redisClient.ttl(redisKey);
+          if (ttl > 0) {
+            await redisClient.setex(redisKey, ttl, JSON.stringify(storedVerification));
+          }
+        } else {
+          // Update fallback storage
+          fallbackVerificationCodes.set(verificationKey, storedVerification);
         }
+        
         return {
           success: false,
-          message: `Invalid verification code. ${3 - verificationData.attempts} attempts remaining.`
+          message: `Invalid verification code. ${3 - storedVerification.attempts} attempts remaining.`
         };
       }
     } catch (error) {
-      console.error('Redis error during code verification:', error);
+      console.error('Error during code verification:', error);
       return {
         success: false,
         message: 'Internal error during verification. Please try again.'
