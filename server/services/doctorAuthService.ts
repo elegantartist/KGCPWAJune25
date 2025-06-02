@@ -278,13 +278,14 @@ export class DoctorAuthService {
 
 
   /**
-   * Clean up expired verification codes
+   * Clean up expired verification codes from fallback storage
+   * (Redis handles TTL automatically)
    */
   static cleanupExpiredCodes(): void {
     const now = new Date();
-    for (const [key, verification] of verificationCodes.entries()) {
+    for (const [key, verification] of fallbackVerificationCodes.entries()) {
       if (now > verification.expiresAt) {
-        verificationCodes.delete(key);
+        fallbackVerificationCodes.delete(key);
       }
     }
   }
