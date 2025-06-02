@@ -5,31 +5,59 @@ import { storage } from '../storage';
 import { SMSService } from './smsService';
 import { emailService } from './emailService';
 
-// JWT secret for doctor authentication tokens
-const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secure-jwt-secret-key-2024';
+// Validate critical environment variables at startup
+if (!process.env.JWT_SECRET) {
+  throw new Error('CRITICAL SECURITY ERROR: JWT_SECRET environment variable must be set for production deployment');
+}
+
+// JWT secret for doctor authentication tokens - NO FALLBACK for security
+const JWT_SECRET = process.env.JWT_SECRET;
 const TOKEN_EXPIRY = '24h';
 const VERIFICATION_CODE_EXPIRY = 10 * 60 * 1000; // 10 minutes in milliseconds
 
-// Redis client for persistent verification code storage with fallback
-const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
+// Redis client for persistent verification code storage with optimized connection
+const REDIS_URL = process.env.REDIS_URL;
 let redisClient: Redis | null = null;
 let useRedis = false;
+let redisInitialized = false;
 
-try {
-  redisClient = new Redis(REDIS_URL);
+// Initialize Redis only once with connection pooling
+function initializeRedis() {
+  if (redisInitialized || !REDIS_URL) {
+    return;
+  }
   
-  redisClient.on('connect', () => {
-    console.log('Redis connected successfully for verification codes');
-    useRedis = true;
-  });
-  
-  redisClient.on('error', (err) => {
-    console.warn('Redis connection failed, using in-memory fallback:', err.message);
+  try {
+    redisClient = new Redis(REDIS_URL, {
+      maxRetriesPerRequest: 3,
+      retryDelayOnFailover: 100,
+      enableReadyCheck: false,
+      lazyConnect: true
+    });
+    
+    redisClient.on('connect', () => {
+      console.log('Redis connected successfully for verification codes');
+      useRedis = true;
+    });
+    
+    redisClient.on('error', (err) => {
+      if (!redisInitialized) {
+        console.warn('Redis connection failed, using in-memory fallback:', err.message);
+      }
+      useRedis = false;
+    });
+    
+    redisInitialized = true;
+  } catch (error) {
+    console.warn('Redis initialization failed, using in-memory fallback');
     useRedis = false;
-  });
-} catch (error) {
-  console.warn('Redis initialization failed, using in-memory fallback');
-  useRedis = false;
+    redisInitialized = true;
+  }
+}
+
+// Initialize Redis only if URL is provided
+if (REDIS_URL) {
+  initializeRedis();
 }
 
 // Fallback in-memory storage when Redis unavailable
