@@ -197,75 +197,93 @@ export class DoctorAuthService {
       const replitDomain = process.env.REPLIT_DOMAINS?.split(',')[0] || 
                            `${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`;
       const baseUrl = `https://${replitDomain}`;
+      const loginUrl = `${baseUrl}/doctor-login`;
 
       const emailSubject = 'Welcome to Keep Going Care - Complete Your Account Setup';
       const emailHtml = `
-        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff;">
-          <!-- Header with KGC Logo -->
-          <div style="text-align: center; padding: 40px 20px 20px; background: linear-gradient(135deg, #2E8BC0 0%, #1e40af 100%);">
-            <div style="background-color: white; padding: 15px; border-radius: 12px; display: inline-block; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-              <h1 style="color: #2E8BC0; margin: 0; font-size: 24px; font-weight: bold;">Keep Going Care</h1>
-              <p style="color: #666; margin: 5px 0 0 0; font-size: 14px;">Healthcare Technology Platform</p>
-            </div>
-          </div>
+  <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff;">
+    <div style="text-align: center; padding: 40px 20px 20px; background: linear-gradient(135deg, #2E8BC0 0%, #1e40af 100%);">
+      <div style="background-color: white; padding: 15px; border-radius: 12px; display: inline-block; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+        <img src="${baseUrl}/shared/logo" alt="KGC Logo" style="max-width: 120px; height: 60px; margin: 0 auto 10px;">
+      </div>
+      <h1 style="color: #ffffff; margin: 20px 0 0 0; font-size: 28px; font-weight: 600;">Welcome to Keep Going Care</h1>
+    </div>
 
-          <!-- Main Content -->
-          <div style="padding: 40px 30px;">
-            <h2 style="color: #1f2937; font-size: 28px; margin-bottom: 20px; text-align: center;">Welcome to Keep Going Care, Dr. ${doctorName}!</h2>
-            
-            <p style="color: #4b5563; font-size: 16px; line-height: 1.6; margin-bottom: 25px;">
-              Thank you for joining Keep Going Care as a healthcare provider. You now have access to our comprehensive digital health platform designed to support your patients' health journey.
-            </p>
+    <div style="padding: 30px; background-color: #ffffff;">
+      <p style="color: #1f2937; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
+        Dear Dr. ${doctorName},
+      </p>
+      <p style="color: #4b5563; font-size: 15px; line-height: 1.6; margin: 0 0 20px 0;">
+        Welcome to Keep Going Care (KGC), a new Class I Software as a Medical Device (SaMD) designed to support your metabolic syndrome patients. KGC is built to seamlessly integrate with your care, empowering patients to make sustainable lifestyle modifications and reduce their risk of heart attack and stroke, all within the TGA regulatory framework.
+      </p>
+      <h3 style="color: #1f2937; margin: 20px 0 15px 0; font-size: 18px; font-weight: 600;">What KGC Is:</h3>
+      <p style="color: #4b5563; font-size: 15px; line-height: 1.6; margin: 0 0 20px 0;">
+        KGC acts as a personalised health assistant for your patients. It combines your clinical guidance, delivered through Care Plan Directives (CPDs) you enter via the Doctor Dashboard, with Australian health guidelines and patient preferences. Using evidence-based techniques from Cognitive Behavioral Therapy (CBT) and Motivational Interviewing (MI), KGC provides non-diagnostic, educational support tailored to each individual.
+      </p>
+      <h3 style="color: #1f2937; margin: 20px 0 15px 0; font-size: 18px; font-weight: 600;">How KGC Works for You and Your Patients:</h3>
+      <ul style="color: #4b5563; font-size: 15px; line-height: 1.6; margin: 0 0 20px 0; padding-left: 20px;">
+        <li style="margin-bottom: 10px;"><strong>Set Patient Directives:</strong> Easily enter personalised CPDs for Diet, Exercise/Wellness Routine, and Medication via your dedicated Doctor Dashboard. These directives form the foundation of the patient experience within the app.</li>
+        <li style="margin-bottom: 10px;"><strong>Receive Patient Progress Reports (PPRs):</strong> Gain valuable insights into your patients engagement and self-reported progress through PPRs generated from their daily self-scores (1-10) and usage of the unique "Keep Going" motivation button.</li>
+        <li style="margin-bottom: 10px;"><strong>Support Patient Adherence:</strong> KGC provides a supportive, engaging platform that helps keep patients motivated, subtly encouraging adherence to their care plan through personalised interactions and helpful features like curated health content and local service directories (presented via a friendly AI interface, our Supervisor Agent).</li>
+        <li style="margin-bottom: 10px;"><strong>Safety and Escalation:</strong> KGC monitors patient engagement and query scope. If a patient stops using the app for 24+ hours or asks questions outside the scope of a Type 1 SaMD, KGC will notify you using the contact details provided. In the event of a medical emergency expressed by the patient (indicating risk of death, serious injury, or self-harm), KGC is programmed to recommend calling 000.</li>
+      </ul>
+      <h3 style="color: #1f2937; margin: 20px 0 15px 0; font-size: 18px; font-weight: 600;">Participate in the Mini Clinical Audit (MCA):</h3>
+      <p style="color: #4b5563; font-size: 15px; line-height: 1.6; margin: 0 0 20px 0;">
+        We invite you to participate in our Mini Clinical Audit, directly accessible through your Doctor Dashboard. By prescribing KGC to a minimum of 5 appropriate patients (those at risk of heart attack and stroke, suitable for primary prevention, and comfortable using technology), monitoring their progress via PPRs for 3 months, and measuring simple health outcomes, you can earn 5 hours of accredited CPD under the ACRRM and RACGP "Measuring Outcomes" category.
+      </p>
+      <div style="background-color: #fef3c7; border: 1px solid #fbbf24; border-radius: 8px; padding: 20px; margin: 25px 0;">
+        <h4 style="color: #92400e; margin: 0 0 15px 0; font-size: 16px; font-weight: 600;">Terms and Conditions Agreement Required</h4>
+        <p style="color: #92400e; margin: 0 0 15px 0; font-size: 14px; line-height: 1.6;">
+          <strong>Terms and Conditions Summary:</strong><br>
+          By using Keep Going Care, you agree to our Terms and Conditions. Please note the following key points:
+        </p>
+        <ul style="color: #92400e; font-size: 14px; line-height: 1.6; margin: 0; padding-left: 20px;">
+          <li style="margin-bottom: 8px;"><strong>Data Privacy:</strong> All private health data is managed securely in accordance with applicable Australian state and federal privacy laws.</li>
+          <li style="margin-bottom: 8px;"><strong>Software as a Medical Device (SaMD):</strong> KGC is a Class I SaMD providing non-diagnostic, educational support. It is not intended for diagnosis or treatment.</li>
+          <li style="margin-bottom: 8px;"><strong>AI Limitations:</strong> KGC uses AI technology. All information is for educational purposes and should be verified with your healthcare professional.</li>
+          <li style="margin-bottom: 8px;"><strong>Verification is Key:</strong> You, as the healthcare professional, remain responsible for all clinical decisions and for verifying any information presented by the KGC system in relation to your patients care.</li>
+        </ul>
+        <p style="color: #92400e; margin: 15px 0 0 0; font-size: 14px; font-weight: 600;">
+          By using Keep Going Care, you confirm that you have read and agree to these terms.
+        </p>
+      </div>
+      <p style="color: #4b5563; font-size: 15px; line-height: 1.6; margin: 20px 0;">
+        We are excited to partner with you in supporting your patients health journeys. You can access your account setup here:
+      </p>
+      <div style="text-align: center; margin: 25px 0;">
+        <a href="${setupUrl}" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; padding: 16px 32px; text-decoration: none; border-radius: 8px; display: inline-block; font-weight: 600; font-size: 16px; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);">
+          🔐 Complete Account Setup
+        </a>
+      </div>
 
-            <div style="background-color: #f8fafc; border-left: 4px solid #2E8BC0; padding: 20px; margin: 25px 0; border-radius: 6px;">
-              <h3 style="color: #1f2937; margin-top: 0; font-size: 18px;">🔒 Secure Account Setup Required</h3>
-              <p style="color: #4b5563; margin-bottom: 15px; font-size: 14px;">
-                For security, please complete your account setup using the secure link below. This link will expire in 24 hours.
-              </p>
-            </div>
+      <p style="color: #6b7280; font-size: 13px; text-align: center; margin: 15px 0 25px 0;">
+        This secure setup link expires in 24 hours for your protection.
+      </p>
 
-            <!-- Setup Button -->
-            <div style="text-align: center; margin: 35px 0;">
-              <a href="${setupUrl}" style="background: linear-gradient(135deg, #2E8BC0 0%, #1e40af 100%); color: white; padding: 15px 35px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; display: inline-block; box-shadow: 0 4px 12px rgba(46, 139, 192, 0.3);">
-                Complete Account Setup
-              </a>
-            </div>
+      <p style="color: #4b5563; font-size: 15px; line-height: 1.6; margin: 20px 0 15px 0;">
+        <strong>Additional Resources:</strong>
+      </p>
+      <div style="text-align: center; margin: 15px 0 30px 0;">
+        <a href="https://youtu.be/AitZI0VTYj8" style="background-color: #2E8BC0; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 500;">
+          📹 Mini Clinical Audit Explainer Video
+        </a>
+      </div>
 
-            <div style="background-color: #fef3cd; border: 1px solid #fbbf24; border-radius: 6px; padding: 15px; margin: 25px 0;">
-              <p style="color: #92400e; margin: 0; font-size: 14px;">
-                <strong>Important:</strong> You'll need to verify your mobile phone number (${doctorPhone}) during setup for two-factor authentication.
-              </p>
-            </div>
+      <p style="color: #1f2937; font-size: 15px; line-height: 1.6; margin: 0;">
+        Sincerely,<br>
+        <strong>The Keep Going Care Team</strong><br>
+        Anthrocyt AI Pty Ltd
+      </p>
+    </div>
 
-            <!-- Features Overview -->
-            <div style="margin-top: 40px;">
-              <h3 style="color: #1f2937; font-size: 20px; margin-bottom: 20px;">What You Can Do:</h3>
-              <ul style="color: #4b5563; line-height: 1.8; font-size: 15px;">
-                <li><strong>Patient Management:</strong> Add and monitor patients in your care</li>
-                <li><strong>Care Plan Creation:</strong> Develop personalised care plans and track progress</li>
-                <li><strong>Health Monitoring:</strong> Real-time access to patient health metrics</li>
-                <li><strong>Secure Messaging:</strong> Communicate safely with patients</li>
-                <li><strong>Compliance Tools:</strong> TGA-compliant digital health solutions</li>
-              </ul>
-            </div>
-
-            <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
-
-            <p style="color: #6b7280; font-size: 14px; line-height: 1.6;">
-              If you have any questions or need assistance, please don't hesitate to contact our support team.<br>
-              This email was sent to ${doctorEmail}. If you did not request this account, please disregard this email.
-            </p>
-          </div>
-
-          <!-- Footer -->
-          <div style="background-color: #f9fafb; padding: 20px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
-            <p style="color: #9ca3af; margin: 0; font-size: 12px;">
-              © 2024 Keep Going Care. Healthcare Technology Platform.<br>
-              Secure • Compliant • Patient-Focused
-            </p>
-          </div>
-        </div>
-      `;
+    <div style="background-color: #f9fafb; padding: 20px; text-align: center; border-top: 1px solid #e5e7eb;">
+      <p style="color: #9ca3af; font-size: 12px; margin: 0;">
+        © 2025 Keep Going Care. All rights reserved.<br>
+        This is a secure, TGA-compliant healthcare communication.
+      </p>
+    </div>
+  </div>
+`;
 
       const result = await emailService.sendEmail({
         to: doctorEmail,
