@@ -138,11 +138,25 @@ export default function DoctorSetup() {
       const result = await response.json();
 
       if (response.ok) {
+        // Complete setup immediately after phone verification (passwordless)
+        setStep('complete');
         toast({
-          title: "Phone Verified Successfully",
-          description: "Now please create your secure password.",
+          title: "Phone Verified!",
+          description: "Your account has been activated successfully.",
         });
-        setStep('password-setup');
+        
+        // Complete the passwordless setup
+        const setupResponse = await fetch('/api/doctor/setup/complete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token })
+        });
+
+        if (setupResponse.ok) {
+          setTimeout(() => {
+            setLocation('/doctor-dashboard');
+          }, 3000);
+        }
       } else {
         setError(result.message || 'Invalid verification code.');
       }
@@ -250,12 +264,7 @@ export default function DoctorSetup() {
                 <span>Verify Your Phone</span>
               </div>
             )}
-            {step === 'password-setup' && (
-              <div className="flex items-center justify-center space-x-2">
-                <Lock className="h-5 w-5 text-blue-600" />
-                <span>Create Secure Password</span>
-              </div>
-            )}
+
             {step === 'complete' && (
               <div className="flex items-center justify-center space-x-2">
                 <CheckCircle className="h-5 w-5 text-green-600" />
@@ -337,79 +346,7 @@ export default function DoctorSetup() {
             </div>
           )}
 
-          {step === 'password-setup' && (
-            <div className="space-y-4">
-              <div className="text-center">
-                <Lock className="h-12 w-12 text-green-600 mx-auto mb-3" />
-                <p className="text-sm text-gray-600 mb-4">
-                  Create a secure password for your Keep Going Care account.
-                </p>
-              </div>
 
-              <Form {...passwordForm}>
-                <form onSubmit={passwordForm.handleSubmit(onPasswordSetupSubmit)} className="space-y-4">
-                  <FormField
-                    control={passwordForm.control}
-                    name="password"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Password</FormLabel>
-                        <FormControl>
-                          <Input
-                            {...field}
-                            type="password"
-                            placeholder="Create secure password"
-                            autoComplete="new-password"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={passwordForm.control}
-                    name="confirmPassword"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Confirm Password</FormLabel>
-                        <FormControl>
-                          <Input
-                            {...field}
-                            type="password"
-                            placeholder="Confirm your password"
-                            autoComplete="new-password"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <div className="bg-blue-50 p-3 rounded-lg">
-                    <h4 className="text-sm font-medium text-blue-900 mb-2">Password Requirements:</h4>
-                    <ul className="text-xs text-blue-800 space-y-1">
-                      <li>• At least 16 characters long</li>
-                      <li>• Contains uppercase and lowercase letters</li>
-                      <li>• Contains at least one number</li>
-                      <li>• Contains at least one special character</li>
-                    </ul>
-                  </div>
-
-                  <Button type="submit" className="w-full" disabled={isLoading}>
-                    {isLoading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Setting up account...
-                      </>
-                    ) : (
-                      'Complete Account Setup'
-                    )}
-                  </Button>
-                </form>
-              </Form>
-            </div>
-          )}
 
           {step === 'complete' && (
             <div className="text-center space-y-4">
