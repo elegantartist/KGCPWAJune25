@@ -3006,7 +3006,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { validateSetupToken } = await import('./services/authTokenService');
-      const validation = validateSetupToken(token);
+      const validation = await validateSetupToken(token);
       
       if (!validation.valid) {
         return res.status(400).json({ 
@@ -3048,7 +3048,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { validateSetupToken, generateVerificationCode } = await import('./services/authTokenService');
       const SMSService = await import('./services/smsService');
       
-      const validation = validateSetupToken(token);
+      const validation = await validateSetupToken(token);
       if (!validation.valid) {
         return res.status(400).json({ success: false, error: "Invalid token" });
       }
@@ -3067,7 +3067,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Generate verification code
-      const verificationCode = generateVerificationCode(doctor[0].id, doctor[0].phoneNumber);
+      const verificationCode = await generateVerificationCode(doctor[0].id, doctor[0].phoneNumber);
       
       // Send SMS
       const smsResult = await SMSService.SMSService.sendVerificationCode(
@@ -3093,7 +3093,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const { validateSetupToken, verifyPhoneCode } = await import('./services/authTokenService');
       
-      const validation = validateSetupToken(token);
+      const validation = await validateSetupToken(token);
       if (!validation.valid) {
         return res.status(400).json({ success: false, error: "Invalid token" });
       }
@@ -3108,7 +3108,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Verify the code
-      const verification = verifyPhoneCode(doctor[0].phoneNumber!, code);
+      const verification = await verifyPhoneCode(doctor[0].phoneNumber!, code);
       
       return res.json({
         success: verification.valid,
@@ -3128,7 +3128,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { validateSetupToken } = await import('./services/authTokenService');
       const bcrypt = await import('bcrypt');
       
-      const validation = validateSetupToken(token);
+      const validation = await validateSetupToken(token);
       if (!validation.valid) {
         return res.status(400).json({ success: false, error: "Invalid token" });
       }
