@@ -1,10 +1,38 @@
 import express, { type Request, Response, NextFunction } from "express";
+import session from 'express-session';
+import { RedisStore } from 'connect-redis';
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { VerificationCodeStorageService } from './services/verificationCodeStorageService';
+
+const NODE_ENV = process.env.NODE_ENV || 'development';
 
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+let sessionStore: session.Store;
+
+if (NODE_ENV === 'production' && VerificationCodeStorageService.getRedisClient()) {
+    console.log('Using Redis for Express sessions (Production Mode).');
+    sessionStore = new RedisStore({ client: VerificationCodeStorageService.getRedisClient()! });
+} else {
+    console.warn('Using in-memory store for Express sessions (Development Mode). NOT FOR PRODUCTION.');
+    sessionStore = new session.MemoryStore();
+}
+
+app.use(
+    session({
+        store: sessionStore,
+        secret: process.env.SESSION_SECRET || 'a-very-secret-string-for-dev',
+        resave: false,
+        saveUninitialized: false,
+        cookie: {
+            secure: NODE_ENV === 'production',
+            httpOnly: true,
+            maxAge: 24 * 60 * 60 * 1000 // 24 hours
+        }
+    })
+);
 
 app.use((req, res, next) => {
   const start = Date.now();
