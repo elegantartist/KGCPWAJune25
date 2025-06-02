@@ -5900,10 +5900,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Generate 6-digit SMS code
       const smsCode = Math.floor(100000 + Math.random() * 900000).toString();
-      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
       
-      // Store code temporarily
-      smsVerificationCodes.set(email, { code: smsCode, expiresAt });
+      // Store code using centralized verification service
+      await VerificationCodeStorageService.setCode(
+        doctor.id,
+        email,
+        smsCode,
+        10 * 60 * 1000, // 10 minutes
+        'sms'
+      );
       
       // Send SMS via Twilio
       const { SMSService } = await import('./services/smsService.js');
@@ -5934,30 +5939,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Email and code are required" });
       }
       
-      // Check stored verification code
-      const storedCode = smsVerificationCodes.get(email);
+      // Find doctor to get ID for verification service
+      const [doctor] = await db
+        .select()
+        .from(users)
+        .where(and(eq(users.email, email), eq(users.roleId, 2)));
+      
+      if (!doctor) {
+        return res.status(404).json({ message: "Doctor not found" });
+      }
+      
+      // Check stored verification code using centralized service
+      const storedCode = await VerificationCodeStorageService.getCode(doctor.id, email, 'sms');
       
       if (!storedCode) {
         return res.status(400).json({ message: "No verification code found. Please request a new code." });
       }
       
-      if (new Date() > storedCode.expiresAt) {
-        smsVerificationCodes.delete(email);
-        return res.status(400).json({ message: "Verification code expired. Please request a new code." });
-      }
-      
       if (storedCode.code !== code) {
+        await VerificationCodeStorageService.incrementAttempts(doctor.id, email, 'sms', storedCode);
         return res.status(400).json({ message: "Invalid verification code" });
       }
       
       // Code is valid - clean up and login
-      smsVerificationCodes.delete(email);
-      
-      // Find doctor details
-      const [doctor] = await db
-        .select()
-        .from(users)
-        .where(and(eq(users.email, email), eq(users.roleId, 2)));
+      await VerificationCodeStorageService.deleteCode(doctor.id, email, 'sms');
       
       if (!doctor) {
         return res.status(404).json({ message: "Doctor not found" });
