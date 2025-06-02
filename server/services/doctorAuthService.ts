@@ -43,7 +43,7 @@ export class DoctorAuthService {
       phone
     };
 
-    return jwt.sign(payload, JWT_SECRET, {
+    return jwt.sign(payload, getJWTSecret(), {
       expiresIn: TOKEN_EXPIRY,
       issuer: 'keep-going-care',
       audience: 'doctor-portal'
@@ -55,7 +55,7 @@ export class DoctorAuthService {
    */
   static verifyAccessToken(token: string): DoctorToken | null {
     try {
-      const decoded = jwt.verify(token, JWT_SECRET, {
+      const decoded = jwt.verify(token, getJWTSecret(), {
         issuer: 'keep-going-care',
         audience: 'doctor-portal'
       }) as DoctorToken;
@@ -179,7 +179,7 @@ export class DoctorAuthService {
   static async sendWelcomeEmail(doctorEmail: string, doctorName: string, doctorPhone: string): Promise<{ success: boolean, message: string }> {
     try {
       // Find the doctor record to get their ID
-      const doctor = await storage.getDoctorByEmail(doctorEmail);
+      const doctor = await storage.getUserByEmail(doctorEmail);
       if (!doctor) {
         return {
           success: false,
@@ -267,6 +267,7 @@ export class DoctorAuthService {
 
       const result = await emailService.sendEmail({
         to: doctorEmail,
+        from: 'welcome@keepgoingcare.com',
         subject: emailSubject,
         html: emailHtml
       });

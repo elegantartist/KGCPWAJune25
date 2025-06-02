@@ -1,11 +1,16 @@
 import { MailService } from '@sendgrid/mail';
 
-if (!process.env.SENDGRID_API_KEY) {
-  throw new Error("SENDGRID_API_KEY environment variable must be set");
-}
-
 const mailService = new MailService();
-mailService.setApiKey(process.env.SENDGRID_API_KEY);
+
+const initializeEmailService = () => {
+  const apiKey = process.env.SENDGRID_API_KEY;
+  if (apiKey) {
+    mailService.setApiKey(apiKey);
+  }
+};
+
+// Initialize on module load
+initializeEmailService();
 
 interface EmailParams {
   to: string;
