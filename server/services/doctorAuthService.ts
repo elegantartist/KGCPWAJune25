@@ -1,67 +1,20 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
-import { Redis } from 'ioredis';
 import { storage } from '../storage';
 import { SMSService } from './smsService';
 import { emailService } from './emailService';
+import { VerificationCodeStorageService } from './verificationCodeStorageService';
 
-// Validate critical environment variables at startup
-if (!process.env.JWT_SECRET) {
-  throw new Error('CRITICAL SECURITY ERROR: JWT_SECRET environment variable must be set for production deployment');
-}
-
-// JWT secret for doctor authentication tokens - NO FALLBACK for security
-const JWT_SECRET = process.env.JWT_SECRET;
+// JWT secret for doctor authentication tokens - validation happens at runtime
+const getJWTSecret = (): string => {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error('CRITICAL SECURITY ERROR: JWT_SECRET environment variable must be set for production deployment');
+  }
+  return secret;
+};
 const TOKEN_EXPIRY = '24h';
 const VERIFICATION_CODE_EXPIRY = 10 * 60 * 1000; // 10 minutes in milliseconds
-
-// Redis client for persistent verification code storage with optimized connection
-const REDIS_URL = process.env.REDIS_URL;
-let redisClient: Redis | null = null;
-let useRedis = false;
-let redisInitialized = false;
-
-// Initialize Redis only once with connection pooling
-function initializeRedis() {
-  if (redisInitialized || !REDIS_URL) {
-    return;
-  }
-  
-  try {
-    redisClient = new Redis(REDIS_URL, {
-      maxRetriesPerRequest: 3,
-      retryDelayOnFailover: 100,
-      enableReadyCheck: false,
-      lazyConnect: true
-    });
-    
-    redisClient.on('connect', () => {
-      console.log('Redis connected successfully for verification codes');
-      useRedis = true;
-    });
-    
-    redisClient.on('error', (err) => {
-      if (!redisInitialized) {
-        console.warn('Redis connection failed, using in-memory fallback:', err.message);
-      }
-      useRedis = false;
-    });
-    
-    redisInitialized = true;
-  } catch (error) {
-    console.warn('Redis initialization failed, using in-memory fallback');
-    useRedis = false;
-    redisInitialized = true;
-  }
-}
-
-// Initialize Redis only if URL is provided
-if (REDIS_URL) {
-  initializeRedis();
-}
-
-// Fallback in-memory storage when Redis unavailable
-const fallbackVerificationCodes = new Map<string, { code: string; phone: string; doctorId: number; expiresAt: Date; attempts: number }>();
 
 export interface DoctorToken {
   doctorId: number;
@@ -78,8 +31,6 @@ export interface VerificationCode {
   expiresAt: Date;
   attempts: number;
 }
-
-// Verification codes now stored in Redis for persistence across server restarts
 
 export class DoctorAuthService {
   /**
@@ -111,7 +62,7 @@ export class DoctorAuthService {
 
       return decoded;
     } catch (error) {
-      console.error('Token verification failed:', error.message);
+      console.error('Token verification failed:', (error as Error).message);
       return null;
     }
   }
@@ -132,34 +83,21 @@ export class DoctorAuthService {
     try {
       // Generate 6-digit verification code
       const code = Math.floor(100000 + Math.random() * 900000).toString();
-      const expiresAt = new Date(Date.now() + VERIFICATION_CODE_EXPIRY);
       
-      // Store verification code (Redis with fallback to in-memory)
-      const verificationKey = `${phone}-${doctorId}`;
-      const verificationData = {
-        code,
-        phone,
+      // Store verification code using centralized service
+      const stored = await VerificationCodeStorageService.setCode(
         doctorId,
-        expiresAt,
-        attempts: 0
-      };
-      
-      if (useRedis && redisClient) {
-        try {
-          const redisKey = `2fa:doctor:${doctorId}:${phone}`;
-          const ttlSeconds = Math.floor(VERIFICATION_CODE_EXPIRY / 1000);
-          await redisClient.setex(redisKey, ttlSeconds, JSON.stringify({
-            code,
-            phone,
-            doctorId,
-            attempts: 0
-          }));
-        } catch (error) {
-          console.warn('Redis storage failed, using fallback:', error);
-          fallbackVerificationCodes.set(verificationKey, verificationData);
-        }
-      } else {
-        fallbackVerificationCodes.set(verificationKey, verificationData);
+        phone,
+        code,
+        VERIFICATION_CODE_EXPIRY,
+        'sms'
+      );
+
+      if (!stored) {
+        return {
+          success: false,
+          message: 'Failed to store verification code'
+        };
       }
 
       // Send SMS
@@ -177,7 +115,7 @@ export class DoctorAuthService {
         };
       }
     } catch (error) {
-      console.error('Error sending verification code:', error);
+      console.error('Error sending verification code:', (error as Error).message);
       return {
         success: false,
         message: 'Internal error sending verification code'
@@ -190,40 +128,8 @@ export class DoctorAuthService {
    */
   static async verifyCode(phone: string, doctorId: number, code: string): Promise<{ success: boolean, message: string }> {
     try {
-      const verificationKey = `${phone}-${doctorId}`;
-      let storedVerification: any = null;
-      let isFromRedis = false;
-
-      // Try Redis first if available
-      if (useRedis && redisClient) {
-        try {
-          const redisKey = `2fa:doctor:${doctorId}:${phone}`;
-          const storedData = await redisClient.get(redisKey);
-          if (storedData) {
-            storedVerification = JSON.parse(storedData);
-            isFromRedis = true;
-          }
-        } catch (redisError) {
-          console.warn('Redis retrieval failed, checking fallback storage:', redisError);
-        }
-      }
-
-      // Fallback to in-memory storage
-      if (!storedVerification) {
-        const fallbackData = fallbackVerificationCodes.get(verificationKey);
-        if (fallbackData) {
-          // Check expiry for fallback storage
-          if (new Date() > fallbackData.expiresAt) {
-            fallbackVerificationCodes.delete(verificationKey);
-            return {
-              success: false,
-              message: 'Verification code has expired. Please request a new code.'
-            };
-          }
-          storedVerification = fallbackData;
-          isFromRedis = false;
-        }
-      }
+      // Get stored verification code
+      const storedVerification = await VerificationCodeStorageService.getCode(doctorId, phone, 'sms');
 
       if (!storedVerification) {
         return {
@@ -234,12 +140,7 @@ export class DoctorAuthService {
 
       // Check attempts (rate limiting)
       if (storedVerification.attempts >= 3) {
-        if (isFromRedis && redisClient) {
-          const redisKey = `2fa:doctor:${doctorId}:${phone}`;
-          await redisClient.del(redisKey);
-        } else {
-          fallbackVerificationCodes.delete(verificationKey);
-        }
+        await VerificationCodeStorageService.deleteCode(doctorId, phone, 'sms');
         return {
           success: false,
           message: 'Too many failed attempts. Please request a new code.'
@@ -249,180 +150,116 @@ export class DoctorAuthService {
       // Verify code
       if (storedVerification.code === code) {
         // Success - clean up
-        if (isFromRedis && redisClient) {
-          const redisKey = `2fa:doctor:${doctorId}:${phone}`;
-          await redisClient.del(redisKey);
-        } else {
-          fallbackVerificationCodes.delete(verificationKey);
-        }
+        await VerificationCodeStorageService.deleteCode(doctorId, phone, 'sms');
         return {
           success: true,
           message: 'Phone number verified successfully'
         };
       } else {
         // Increment attempts
-        storedVerification.attempts++;
-        
-        if (isFromRedis && redisClient) {
-          const redisKey = `2fa:doctor:${doctorId}:${phone}`;
-          const ttl = await redisClient.ttl(redisKey);
-          if (ttl > 0) {
-            await redisClient.setex(redisKey, ttl, JSON.stringify(storedVerification));
-          }
-        } else {
-          // Update fallback storage
-          fallbackVerificationCodes.set(verificationKey, storedVerification);
-        }
+        await VerificationCodeStorageService.incrementAttempts(doctorId, phone, 'sms', storedVerification);
         
         return {
           success: false,
-          message: `Invalid verification code. ${3 - storedVerification.attempts} attempts remaining.`
+          message: `Invalid verification code. ${2 - storedVerification.attempts} attempts remaining.`
         };
       }
     } catch (error) {
-      console.error('Error during code verification:', error);
+      console.error('Error verifying code:', (error as Error).message);
       return {
         success: false,
-        message: 'Internal error during verification. Please try again.'
+        message: 'Internal error verifying code'
       };
-    }
-  }
-
-  /**
-   * Create secure password hash
-   */
-  static async hashPassword(password: string): Promise<string> {
-    const saltRounds = 12;
-    return bcrypt.hash(password, saltRounds);
-  }
-
-  /**
-   * Verify password against hash
-   */
-  static async verifyPassword(password: string, hash: string): Promise<boolean> {
-    return bcrypt.compare(password, hash);
-  }
-
-
-
-  /**
-   * Clean up expired verification codes from fallback storage
-   * (Redis handles TTL automatically)
-   */
-  static cleanupExpiredCodes(): void {
-    const now = new Date();
-    for (const [key, verification] of fallbackVerificationCodes.entries()) {
-      if (now > verification.expiresAt) {
-        fallbackVerificationCodes.delete(key);
-      }
     }
   }
 
   /**
    * Send welcome email with secure setup link
    */
-  static async sendWelcomeEmail(doctorEmail: string, doctorName: string, setupToken: string): Promise<{ success: boolean, message: string }> {
+  static async sendWelcomeEmail(doctorEmail: string, doctorName: string, doctorPhone: string): Promise<{ success: boolean, message: string }> {
     try {
+      // Find the doctor record to get their ID
+      const doctor = await storage.getDoctorByEmail(doctorEmail);
+      if (!doctor) {
+        return {
+          success: false,
+          message: 'Doctor not found'
+        };
+      }
+
+      // Generate secure access token
+      const accessToken = DoctorAuthService.generateAccessToken(doctor.id, doctorEmail, doctorPhone);
+      const setupUrl = DoctorAuthService.generateSetupUrl(accessToken);
+
       // Get the correct Replit domain from environment or construct it
       const replitDomain = process.env.REPLIT_DOMAINS?.split(',')[0] || 
                            `${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`;
       const baseUrl = `https://${replitDomain}`;
-      const setupUrl = `${baseUrl}/doctor-login`;
-      
+
       const emailSubject = 'Welcome to Keep Going Care - Complete Your Account Setup';
       const emailHtml = `
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff;">
           <!-- Header with KGC Logo -->
           <div style="text-align: center; padding: 40px 20px 20px; background: linear-gradient(135deg, #2E8BC0 0%, #1e40af 100%);">
             <div style="background-color: white; padding: 15px; border-radius: 12px; display: inline-block; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-              <div style="width: 120px; height: 60px; background-color: #2E8BC0; border-radius: 8px; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px;">
-                <span style="color: white; font-weight: bold; font-size: 16px;">KGC</span>
-              </div>
+              <h1 style="color: #2E8BC0; margin: 0; font-size: 24px; font-weight: bold;">Keep Going Care</h1>
+              <p style="color: #666; margin: 5px 0 0 0; font-size: 14px;">Healthcare Technology Platform</p>
             </div>
-            <h1 style="color: #ffffff; margin: 20px 0 0 0; font-size: 28px; font-weight: 600;">Welcome to Keep Going Care</h1>
           </div>
-          
+
           <!-- Main Content -->
-          <div style="padding: 30px; background-color: #ffffff;">
-            <p style="color: #1f2937; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
-              Dear Dr. ${doctorName},
+          <div style="padding: 40px 30px;">
+            <h2 style="color: #1f2937; font-size: 28px; margin-bottom: 20px; text-align: center;">Welcome to Keep Going Care, Dr. ${doctorName}!</h2>
+            
+            <p style="color: #4b5563; font-size: 16px; line-height: 1.6; margin-bottom: 25px;">
+              Thank you for joining Keep Going Care as a healthcare provider. You now have access to our comprehensive digital health platform designed to support your patients' health journey.
             </p>
-            
-            <p style="color: #4b5563; font-size: 15px; line-height: 1.6; margin: 0 0 20px 0;">
-              Welcome to Keep Going Care (KGC), a new Class I Software as a Medical Device (SaMD) designed to support your metabolic syndrome patients. KGC is built to seamlessly integrate with your care, empowering patients to make sustainable lifestyle modifications and reduce their risk of heart attack and stroke, all within the TGA regulatory framework.
-            </p>
-            
-            <h3 style="color: #1f2937; margin: 20px 0 15px 0; font-size: 18px; font-weight: 600;">What KGC Is:</h3>
-            <p style="color: #4b5563; font-size: 15px; line-height: 1.6; margin: 0 0 20px 0;">
-              KGC acts as a personalised health assistant for your patients. It combines your clinical guidance, delivered through Care Plan Directives (CPDs) you enter via the Doctor Dashboard, with Australian health guidelines and patient preferences. Using evidence-based techniques from Cognitive Behavioural Therapy (CBT) and Motivational Interviewing (MI), KGC provides non-diagnostic, educational support tailored to each individual.
-            </p>
-            
-            <h3 style="color: #1f2937; margin: 20px 0 15px 0; font-size: 18px; font-weight: 600;">How KGC Works for You and Your Patients:</h3>
-            <ul style="color: #4b5563; font-size: 15px; line-height: 1.6; margin: 0 0 20px 0; padding-left: 20px;">
-              <li style="margin-bottom: 10px;"><strong>Set Patient Directives:</strong> Easily enter personalised CPDs for Diet, Exercise/Wellness Routine, and Medication via your dedicated Doctor Dashboard. These directives form the foundation of the patient experience within the app.</li>
-              <li style="margin-bottom: 10px;"><strong>Receive Patient Progress Reports (PPRs):</strong> Gain valuable insights into your patients engagement and self-reported progress through PPRs generated from their daily self-scores (1-10) and usage of the unique "Keep Going" motivation button.</li>
-              <li style="margin-bottom: 10px;"><strong>Support Patient Adherence:</strong> KGC provides a supportive, engaging platform that helps keep patients motivated, subtly encouraging adherence to their care plan through personalised interactions and helpful features like curated health content and local service directories (presented via a friendly AI interface, our Supervisor Agent).</li>
-              <li style="margin-bottom: 10px;"><strong>Safety and Escalation:</strong> KGC monitors patient engagement and query scope. If a patient stops using the app for 24+ hours or asks questions outside the scope of a Type 1 SaMD, KGC will notify you using the contact details provided. In the event of a medical emergency expressed by the patient (indicating risk of death, serious injury, or self-harm), KGC is programmed to recommend calling 000.</li>
-            </ul>
-            
-            <h3 style="color: #1f2937; margin: 20px 0 15px 0; font-size: 18px; font-weight: 600;">Participate in the Mini Clinical Audit (MCA):</h3>
-            <p style="color: #4b5563; font-size: 15px; line-height: 1.6; margin: 0 0 20px 0;">
-              We invite you to participate in our Mini Clinical Audit, directly accessible through your Doctor Dashboard. By prescribing KGC to a minimum of 5 appropriate patients (those at risk of heart attack and stroke, suitable for primary prevention, and comfortable using technology), monitoring their progress via PPRs for 3 months, and measuring simple health outcomes, you can earn 5 hours of accredited CPD under the ACRRM and RACGP "Measuring Outcomes" category.
-            </p>
-            
-            <div style="background-color: #fef3c7; border: 1px solid #fbbf24; border-radius: 8px; padding: 20px; margin: 25px 0;">
-              <h4 style="color: #92400e; margin: 0 0 15px 0; font-size: 16px; font-weight: 600;">Terms and Conditions Agreement Required</h4>
-              <p style="color: #92400e; margin: 0 0 15px 0; font-size: 14px; line-height: 1.6;">
-                <strong>Terms and Conditions Summary:</strong><br>
-                By using Keep Going Care, you agree to our Terms and Conditions. Please note the following key points:
+
+            <div style="background-color: #f8fafc; border-left: 4px solid #2E8BC0; padding: 20px; margin: 25px 0; border-radius: 6px;">
+              <h3 style="color: #1f2937; margin-top: 0; font-size: 18px;">🔒 Secure Account Setup Required</h3>
+              <p style="color: #4b5563; margin-bottom: 15px; font-size: 14px;">
+                For security, please complete your account setup using the secure link below. This link will expire in 24 hours.
               </p>
-              <ul style="color: #92400e; font-size: 14px; line-height: 1.6; margin: 0; padding-left: 20px;">
-                <li style="margin-bottom: 8px;"><strong>Data Privacy:</strong> All private health data is managed securely in accordance with applicable Australian state and federal privacy laws.</li>
-                <li style="margin-bottom: 8px;"><strong>Software as a Medical Device (SaMD):</strong> KGC is a Class I SaMD providing non-diagnostic, educational support. It is not intended for diagnosis or treatment of any medical condition.</li>
-                <li style="margin-bottom: 8px;"><strong>AI and LLM Limitations:</strong> KGC utilises Artificial Intelligence, including Large Language Models (LLMs). While powerful, LLMs are prone to occasional inaccuracies or hallucinations. All information provided by the KGC system is for educational purposes only and must not be considered definitive or acted upon until verified by a qualified healthcare professional.</li>
-                <li style="margin-bottom: 8px;"><strong>Verification is Key:</strong> You, as the healthcare professional, remain responsible for all clinical decisions and for verifying any information presented by the KGC system in relation to your patients care.</li>
+            </div>
+
+            <!-- Setup Button -->
+            <div style="text-align: center; margin: 35px 0;">
+              <a href="${setupUrl}" style="background: linear-gradient(135deg, #2E8BC0 0%, #1e40af 100%); color: white; padding: 15px 35px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; display: inline-block; box-shadow: 0 4px 12px rgba(46, 139, 192, 0.3);">
+                Complete Account Setup
+              </a>
+            </div>
+
+            <div style="background-color: #fef3cd; border: 1px solid #fbbf24; border-radius: 6px; padding: 15px; margin: 25px 0;">
+              <p style="color: #92400e; margin: 0; font-size: 14px;">
+                <strong>Important:</strong> You'll need to verify your mobile phone number (${doctorPhone}) during setup for two-factor authentication.
+              </p>
+            </div>
+
+            <!-- Features Overview -->
+            <div style="margin-top: 40px;">
+              <h3 style="color: #1f2937; font-size: 20px; margin-bottom: 20px;">What You Can Do:</h3>
+              <ul style="color: #4b5563; line-height: 1.8; font-size: 15px;">
+                <li><strong>Patient Management:</strong> Add and monitor patients in your care</li>
+                <li><strong>Care Plan Creation:</strong> Develop personalised care plans and track progress</li>
+                <li><strong>Health Monitoring:</strong> Real-time access to patient health metrics</li>
+                <li><strong>Secure Messaging:</strong> Communicate safely with patients</li>
+                <li><strong>Compliance Tools:</strong> TGA-compliant digital health solutions</li>
               </ul>
-              <p style="color: #92400e; margin: 15px 0 0 0; font-size: 14px; font-weight: 600;">
-                By using Keep Going Care, you confirm that you have read and agree to these terms.
-              </p>
             </div>
-            
-            <p style="color: #4b5563; font-size: 15px; line-height: 1.6; margin: 20px 0;">
-              We are excited to partner with you in supporting your patients health journeys. You can access your account setup here:
-            </p>
-            
-            <!-- Call to Action Button -->
-            <div style="text-align: center; margin: 25px 0;">
-              <a href="${baseUrl}/doctor-login" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; padding: 16px 32px; text-decoration: none; border-radius: 8px; display: inline-block; font-weight: 600; font-size: 16px; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);">
-                🔐 Complete Account Setup
-              </a>
-            </div>
-            
-            <p style="color: #6b7280; font-size: 13px; text-align: center; margin: 15px 0 25px 0;">
-              This secure setup link expires in 24 hours for your protection.
-            </p>
-            
-            <p style="color: #4b5563; font-size: 15px; line-height: 1.6; margin: 20px 0 15px 0;">
-              <strong>Additional Resources:</strong>
-            </p>
-            <div style="text-align: center; margin: 15px 0 30px 0;">
-              <a href="https://youtu.be/AitZI0VTYj8" style="background-color: #2E8BC0; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: 500; font-size: 14px;">
-                📹 Mini Clinical Audit Explainer Video
-              </a>
-            </div>
-            
-            <p style="color: #1f2937; font-size: 15px; line-height: 1.6; margin: 0;">
-              Sincerely,<br>
-              <strong>The Keep Going Care Team</strong><br>
-              Anthrocyt AI Pty Ltd
+
+            <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
+
+            <p style="color: #6b7280; font-size: 14px; line-height: 1.6;">
+              If you have any questions or need assistance, please don't hesitate to contact our support team.<br>
+              This email was sent to ${doctorEmail}. If you did not request this account, please disregard this email.
             </p>
           </div>
-          
+
           <!-- Footer -->
-          <div style="background-color: #f9fafb; padding: 20px; text-align: center; border-top: 1px solid #e5e7eb;">
-            <p style="color: #9ca3af; font-size: 12px; margin: 0;">
-              © 2025 Keep Going Care. All rights reserved.<br>
-              This is a secure, TGA-compliant healthcare communication.
+          <div style="background-color: #f9fafb; padding: 20px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+            <p style="color: #9ca3af; margin: 0; font-size: 12px;">
+              © 2024 Keep Going Care. Healthcare Technology Platform.<br>
+              Secure • Compliant • Patient-Focused
             </p>
           </div>
         </div>
@@ -430,25 +267,27 @@ export class DoctorAuthService {
 
       const result = await emailService.sendEmail({
         to: doctorEmail,
-        from: 'welcome@keepgoingcare.com',
         subject: emailSubject,
         html: emailHtml
       });
 
-      return result;
+      if (result.success) {
+        return {
+          success: true,
+          message: 'Welcome email sent successfully'
+        };
+      } else {
+        return {
+          success: false,
+          message: result.error || 'Failed to send welcome email'
+        };
+      }
     } catch (error) {
-      console.error('Error sending welcome email:', error);
+      console.error('Error sending welcome email:', (error as Error).message);
       return {
         success: false,
-        message: 'Failed to send welcome email'
+        message: 'Internal error sending welcome email'
       };
     }
   }
 }
-
-// Clean up expired codes every 5 minutes
-setInterval(() => {
-  DoctorAuthService.cleanupExpiredCodes();
-}, 5 * 60 * 1000);
-
-export { DoctorAuthService as doctorAuthService };
