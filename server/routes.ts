@@ -67,6 +67,7 @@ import {
   getPatientProgressReportById
 } from './services/pprService';
 import { randomUUID } from "crypto";
+import { VerificationCodeStorageService } from './services/verificationCodeStorageService';
 
 // Generate a Unique Identity Number (UIN) for users
 function generateUIN(prefix: string, doctorId?: number): string {
@@ -5873,12 +5874,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Doctor Setup API Routes
   const { DoctorAuthService } = await import('./services/doctorAuthService.js');
-  
-  // Simple Doctor Login API Routes  
-  const smsVerificationCodes = new Map<string, { code: string, expiresAt: Date }>();
-  
-  // Simple Patient Login API Routes
-  const patientSmsVerificationCodes = new Map<string, { code: string, expiresAt: Date }>();
 
   // Send SMS code for doctor login
   app.post("/api/doctor/login/send-sms", async (req, res) => {
