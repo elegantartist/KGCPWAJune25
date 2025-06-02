@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { sessionTimeoutMiddleware, updateSessionActivity } from "./sessionTimeout";
+import session from 'express-session';
 import path from "path";
 import fs from "fs";
 import { 
@@ -148,6 +149,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/ping", (req, res) => {
     res.status(200).send("pong");
   });
+
+  // Configure Express Session with MemoryStore for development
+  const NODE_ENV = process.env.NODE_ENV || 'development';
+  
+  console.warn('Using in-memory store for Express sessions (Development Mode). NOT FOR PRODUCTION.');
+
+  app.use(
+    session({
+      secret: process.env.SESSION_SECRET || 'a-very-secret-string-for-dev',
+      resave: false,
+      saveUninitialized: false,
+      cookie: {
+        secure: NODE_ENV === 'production',
+        httpOnly: true,
+        maxAge: 24 * 60 * 60 * 1000
+      }
+    })
+  );
 
   // Apply session timeout middleware to all authenticated routes
   app.use("/api", sessionTimeoutMiddleware);
@@ -5961,12 +5980,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid verification code" });
       }
       
-      // Code is valid - clean up and login
+      // Code is valid - clean up and update last login
       await VerificationCodeStorageService.deleteCode(doctor.id, email, 'sms');
-      
-      if (!doctor) {
-        return res.status(404).json({ message: "Doctor not found" });
-      }
       
       // Update last login
       await db
