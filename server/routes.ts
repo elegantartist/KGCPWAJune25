@@ -3185,7 +3185,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`Generated new setup token for doctor ${doctor[0].id} (${email})`);
 
       // Send updated welcome email
-      const emailResult = await DoctorAuthService.sendWelcomeEmail(email, doctorName, setupToken);
+      const emailResult = await DoctorAuthService.sendWelcomeEmail(email, doctorName, doctorPhone, req);
 
       if (emailResult.success) {
         console.log(`Updated welcome email sent successfully to ${email}`);
@@ -3579,7 +3579,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get doctor profile
   app.get("/api/doctor/profile", async (req, res) => {
     try {
-      const doctorId = req.session.doctorId; // Get doctorId directly from session
+      const session = req.session as any;
+      const doctorId = session.doctorId; // Get doctorId directly from session
 
       if (!doctorId) {
         return res.status(401).json({ message: "Not authenticated as a doctor" });
@@ -3792,7 +3793,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get doctor's patients
   app.get("/api/doctor/patients", async (req, res) => {
     try {
-      const doctorId = req.session.doctorId; // Get doctorId directly from session
+      const session = req.session as any;
+      const doctorId = session.doctorId; // Get doctorId directly from session
 
       if (!doctorId) {
         return res.status(401).json({ message: "Not authenticated as a doctor" });
