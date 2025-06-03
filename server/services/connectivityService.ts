@@ -5,11 +5,7 @@
  * Healthcare systems require consistent, reliable responses regardless of connection quality.
  */
 
-// Simplified connectivity state
-export enum ConnectivityLevel {
-  OFFLINE = 0,
-  ONLINE = 1
-}
+import { ConnectivityLevel } from '@shared/types';
 
 /**
  * Determines basic connectivity state

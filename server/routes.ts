@@ -20,10 +20,10 @@ import path from "path";
 import fs from "fs";
 import { 
   determineConnectivityLevel, 
-  ConnectivityLevel,
   adaptResponseForConnectivity,
   selectModelForConnectivity
 } from './services/connectivityService';
+import { ConnectivityLevel } from '@shared/types';
 import { privacyService } from './services/privacyService';
 import { 
   insertHealthMetricSchema, 
