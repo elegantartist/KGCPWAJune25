@@ -1,7 +1,18 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { sessionTimeoutMiddleware, updateSessionActivity } from "./sessionTimeout";
+import { sessionTimeoutMiddleware, updateSessionActivity, SessionData } from "./sessionTimeout";
+
+// Extend Express session interface
+declare module 'express-session' {
+  interface SessionData {
+    userId?: number;
+    doctorId?: number;
+    patientId?: number;
+    userRole?: string;
+    lastActivity?: number;
+  }
+}
 import session from 'express-session';
 import { RedisStore } from 'connect-redis';
 import { Redis } from 'ioredis';
@@ -189,13 +200,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Get current user
   app.get("/api/user", async (req, res) => {
-    const user = await storage.getUserByUsername("billsmith");
-    
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
+    try {
+      const session = req.session as any;
+      let userIdToFetch = session.userId || session.doctorId || session.patientId;
+
+      if (!userIdToFetch) {
+        return res.status(401).json({ message: "Not authenticated or user ID not in session" });
+      }
+
+      const user = await storage.getUser(userIdToFetch);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      res.json(user);
+    } catch (error) {
+      console.error("Error fetching user:", error);
+      res.status(500).json({ message: "Failed to fetch user" });
     }
-    
-    return res.json(user);
   });
   
   // Get user by ID
@@ -3558,8 +3579,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get doctor profile
   app.get("/api/doctor/profile", async (req, res) => {
     try {
-      // For testing purposes, allow passing doctorId in query params
-      const doctorId = req.query.doctorId ? parseInt(req.query.doctorId as string) : 3; // Default to Dr. Adel (id: 3)
+      const doctorId = req.session.doctorId; // Get doctorId directly from session
+
+      if (!doctorId) {
+        return res.status(401).json({ message: "Not authenticated as a doctor" });
+      }
       
       const [doctor] = await db
         .select()
@@ -3768,8 +3792,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get doctor's patients
   app.get("/api/doctor/patients", async (req, res) => {
     try {
-      // For testing purposes, allow passing doctorId in query params
-      const doctorId = req.query.doctorId ? parseInt(req.query.doctorId as string) : 3; // Default to Dr. Adel (id: 3)
+      const doctorId = req.session.doctorId; // Get doctorId directly from session
+
+      if (!doctorId) {
+        return res.status(401).json({ message: "Not authenticated as a doctor" });
+      }
       
       // Get assigned patients from the doctor_patients relationship table
       const relationships = await db.select()
