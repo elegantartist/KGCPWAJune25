@@ -2966,7 +2966,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let emailResult = { success: false, error: 'Email not attempted' };
       try {
         const { DoctorAuthService } = await import('./services/doctorAuthService');
-        const emailSent = await DoctorAuthService.sendWelcomeEmail(doctor.email, doctor.name, setupToken);
+        const emailSent = await DoctorAuthService.sendWelcomeEmail(doctor.email, doctor.name, doctor.phoneNumber || '', req);
         
         if (emailSent.success) {
           emailResult = { success: true, error: '' };

@@ -72,10 +72,19 @@ export class DoctorAuthService {
   /**
    * Generate secure setup URL with token
    */
-  static generateSetupUrl(token: string, baseUrl?: string): string {
-    // Use the current request's host or fall back to Replit domain
-    const domain = baseUrl || `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`;
-    return `${domain}/doctor-setup?token=${token}`;
+  static generateSetupUrl(token: string, req?: any): string {
+    // Use the request host if available, otherwise fallback to environment
+    let baseUrl;
+    if (req && req.get && req.get('host')) {
+      const protocol = req.secure || req.get('x-forwarded-proto') === 'https' ? 'https' : 'http';
+      baseUrl = `${protocol}://${req.get('host')}`;
+    } else {
+      // Fallback to environment variables
+      const replitDomain = process.env.REPLIT_DOMAINS?.split(',')[0] || 
+                           `${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`;
+      baseUrl = `https://${replitDomain}`;
+    }
+    return `${baseUrl}/doctor-setup?token=${token}`;
   }
 
   /**
@@ -178,7 +187,7 @@ export class DoctorAuthService {
   /**
    * Send welcome email with secure setup link
    */
-  static async sendWelcomeEmail(doctorEmail: string, doctorName: string, doctorPhone: string): Promise<{ success: boolean, message: string }> {
+  static async sendWelcomeEmail(doctorEmail: string, doctorName: string, doctorPhone: string, req?: any): Promise<{ success: boolean, message: string }> {
     try {
       // Find the doctor record to get their ID
       const doctor = await storage.getUserByEmail(doctorEmail);
@@ -191,7 +200,7 @@ export class DoctorAuthService {
 
       // Generate secure access token
       const accessToken = DoctorAuthService.generateAccessToken(doctor.id, doctorEmail, doctorPhone);
-      const setupUrl = DoctorAuthService.generateSetupUrl(accessToken);
+      const setupUrl = DoctorAuthService.generateSetupUrl(accessToken, req);
 
       // Get the correct Replit domain from environment or construct it
       const replitDomain = process.env.REPLIT_DOMAINS?.split(',')[0] || 
