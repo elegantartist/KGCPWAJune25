@@ -227,7 +227,7 @@ export class DoctorAuthService {
       </p>
       <h3 style="color: #1f2937; margin: 20px 0 15px 0; font-size: 18px; font-weight: 600;">What KGC Is:</h3>
       <p style="color: #4b5563; font-size: 15px; line-height: 1.6; margin: 0 0 20px 0;">
-        KGC acts as a personalised health assistant for your patients. It combines your clinical guidance, delivered through Care Plan Directives (CPDs) you enter via the Doctor Dashboard, with Australian health guidelines and patient preferences. Using evidence-based techniques from Cognitive Behavioral Therapy (CBT) and Motivational Interviewing (MI), KGC provides non-diagnostic, educational support tailored to each individual.
+        KGC acts as a personalised health assistant for your patients. It combines your clinical guidance, delivered through Care Plan Directives (CPDs) you enter via the Doctor Dashboard, with Australian health guidelines and patient preferences. Using evidence-based techniques from Cognitive Behavioural Therapy (CBT) and Motivational Interviewing (MI), KGC provides non-diagnostic, educational support tailored to each individual.
       </p>
       <h3 style="color: #1f2937; margin: 20px 0 15px 0; font-size: 18px; font-weight: 600;">How KGC Works for You and Your Patients:</h3>
       <ul style="color: #4b5563; font-size: 15px; line-height: 1.6; margin: 0 0 20px 0; padding-left: 20px;">
@@ -248,8 +248,8 @@ export class DoctorAuthService {
         </p>
         <ul style="color: #92400e; font-size: 14px; line-height: 1.6; margin: 0; padding-left: 20px;">
           <li style="margin-bottom: 8px;"><strong>Data Privacy:</strong> All private health data is managed securely in accordance with applicable Australian state and federal privacy laws.</li>
-          <li style="margin-bottom: 8px;"><strong>Software as a Medical Device (SaMD):</strong> KGC is a Class I SaMD providing non-diagnostic, educational support. It is not intended for diagnosis or treatment.</li>
-          <li style="margin-bottom: 8px;"><strong>AI Limitations:</strong> KGC uses AI technology. All information is for educational purposes and should be verified with your healthcare professional.</li>
+          <li style="margin-bottom: 8px;"><strong>Software as a Medical Device (SaMD):</strong> KGC is a Class I SaMD providing non-diagnostic, educational support. It is not intended for diagnosis or treatment of any medical condition.</li>
+          <li style="margin-bottom: 8px;"><strong>AI and LLM Limitations:</strong> KGC utilises Artificial Intelligence, including Large Language Models (LLMs). While powerful, LLMs are prone to occasional inaccuracies or hallucinations. All information provided by the KGC system is for educational purposes only and must not be considered definitive or acted upon until verified by a qualified healthcare professional.</li>
           <li style="margin-bottom: 8px;"><strong>Verification is Key:</strong> You, as the healthcare professional, remain responsible for all clinical decisions and for verifying any information presented by the KGC system in relation to your patients care.</li>
         </ul>
         <p style="color: #92400e; margin: 15px 0 0 0; font-size: 14px; font-weight: 600;">
