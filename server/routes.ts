@@ -2939,7 +2939,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         phoneNumber: req.body.phoneNumber,
         roleId: 2, // Set role to doctor
         isActive: false, // Inactive until account setup is complete
-        // username and password are null until setup completion (SMS-based auth)
+        username: '', // Will be set during setup
+        password: '' // Will be set during setup
       };
       
       const doctorData = insertUserSchema.parse(doctorInput);
