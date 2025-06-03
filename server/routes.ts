@@ -82,6 +82,7 @@ import {
 } from './services/pprService';
 import { randomUUID } from "crypto";
 import { VerificationCodeStorageService } from './services/verificationCodeStorageService';
+import { DoctorAuthService } from './services/doctorAuthService';
 
 // Generate a Unique Identity Number (UIN) for users
 function generateUIN(prefix: string, doctorId?: number): string {
@@ -3179,13 +3180,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Generate new setup token
-      const DoctorAuthService = (await import('./services/doctorAuthService')).DoctorAuthService;
       const setupToken = DoctorAuthService.generateAccessToken(doctor[0].id, doctor[0].email, doctor[0].phoneNumber || '');
       
       console.log(`Generated new setup token for doctor ${doctor[0].id} (${email})`);
 
       // Send updated welcome email
-      const emailResult = await DoctorAuthService.sendWelcomeEmail(email, doctorName, doctorPhone, req);
+      const emailResult = await DoctorAuthService.sendWelcomeEmail(email, doctorName, doctor[0].phoneNumber || '', req);
 
       if (emailResult.success) {
         console.log(`Updated welcome email sent successfully to ${email}`);
