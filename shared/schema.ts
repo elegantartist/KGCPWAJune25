@@ -19,7 +19,7 @@ export const users = pgTable("users", {
   roleId: integer("role_id").notNull().references(() => userRoles.id),
   phoneNumber: text("phone_number"),
   joinedDate: timestamp("joined_date").defaultNow().notNull(),
-  username: text("username").notNull().unique(),
+  username: text("username").unique(),
   password: text("password"), // Optional for SMS-based auth
   isActive: boolean("is_active").default(true).notNull(),
   lastLogin: timestamp("last_login"),
@@ -167,7 +167,7 @@ export const insertUserSchema = createInsertSchema(users).pick({
   uin: true,
   phoneNumber: true,
   isActive: true,
-});
+}).partial({ username: true, password: true });
 
 // Update schema for users (for updating existing users)
 export const updateUserSchema = createInsertSchema(users).pick({
