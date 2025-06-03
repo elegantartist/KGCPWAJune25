@@ -3148,9 +3148,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Verify the code
       const verification = await verifyPhoneCode(doctor[0].phoneNumber!, code);
       
+      if (!verification.valid) {
+        return res.status(400).json({
+          success: false,
+          error: verification.error || "Invalid verification code"
+        });
+      }
+
+      // Update doctor status to active
+      await db
+        .update(users)
+        .set({ 
+          isActive: true,
+          lastLogin: new Date()
+        })
+        .where(eq(users.id, doctor[0].id));
+
+      // Establish proper session for the doctor
+      if (!req.session) {
+        req.session = {};
+      }
+      req.session.doctorId = doctor[0].id;
+      req.session.userRole = 'doctor';
+      req.session.lastActivity = Date.now();
+      
       return res.json({
-        success: verification.valid,
-        error: verification.error
+        success: true,
+        message: "Setup completed successfully",
+        doctor: {
+          id: doctor[0].id,
+          name: doctor[0].name,
+          email: doctor[0].email,
+          uin: doctor[0].uin
+        }
       });
     } catch (error) {
       console.error("Code verification error:", error);
