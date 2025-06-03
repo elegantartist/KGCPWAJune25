@@ -13,7 +13,7 @@ import { ConnectivityLevel } from '@shared/types';
  * @returns ConnectivityLevel enum value
  */
 export function determineConnectivityLevel(online: boolean = true): ConnectivityLevel {
-  return online ? ConnectivityLevel.ONLINE : ConnectivityLevel.OFFLINE;
+  return online ? ConnectivityLevel.FULL : ConnectivityLevel.OFFLINE;
 }
 
 /**
@@ -23,7 +23,7 @@ export function determineConnectivityLevel(online: boolean = true): Connectivity
  * @returns Full data for online, error message for offline
  */
 export function adaptResponseForConnectivity<T>(data: T, level: ConnectivityLevel): T | string {
-  if (level === ConnectivityLevel.ONLINE) {
+  if (level === ConnectivityLevel.FULL) {
     // Always return full data for healthcare applications
     return data;
   }
@@ -46,7 +46,7 @@ export function selectModelForConnectivity(
       // For offline mode, return error configuration
       return { model: 'offline', maxTokens: 0 };
     
-    case ConnectivityLevel.ONLINE:
+    case ConnectivityLevel.FULL:
     default:
       // Always use the best available model for healthcare responses
       return { model: 'gpt-4o', maxTokens: 1000 };
