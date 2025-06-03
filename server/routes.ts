@@ -6192,6 +6192,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Rate limiting map for SMS sends (doctorId -> lastSendTime)
+  const smsRateLimitMap = new Map<number, number>();
+  const SMS_RATE_LIMIT_MS = 30000; // 30 seconds between SMS sends
+
   // Send verification code
   app.post("/api/doctor/setup/send-verification", async (req, res) => {
     try {
@@ -6207,9 +6211,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Invalid or expired setup token" });
       }
       
+      // Check rate limiting
+      const now = Date.now();
+      const lastSendTime = smsRateLimitMap.get(tokenData.doctorId) || 0;
+      
+      if (now - lastSendTime < SMS_RATE_LIMIT_MS) {
+        const remainingTime = Math.ceil((SMS_RATE_LIMIT_MS - (now - lastSendTime)) / 1000);
+        return res.status(429).json({ 
+          success: false, 
+          message: `Please wait ${remainingTime} seconds before requesting another code` 
+        });
+      }
+      
       const result = await DoctorAuthService.sendVerificationCode(tokenData.phone, tokenData.doctorId);
       
       if (result.success) {
+        // Update rate limit timestamp only on successful send
+        smsRateLimitMap.set(tokenData.doctorId, now);
         res.json({ success: true, message: result.message });
       } else {
         res.status(400).json({ success: false, message: result.message });
