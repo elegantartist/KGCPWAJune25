@@ -100,19 +100,22 @@ export default function DoctorDashboard() {
     retry: false,
   });
 
-  // Get doctor's patients
+  // Get doctor's patients with admin impersonation support
   const { 
     data: patients, 
     isLoading: isLoadingPatients,
     refetch: refetchPatients
   } = useQuery({
-    queryKey: ["/api/doctor/patients", doctor?.id],
+    queryKey: ["/api/doctor/patients", doctor?.id, impersonateDoctorId],
     queryFn: async () => {
-      const res = await fetch(`/api/doctor/patients?doctorId=${doctor?.id || 3}`);
+      const url = impersonateDoctorId 
+        ? `/api/doctor/patients?impersonateDoctor=${impersonateDoctorId}`
+        : '/api/doctor/patients';
+      const res = await fetch(url);
       if (!res.ok) throw new Error('Failed to fetch patients');
       return res.json();
     },
-    enabled: true,
+    enabled: !!doctor,
     retry: false,
   });
 
