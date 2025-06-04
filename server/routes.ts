@@ -6323,7 +6323,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Generate secure MCA access token for authenticated doctors and admins
+  // Generate secure MCA access token for authenticated doctors and admins with proper data segregation
   app.post("/api/doctor/mca-access", async (req, res) => {
     try {
       // Check session data
@@ -6331,43 +6331,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const doctorId = session?.doctorId;
       const userId = session?.userId;
       const userRole = session?.userRole;
+      const targetDoctorId = req.body.targetDoctorId; // For admin super-user access
       
-      console.log("MCA Access - Full session:", { doctorId, userId, userRole, sessionKeys: Object.keys(session || {}) });
+      console.log("MCA Access - Full session:", { doctorId, userId, userRole, targetDoctorId, sessionKeys: Object.keys(session || {}) });
       
       // Allow access for authenticated doctors or admins
       if (!doctorId && !userId) {
         return res.status(401).json({ message: "Authentication required - no valid session found" });
       }
       
-      // Get user details for token
-      let user;
-      if (doctorId) {
-        // Doctor session
+      // Determine which doctor's MCA to access
+      let targetDoctor;
+      let returnUrl = '/doctor-dashboard';
+      let accessContext = 'direct';
+      
+      if (targetDoctorId && userRole === 'admin') {
+        // Admin accessing specific doctor's MCA
+        const [adminTargetDoctor] = await db
+          .select()
+          .from(users)
+          .where(and(eq(users.id, targetDoctorId), eq(users.roleId, 2)));
+        
+        if (!adminTargetDoctor) {
+          return res.status(404).json({ message: "Target doctor not found" });
+        }
+        
+        targetDoctor = adminTargetDoctor;
+        returnUrl = `/admin-dashboard?doctorView=${targetDoctorId}`;
+        accessContext = 'admin_superuser';
+        
+        console.log(`Admin ${userId} accessing MCA for doctor ${targetDoctorId} (${adminTargetDoctor.name})`);
+      } else if (doctorId) {
+        // Doctor accessing their own MCA
         const [doctorData] = await db
           .select()
           .from(users)
           .where(eq(users.id, doctorId));
-        user = doctorData;
-      } else if (userId) {
-        // Admin or other user session
-        const [userData] = await db
-          .select()
-          .from(users)
-          .where(eq(users.id, userId));
-        user = userData;
+        targetDoctor = doctorData;
+        accessContext = 'doctor_direct';
+      } else if (userId && userRole === 'admin') {
+        return res.status(400).json({ message: "Admin must specify targetDoctorId to access MCA" });
       }
       
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
+      if (!targetDoctor) {
+        return res.status(404).json({ message: "Doctor not found" });
       }
       
-      // Generate secure token for MCA access (expires in 24 hours)
+      // Get assigned patients for this doctor from doctor_patients table
+      const assignedPatients = await db
+        .select({
+          patientId: doctorPatients.patientId
+        })
+        .from(doctorPatients)
+        .where(eq(doctorPatients.doctorId, targetDoctor.id));
+      
+      const patientIds = assignedPatients.map(p => p.patientId);
+      
+      console.log(`Doctor ${targetDoctor.id} (${targetDoctor.name}) has ${patientIds.length} assigned patients: [${patientIds.join(', ')}]`);
+      
+      // Generate secure token for MCA access with patient filtering data
       const mcaToken = {
-        userId: user.id,
-        name: user.name,
-        email: user.email,
-        uin: user.uin,
-        role: userRole || 'doctor',
+        userId: targetDoctor.id,
+        name: targetDoctor.name,
+        email: targetDoctor.email,
+        uin: targetDoctor.uin,
+        role: 'doctor',
+        assignedPatientIds: patientIds, // Critical: Include assigned patient list for data segregation
+        accessContext: accessContext,
+        accessedByAdmin: userRole === 'admin',
+        adminUserId: userRole === 'admin' ? userId : null,
         timestamp: Date.now(),
         expiresAt: Date.now() + (24 * 60 * 60 * 1000) // 24 hours
       };
@@ -6377,12 +6409,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Your MCA app URL - can be updated when you have the Replit URL
       const mcaAppUrl = process.env.MCA_APP_URL || 'https://your-mca-app.replit.app';
-      const mcaAccessUrl = `${mcaAppUrl}?source=kgc&return_url=${encodeURIComponent(req.protocol + '://' + req.get('host') + '/doctor-dashboard')}`;
+      const mcaAccessUrl = `${mcaAppUrl}?source=kgc&token=${encodeURIComponent(encodedToken)}&return_url=${encodeURIComponent(req.protocol + '://' + req.get('host') + returnUrl)}`;
       
       res.json({
         success: true,
         mcaAccessUrl,
         token: encodedToken,
+        doctorId: targetDoctor.id,
+        doctorName: targetDoctor.name,
+        assignedPatientCount: patientIds.length,
+        accessContext: accessContext,
         expiresIn: '24 hours'
       });
       

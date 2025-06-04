@@ -321,17 +321,17 @@ export default function AdminDashboard() {
     }
   });
 
-  // MCA access mutation
+  // MCA access mutation for admin super-user access
   const mcaAccessMutation = useMutation({
-    mutationFn: () => {
-      return apiRequest("POST", "/api/doctor/mca-access", {});
+    mutationFn: (params: { targetDoctorId?: number } = {}) => {
+      return apiRequest("POST", "/api/doctor/mca-access", params);
     },
     onSuccess: (data) => {
       // Open MCA app in new tab with secure token
       window.open(data.mcaAccessUrl, '_blank');
       toast({
         title: "MCA Access Granted",
-        description: "Opening Mini Clinical Audit application",
+        description: `Opening ${data.doctorName || 'Doctor'}'s Mini Clinical Audit (${data.assignedPatientCount} patients)`,
       });
     },
     onError: (error) => {
@@ -935,41 +935,55 @@ export default function AdminDashboard() {
                         )}
                       </TableCell>
                       <TableCell>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button 
-                              variant="outline" 
-                              size="icon" 
-                              className="h-8 w-8 text-red-500"
-                              onClick={() => setUserToDelete({
-                                id: doctor.id,
-                                name: doctor.name,
-                                role: "doctor"
-                              })}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Deactivate Doctor</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Are you sure you want to deactivate <strong>{userToDelete?.name}</strong>? This will prevent them from accessing the system and managing their patients. This action can be reversed later if needed.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel onClick={() => setUserToDelete(null)}>
-                                Cancel
-                              </AlertDialogCancel>
-                              <AlertDialogAction 
-                                onClick={handleDeleteUser}
-                                className="bg-red-500 text-white hover:bg-red-600"
+                        <div className="flex items-center space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 text-[#2E8BC0] border-[#2E8BC0] hover:bg-[#2E8BC0] hover:text-white"
+                            onClick={() => {
+                              mcaAccessMutation.mutate({ targetDoctorId: doctor.id });
+                            }}
+                            disabled={mcaAccessMutation.isPending}
+                          >
+                            <FileBarChart className="h-3 w-3 mr-1" />
+                            MCA
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button 
+                                variant="outline" 
+                                size="icon" 
+                                className="h-8 w-8 text-red-500"
+                                onClick={() => setUserToDelete({
+                                  id: doctor.id,
+                                  name: doctor.name,
+                                  role: "doctor"
+                                })}
                               >
-                                {deleteUserMutation.isPending ? "Deactivating..." : "Deactivate"}
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Deactivate Doctor</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to deactivate <strong>{userToDelete?.name}</strong>? This will prevent them from accessing the system and managing their patients. This action can be reversed later if needed.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel onClick={() => setUserToDelete(null)}>
+                                  Cancel
+                                </AlertDialogCancel>
+                                <AlertDialogAction 
+                                  onClick={handleDeleteUser}
+                                  className="bg-red-500 text-white hover:bg-red-600"
+                                >
+                                  {deleteUserMutation.isPending ? "Deactivating..." : "Deactivate"}
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
