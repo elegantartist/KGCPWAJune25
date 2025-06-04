@@ -2,6 +2,10 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { sessionTimeoutMiddleware, updateSessionActivity, SessionData } from "./sessionTimeout";
+import { envManager } from "./environmentConfig";
+import { auditLogger } from "./auditLogger";
+import { securityManager } from "./securityManager";
+import { encryptionService } from "./encryptionService";
 
 // Extend Express session interface
 declare module 'express-session' {
@@ -6387,6 +6391,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to generate MCA access" });
     }
   });
+
+  // Production-Ready Security Endpoints
   
+  // Secure logout endpoint for all user roles
+  app.post('/api/auth/logout', securityManager.createLogoutHandler());
+
+  // Initialize production security system
+  console.log(`🔐 Production Security System Initialized`);
+  console.log(`📊 Environment: ${envManager.getEnvironment()}`);
+  console.log(`🔧 Security Level: ${envManager.getConfig().auditLevel.toUpperCase()}`);
+  console.log(`📋 Compliance Mode: ${envManager.requiresCompliance() ? 'ENABLED' : 'DISABLED'}`);
+  
+  // Test encryption system
+  encryptionService.testEncryption().then(success => {
+    console.log(`🔐 Encryption Test: ${success ? 'PASSED' : 'FAILED'}`);
+  });
+
   return httpServer;
 }
