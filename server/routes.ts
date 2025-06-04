@@ -6701,11 +6701,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Your MCA app URL - can be updated when you have the Replit URL
       const mcaAppUrl = process.env.MCA_APP_URL || 'https://self-reported-mini-clinical-audit-program-dashboard-admin1023.replit.app';
-      const fullReturnUrl = req.protocol + '://' + req.get('host') + returnUrl;
-      const mcaAccessUrl = `${mcaAppUrl}?source=kgc&token=${encodeURIComponent(encodedToken)}&return_url=${encodeURIComponent(fullReturnUrl)}`;
+      // Create a special return URL that handles impersonation context
+      const mcaReturnUrl = req.protocol + '://' + req.get('host') + '/mca-return';
+      const mcaAccessUrl = `${mcaAppUrl}?source=kgc&token=${encodeURIComponent(encodedToken)}&return_url=${encodeURIComponent(mcaReturnUrl)}`;
       
       console.log('[MCA DEBUG] Generated MCA Access URL:', mcaAccessUrl);
-      console.log('[MCA DEBUG] Full Return URL:', fullReturnUrl);
+      console.log('[MCA DEBUG] MCA Return URL:', mcaReturnUrl);
       console.log('[MCA DEBUG] MCA App Base URL:', mcaAppUrl);
       
       res.json({
@@ -6739,6 +6740,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Test encryption system
   encryptionService.testEncryption().then(success => {
     console.log(`🔐 Encryption Test: ${success ? 'PASSED' : 'FAILED'}`);
+  });
+
+  // ============================================================================
+  // MCA Return Handler
+  // ============================================================================
+  app.get('/mca-return', (req, res) => {
+    const session = req.session as Session & Partial<SessionData>;
+    
+    console.log('[MCA RETURN] Session context:', {
+      userId: session.userId,
+      userRole: session.userRole,
+      impersonatedDoctorId: session.impersonatedDoctorId,
+      hasImpersonation: !!session.impersonatedDoctorId
+    });
+    
+    // If admin is impersonating a doctor, return to doctor dashboard
+    if (session.userRole === 'admin' && session.impersonatedDoctorId) {
+      console.log('[MCA RETURN] Admin impersonating doctor - redirecting to doctor dashboard');
+      return res.redirect('/doctor-dashboard');
+    }
+    
+    // If regular doctor session, return to doctor dashboard
+    if (session.userRole === 'doctor') {
+      console.log('[MCA RETURN] Regular doctor session - redirecting to doctor dashboard');
+      return res.redirect('/doctor-dashboard');
+    }
+    
+    // If admin session without impersonation, return to admin dashboard
+    if (session.userRole === 'admin') {
+      console.log('[MCA RETURN] Regular admin session - redirecting to admin dashboard');
+      return res.redirect('/admin-dashboard');
+    }
+    
+    // Default fallback
+    console.log('[MCA RETURN] Unknown session context - redirecting to home');
+    res.redirect('/');
   });
 
   return httpServer;
