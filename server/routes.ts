@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import path from "path";
 import { storage } from "./storage";
 import { sessionTimeoutMiddleware, updateSessionActivity, SessionData } from "./sessionTimeout";
 import { envManager } from "./environmentConfig";
@@ -6743,7 +6744,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ============================================================================
-  // MCA Return Handler
+  // MCA Return Handler & Admin Dashboard Intercept
   // ============================================================================
   app.get('/mca-return', (req, res) => {
     const session = req.session as Session & Partial<SessionData>;
@@ -6776,6 +6777,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // Default fallback
     console.log('[MCA RETURN] Unknown session context - redirecting to home');
     res.redirect('/');
+  });
+
+  // Intercept admin dashboard requests during MCA returns
+  app.get('/admin-dashboard', (req, res) => {
+    const session = req.session as Session & Partial<SessionData>;
+    const referer = req.get('Referer') || '';
+    
+    // Check if this request came from MCA and admin is impersonating
+    if (referer.includes('self-reported-mini-clinical-audit-program-dashboard-admin1023.replit.app') && 
+        session.userRole === 'admin' && 
+        session.impersonatedDoctorId) {
+      console.log('[ADMIN DASHBOARD INTERCEPT] MCA return detected during impersonation - redirecting to doctor dashboard');
+      return res.redirect('/doctor-dashboard');
+    }
+    
+    // Normal admin dashboard access - serve the React app
+    res.sendFile(path.join(__dirname, '../client/dist/index.html'));
   });
 
   return httpServer;
