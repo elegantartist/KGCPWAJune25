@@ -3619,6 +3619,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userRole = session.userRole;
       const impersonateDoctorId = req.query.impersonateDoctor;
 
+      console.log('Doctor profile request:', {
+        sessionDoctorId: doctorId,
+        sessionUserId: userId,
+        sessionUserRole: userRole,
+        impersonateParam: impersonateDoctorId,
+        fullSession: session
+      });
+
       let targetDoctorId = doctorId;
       
       // Admin impersonation - allow admin to view doctor profile
@@ -3628,6 +3636,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       if (!targetDoctorId) {
+        console.log('Authentication failed - no targetDoctorId');
         return res.status(401).json({ message: "Not authenticated as a doctor" });
       }
       

@@ -85,6 +85,8 @@ export default function DoctorDashboard() {
   const adminDoctorData = localStorage.getItem('adminViewingDoctor');
   const impersonateDoctorId = adminDoctorData ? JSON.parse(adminDoctorData).id : null;
   const isAdminImpersonating = !!impersonateDoctorId;
+  
+  console.log('Admin impersonation data:', { adminDoctorData, impersonateDoctorId, isAdminImpersonating });
 
   // Doctor information with admin impersonation support
   const { data: doctor, isLoading: isLoadingDoctor } = useQuery({
