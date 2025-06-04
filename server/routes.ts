@@ -2710,8 +2710,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const adminUserId = session?.userId;
       const userRole = session?.userRole;
       
+      console.log(`[IMPERSONATION DEBUG] Full session object:`, JSON.stringify(session, null, 2));
+      console.log(`[IMPERSONATION DEBUG] Admin User ID: ${adminUserId}, User Role: ${userRole}`);
+      
       // Verify admin authentication
       if (!adminUserId || userRole !== 'admin') {
+        console.error(`[IMPERSONATION DEBUG] Authentication failed - Admin ID: ${adminUserId}, Role: ${userRole}`);
         return res.status(401).json({ message: "Unauthorized: Admin access required" });
       }
       
