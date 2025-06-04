@@ -224,6 +224,19 @@ export default function AdminDashboard() {
 
       if (!response.ok) {
         const errorData = await response.json();
+        
+        // If unauthorized (401), redirect to admin login for re-authentication
+        if (response.status === 401) {
+          console.log('[FRONTEND DEBUG] Admin session expired or invalid. Redirecting to admin login.');
+          toast({
+            title: "Authentication Required",
+            description: "Please log in as admin to access doctor dashboard.",
+            variant: "destructive",
+          });
+          navigate('/admin-login');
+          return;
+        }
+        
         throw new Error(errorData.message || 'Failed to set impersonation context.');
       }
 
