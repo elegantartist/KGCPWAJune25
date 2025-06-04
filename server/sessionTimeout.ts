@@ -15,7 +15,7 @@ export interface SessionData {
 export function sessionTimeoutMiddleware(req: Request, res: Response, next: NextFunction) {
   const session = req.session as any;
   
-  if (!session || (!session.doctorId && !session.patientId && !session.userRole)) {
+  if (!session || (!session.doctorId && !session.patientId && !session.userId && !session.userRole)) {
     // No active session, continue
     return next();
   }
@@ -24,11 +24,16 @@ export function sessionTimeoutMiddleware(req: Request, res: Response, next: Next
   const lastActivity = session.lastActivity || now;
   
   // Determine timeout based on user role
-  const timeoutDuration = session.userRole === 'doctor' ? DOCTOR_TIMEOUT : PATIENT_TIMEOUT;
+  let timeoutDuration = PATIENT_TIMEOUT; // Default
+  if (session.userRole === 'doctor') {
+    timeoutDuration = DOCTOR_TIMEOUT;
+  } else if (session.userRole === 'admin') {
+    timeoutDuration = 60 * 60 * 1000; // 1 hour for admin
+  }
   
   if (now - lastActivity > timeoutDuration) {
     // Session expired
-    console.log(`Session expired for ${session.userRole} ID: ${session.doctorId || session.patientId}`);
+    console.log(`Session expired for ${session.userRole} ID: ${session.doctorId || session.patientId || session.userId}`);
     
     // Clear session
     req.session.destroy((err: any) => {
