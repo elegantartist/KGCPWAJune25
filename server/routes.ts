@@ -6402,15 +6402,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`[ADMIN LOGIN] Admin ${admin.id} logged in successfully. Session role: ${req.session.userRole}`);
       
-      res.json({ 
-        success: true, 
-        message: "Admin login successful",
-        admin: {
-          id: admin.id,
-          name: admin.name,
-          email: admin.email,
-          uin: admin.uin
+      // Save session to ensure persistence
+      req.session.save((err: any) => {
+        if (err) {
+          console.error('[ADMIN LOGIN] Error saving session:', err);
+          return res.status(500).json({ message: "Failed to save admin session" });
         }
+        
+        console.log(`[ADMIN LOGIN] Admin session saved successfully for user ${admin.id}`);
+        res.json({ 
+          success: true, 
+          message: "Admin login successful",
+          admin: {
+            id: admin.id,
+            name: admin.name,
+            email: admin.email,
+            uin: admin.uin
+          }
+        });
       });
       
     } catch (error) {
