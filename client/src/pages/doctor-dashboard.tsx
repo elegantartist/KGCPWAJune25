@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { LogoutButton } from "@/components/ui/LogoutButton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormDescription, FormMessage } from "@/components/ui/form";
@@ -440,6 +441,7 @@ export default function DoctorDashboard() {
             Self-Reported Mini Clinical Audit (MCA)
             <ExternalLink className="h-4 w-4 ml-2" />
           </Button>
+          <LogoutButton userRole="doctor" variant="outline" />
         </div>
         <Card className="p-4 shadow-sm">
           <div className="flex items-center space-x-4">
