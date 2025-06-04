@@ -3949,10 +3949,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await Promise.all(cpdPromises);
       }
       
-      // Assign patient to Dr Adel (doctor ID 3)
-      const doctorId = 3; // Dr Adel's ID
+      // Get the doctor ID from session - support both direct doctor login and admin impersonation
+      const session = req.session as any;
+      const authenticatedDoctorId = session.doctorId;
+      const impersonatedDoctorId = session.impersonatedDoctorId;
+      const isAdminUser = session.userRole === 'admin';
+
+      let activeDoctorId: number;
+
+      if (isAdminUser && impersonatedDoctorId) {
+        // Priority 1: Admin impersonating a doctor
+        activeDoctorId = impersonatedDoctorId;
+        console.log(`[PATIENT CREATION] Admin (User ${session.userId}) creating patient for Impersonated Doctor: ${activeDoctorId}`);
+      } else if (session.userRole === 'doctor' && authenticatedDoctorId) {
+        // Priority 2: Authenticated Doctor
+        activeDoctorId = authenticatedDoctorId;
+        console.log(`[PATIENT CREATION] Authenticated Doctor ${activeDoctorId} creating patient`);
+      } else {
+        console.error(`[PATIENT CREATION] Unauthorized: No valid doctor context. Session: ${JSON.stringify(session)}`);
+        return res.status(401).json({ message: "Unauthorized: Must be authenticated as a doctor or admin impersonating a doctor" });
+      }
+
+      // Verify the doctor exists
+      const [doctor] = await db
+        .select()
+        .from(users)
+        .where(and(eq(users.id, activeDoctorId), eq(users.roleId, 2)));
+      
+      if (!doctor) {
+        console.error(`[PATIENT CREATION] Doctor ID ${activeDoctorId} not found`);
+        return res.status(404).json({ message: "Doctor not found" });
+      }
+
+      // Assign patient to the authenticated/impersonated doctor
+      console.log(`[PATIENT CREATION] Assigning patient ${patient.id} to doctor ${activeDoctorId} (${doctor.name})`);
       await db.insert(doctorPatients).values({
-        doctorId: doctorId,
+        doctorId: activeDoctorId,
         patientId: patient.id,
         assignedDate: new Date(),
         active: true
