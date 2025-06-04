@@ -498,6 +498,22 @@ export const emergencyEvents = pgTable("emergency_events", {
   notes: text("notes"),
 });
 
+// Audit Log for Regulatory Compliance (HIPAA, TGA SaMD, Australian Privacy Principles)
+export const auditLog = pgTable("audit_log", {
+  id: serial("id").primaryKey(),
+  eventId: text("event_id").notNull().unique(),
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
+  eventType: text("event_type").notNull(), // 'LOGIN', 'LOGOUT', 'DATA_ACCESS', etc.
+  severity: text("severity").notNull(), // 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL'
+  userId: integer("user_id").references(() => users.id),
+  targetUserId: integer("target_user_id").references(() => users.id),
+  ipAddress: text("ip_address").notNull(),
+  userAgent: text("user_agent").notNull(),
+  details: text("details"), // JSON string with event details
+  complianceStandards: text("compliance_standards"), // CSV of applicable standards
+  environment: text("environment").notNull(), // 'development', 'replit', 'aws', 'production'
+});
+
 // Admin activity log
 export const adminActivityLog = pgTable("admin_activity_log", {
   id: serial("id").primaryKey(),
