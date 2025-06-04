@@ -81,9 +81,22 @@ export default function DoctorDashboard() {
   const [isViewingReport, setIsViewingReport] = useState<number | null>(null);
   const [isEditingCpd, setIsEditingCpd] = useState<{ id: number, category: string } | null>(null);
 
-  // Doctor information
+  // Check if admin is impersonating a doctor
+  const adminDoctorData = localStorage.getItem('adminViewingDoctor');
+  const impersonateDoctorId = adminDoctorData ? JSON.parse(adminDoctorData).id : null;
+  const isAdminImpersonating = !!impersonateDoctorId;
+
+  // Doctor information with admin impersonation support
   const { data: doctor, isLoading: isLoadingDoctor } = useQuery({
-    queryKey: ["/api/doctor/profile"],
+    queryKey: ["/api/doctor/profile", impersonateDoctorId],
+    queryFn: async () => {
+      const url = impersonateDoctorId 
+        ? `/api/doctor/profile?impersonateDoctor=${impersonateDoctorId}`
+        : '/api/doctor/profile';
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Failed to fetch doctor profile');
+      return res.json();
+    },
     retry: false,
   });
 

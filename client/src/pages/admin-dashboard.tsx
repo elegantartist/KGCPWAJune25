@@ -511,18 +511,6 @@ export default function AdminDashboard() {
           <p className="text-gray-600">Manage users and system settings</p>
         </div>
         <div className="flex items-center space-x-4">
-          <Button
-            onClick={() => {
-              const currentUrl = window.location.origin + '/admin-dashboard';
-              const mcaUrl = `https://self-reported-mini-clinical-audit-program-dashboard-admin1023.replit.app?source=kgc&return_url=${encodeURIComponent(currentUrl)}`;
-              window.open(mcaUrl, '_blank');
-            }}
-            className="bg-[#2E8BC0] hover:bg-[#1E6B8F] text-white"
-          >
-            <FileBarChart className="h-4 w-4 mr-2" />
-            Self-Reported Mini Clinical Audit (MCA)
-            <ExternalLink className="h-4 w-4 ml-2" />
-          </Button>
           <Card className="p-4 shadow-sm">
             <div className="flex items-center space-x-4">
               <Avatar className="h-16 w-16">

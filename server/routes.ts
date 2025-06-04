@@ -3610,13 +3610,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ===== DOCTOR DASHBOARD API =====
   
-  // Get doctor profile
+  // Get doctor profile with admin impersonation support
   app.get("/api/doctor/profile", async (req, res) => {
     try {
       const session = req.session as any;
-      const doctorId = session.doctorId; // Get doctorId directly from session
+      const doctorId = session.doctorId;
+      const userId = session.userId;
+      const userRole = session.userRole;
+      const impersonateDoctorId = req.query.impersonateDoctor;
 
-      if (!doctorId) {
+      let targetDoctorId = doctorId;
+      
+      // Admin impersonation - allow admin to view doctor profile
+      if (userRole === 'admin' && impersonateDoctorId) {
+        targetDoctorId = parseInt(impersonateDoctorId as string);
+        console.log(`Admin ${userId} impersonating doctor ${targetDoctorId}`);
+      }
+
+      if (!targetDoctorId) {
         return res.status(401).json({ message: "Not authenticated as a doctor" });
       }
       
@@ -3624,7 +3635,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .select()
         .from(users)
         .where(and(
-          eq(users.id, doctorId),
+          eq(users.id, targetDoctorId),
           eq(users.roleId, 2) // roleId 2 is for doctors
         ));
       
@@ -3824,13 +3835,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get doctor's patients
+  // Get doctor's patients with admin impersonation support
   app.get("/api/doctor/patients", async (req, res) => {
     try {
       const session = req.session as any;
-      const doctorId = session.doctorId; // Get doctorId directly from session
+      const doctorId = session.doctorId;
+      const userId = session.userId;
+      const userRole = session.userRole;
+      const impersonateDoctorId = req.query.impersonateDoctor;
 
-      if (!doctorId) {
+      let targetDoctorId = doctorId;
+      
+      // Admin impersonation - allow admin to view doctor's patients
+      if (userRole === 'admin' && impersonateDoctorId) {
+        targetDoctorId = parseInt(impersonateDoctorId as string);
+        console.log(`Admin ${userId} impersonating doctor ${targetDoctorId} for patients`);
+      }
+
+      if (!targetDoctorId) {
         return res.status(401).json({ message: "Not authenticated as a doctor" });
       }
       
@@ -3838,7 +3860,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const relationships = await db.select()
         .from(doctorPatients)
         .where(and(
-          eq(doctorPatients.doctorId, doctorId),
+          eq(doctorPatients.doctorId, targetDoctorId),
           eq(doctorPatients.active, true)
         ));
       
