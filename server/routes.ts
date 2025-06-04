@@ -2674,6 +2674,132 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ===== ADMIN DASHBOARD API =====
   
+  // Admin impersonation endpoints
+  app.post("/api/admin/set-impersonated-doctor", async (req, res) => {
+    try {
+      const session = req.session as any;
+      const adminUserId = session?.userId;
+      const userRole = session?.userRole;
+      
+      // Verify admin authentication
+      if (!adminUserId || userRole !== 'admin') {
+        return res.status(401).json({ message: "Unauthorized: Admin access required" });
+      }
+      
+      const { doctorIdToImpersonate } = req.body;
+      
+      console.log(`[IMPERSONATION DEBUG] Admin ${adminUserId} attempting to set impersonation for doctor: ${doctorIdToImpersonate}`);
+      console.log(`[IMPERSONATION DEBUG] Current session ID: ${req.session.id}`);
+
+      if (typeof doctorIdToImpersonate !== 'number' || doctorIdToImpersonate <= 0) {
+        console.error(`[IMPERSONATION DEBUG] Invalid doctor ID provided: ${doctorIdToImpersonate}`);
+        return res.status(400).json({ message: "Invalid doctor ID provided for impersonation." });
+      }
+
+      // Verify the doctor exists
+      const [doctor] = await db
+        .select()
+        .from(users)
+        .where(and(eq(users.id, doctorIdToImpersonate), eq(users.roleId, 2)));
+      
+      if (!doctor) {
+        console.error(`[IMPERSONATION DEBUG] Doctor ID ${doctorIdToImpersonate} not found`);
+        return res.status(404).json({ message: "Doctor not found" });
+      }
+
+      session.impersonatedDoctorId = doctorIdToImpersonate;
+      session.adminOriginalUserId = adminUserId;
+      session.adminOriginalUserRole = 'admin';
+
+      // Save session manually to ensure persistence
+      req.session.save((err: any) => {
+        if (err) {
+          console.error('[IMPERSONATION DEBUG] Error saving session during set-impersonation:', err);
+          return res.status(500).json({ message: "Failed to save session for impersonation." });
+        }
+        console.log(`[IMPERSONATION DEBUG] Admin ${adminUserId} successfully set impersonation to Doctor ${doctorIdToImpersonate}. Session saved.`);
+        res.json({ success: true, message: `Successfully set impersonation to doctor ID ${doctorIdToImpersonate}` });
+      });
+    } catch (error) {
+      console.error("Error setting impersonation:", error);
+      res.status(500).json({ message: "Failed to set impersonation" });
+    }
+  });
+
+  app.post("/api/admin/clear-impersonation", async (req, res) => {
+    try {
+      const session = req.session as any;
+      const adminUserId = session?.adminOriginalUserId || session?.userId;
+      
+      console.log(`[IMPERSONATION DEBUG] Clearing impersonation for admin ${adminUserId}`);
+      
+      // Clear impersonation data
+      delete session.impersonatedDoctorId;
+      delete session.adminOriginalUserId;
+      delete session.adminOriginalUserRole;
+
+      req.session.save((err: any) => {
+        if (err) {
+          console.error('[IMPERSONATION DEBUG] Error saving session during clear-impersonation:', err);
+          return res.status(500).json({ message: "Failed to clear impersonation." });
+        }
+        console.log(`[IMPERSONATION DEBUG] Admin ${adminUserId} successfully cleared impersonation. Session saved.`);
+        res.json({ success: true, message: "Impersonation cleared successfully" });
+      });
+    } catch (error) {
+      console.error("Error clearing impersonation:", error);
+      res.status(500).json({ message: "Failed to clear impersonation" });
+    }
+  });
+
+  // Get current user context (for impersonation detection)
+  app.get("/api/user/current-context", async (req, res) => {
+    try {
+      const session = req.session as any;
+      
+      const context = {
+        userRole: session?.userRole,
+        doctorId: session?.doctorId,
+        impersonatedDoctorId: session?.impersonatedDoctorId,
+        adminOriginalUserId: session?.adminOriginalUserId
+      };
+      
+      console.log(`[IMPERSONATION DEBUG] Current context for session ${req.session.id}:`, context);
+      
+      res.json(context);
+    } catch (error) {
+      console.error("Error getting current context:", error);
+      res.status(500).json({ message: "Failed to get current context" });
+    }
+  });
+
+  // Get doctor details by ID (for impersonation display)
+  app.get("/api/doctor/details/:id", async (req, res) => {
+    try {
+      const session = req.session as any;
+      const doctorId = parseInt(req.params.id);
+      
+      // Only allow admin or the doctor themselves to view details
+      if (session?.userRole !== 'admin' && session?.doctorId !== doctorId) {
+        return res.status(401).json({ message: "Unauthorized to view doctor details" });
+      }
+      
+      const [doctor] = await db
+        .select()
+        .from(users)
+        .where(and(eq(users.id, doctorId), eq(users.roleId, 2)));
+      
+      if (!doctor) {
+        return res.status(404).json({ message: "Doctor not found" });
+      }
+      
+      res.json(doctor);
+    } catch (error) {
+      console.error("Error fetching doctor details:", error);
+      res.status(500).json({ message: "Failed to fetch doctor details" });
+    }
+  });
+  
   // Get admin profile
   app.get("/api/admin/profile", async (req, res) => {
     try {
@@ -3614,37 +3740,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/doctor/profile", async (req, res) => {
     try {
       const session = req.session as any;
-      const doctorId = session.doctorId;
-      const userId = session.userId;
-      const userRole = session.userRole;
-      const impersonateDoctorId = req.query.impersonateDoctor;
+      const authenticatedDoctorId = session.doctorId;
+      const impersonatedDoctorId = session.impersonatedDoctorId;
+      const isAdminUser = session.userRole === 'admin';
 
-      console.log('Doctor profile request:', {
-        sessionDoctorId: doctorId,
-        sessionUserId: userId,
-        sessionUserRole: userRole,
-        impersonateParam: impersonateDoctorId,
-        fullSession: session
-      });
+      let activeDoctorId: number;
 
-      let targetDoctorId = doctorId;
-      
-      // Admin impersonation - allow admin to view doctor profile
-      if (userRole === 'admin' && impersonateDoctorId) {
-        targetDoctorId = parseInt(impersonateDoctorId as string);
-        console.log(`Admin ${userId} impersonating doctor ${targetDoctorId}`);
-      }
-
-      if (!targetDoctorId) {
-        console.log('Authentication failed - no targetDoctorId');
-        return res.status(401).json({ message: "Not authenticated as a doctor" });
+      if (isAdminUser && impersonatedDoctorId) {
+        // Priority 1: Admin impersonating a doctor
+        activeDoctorId = impersonatedDoctorId;
+        console.log(`[IMPERSONATION DEBUG - Route: ${req.path}] Admin (User ${session.userId}) acting as Impersonated Doctor: ${activeDoctorId}`);
+      } else if (session.userRole === 'doctor' && authenticatedDoctorId) {
+        // Priority 2: Authenticated Doctor (if not impersonating)
+        activeDoctorId = authenticatedDoctorId;
+        console.log(`[IMPERSONATION DEBUG - Route: ${req.path}] Authenticated Doctor: ${activeDoctorId}`);
+      } else {
+        // Neither impersonating Admin nor authenticated Doctor
+        console.error(`[IMPERSONATION DEBUG - Route: ${req.path}] Unauthorized access attempt. Session: ${JSON.stringify(session)}`);
+        return res.status(401).json({ message: "Unauthorized: Invalid session or doctor context." });
       }
       
       const [doctor] = await db
         .select()
         .from(users)
         .where(and(
-          eq(users.id, targetDoctorId),
+          eq(users.id, activeDoctorId),
           eq(users.roleId, 2) // roleId 2 is for doctors
         ));
       
@@ -3848,21 +3968,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/doctor/patients", async (req, res) => {
     try {
       const session = req.session as any;
-      const doctorId = session.doctorId;
-      const userId = session.userId;
-      const userRole = session.userRole;
-      const impersonateDoctorId = req.query.impersonateDoctor;
+      const authenticatedDoctorId = session.doctorId;
+      const impersonatedDoctorId = session.impersonatedDoctorId;
+      const isAdminUser = session.userRole === 'admin';
 
-      let targetDoctorId = doctorId;
-      
-      // Admin impersonation - allow admin to view doctor's patients
-      if (userRole === 'admin' && impersonateDoctorId) {
-        targetDoctorId = parseInt(impersonateDoctorId as string);
-        console.log(`Admin ${userId} impersonating doctor ${targetDoctorId} for patients`);
-      }
+      let activeDoctorId: number;
 
-      if (!targetDoctorId) {
-        return res.status(401).json({ message: "Not authenticated as a doctor" });
+      if (isAdminUser && impersonatedDoctorId) {
+        // Priority 1: Admin impersonating a doctor
+        activeDoctorId = impersonatedDoctorId;
+        console.log(`[IMPERSONATION DEBUG - Route: ${req.path}] Admin (User ${session.userId}) acting as Impersonated Doctor: ${activeDoctorId}`);
+      } else if (session.userRole === 'doctor' && authenticatedDoctorId) {
+        // Priority 2: Authenticated Doctor (if not impersonating)
+        activeDoctorId = authenticatedDoctorId;
+        console.log(`[IMPERSONATION DEBUG - Route: ${req.path}] Authenticated Doctor: ${activeDoctorId}`);
+      } else {
+        // Neither impersonating Admin nor authenticated Doctor
+        console.error(`[IMPERSONATION DEBUG - Route: ${req.path}] Unauthorized access attempt. Session: ${JSON.stringify(session)}`);
+        return res.status(401).json({ message: "Unauthorized: Invalid session or doctor context." });
       }
       
       // Get assigned patients from the doctor_patients relationship table
