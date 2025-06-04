@@ -282,7 +282,12 @@ export default function DoctorDashboard() {
   // MCA access mutation
   const mcaAccessMutation = useMutation({
     mutationFn: () => {
-      return apiRequest("POST", "/api/doctor/mca-access", {});
+      // For impersonated sessions, pass the target doctor ID
+      const params = isAdminImpersonating && userContext?.impersonatedDoctorId 
+        ? { targetDoctorId: userContext.impersonatedDoctorId }
+        : {};
+      
+      return apiRequest("POST", "/api/doctor/mca-access", params);
     },
     onSuccess: (data) => {
       // Open MCA app in new tab with secure token
@@ -460,15 +465,12 @@ export default function DoctorDashboard() {
         </div>
         <div className="flex items-center space-x-3">
           <Button
-            onClick={() => {
-              const currentUrl = window.location.origin + '/doctor-dashboard';
-              const mcaUrl = `https://self-reported-mini-clinical-audit-program-dashboard-admin1023.replit.app?source=kgc&return_url=${encodeURIComponent(currentUrl)}`;
-              window.open(mcaUrl, '_blank');
-            }}
+            onClick={() => mcaAccessMutation.mutate()}
+            disabled={mcaAccessMutation.isPending}
             className="bg-[#2E8BC0] hover:bg-[#1E6B8F] text-white"
           >
             <FileBarChart className="h-4 w-4 mr-2" />
-            Self-Reported Mini Clinical Audit (MCA)
+            {mcaAccessMutation.isPending ? "Opening..." : "Self-Reported Mini Clinical Audit (MCA)"}
             <ExternalLink className="h-4 w-4 ml-2" />
           </Button>
           <LogoutButton userRole="doctor" variant="outline" />
