@@ -81,16 +81,23 @@ export default function DoctorDashboard() {
   const [isViewingReport, setIsViewingReport] = useState<number | null>(null);
   const [isEditingCpd, setIsEditingCpd] = useState<{ id: number, category: string } | null>(null);
 
-  // Check if admin is impersonating a doctor
-  const adminDoctorData = localStorage.getItem('adminViewingDoctor');
-  const impersonateDoctorId = adminDoctorData ? JSON.parse(adminDoctorData).id : null;
-  const isAdminImpersonating = !!impersonateDoctorId;
-  
-  console.log('Admin impersonation data:', { adminDoctorData, impersonateDoctorId, isAdminImpersonating });
+  // Fetch current user context (for impersonation detection)
+  const { data: userContext, isLoading: isLoadingContext } = useQuery<{
+    userRole: string;
+    doctorId?: number;
+    impersonatedDoctorId?: number;
+    adminOriginalUserId?: number;
+  }>({
+    queryKey: ["/api/user/current-context"],
+    staleTime: 0,
+  });
+
+  const isAdminImpersonating = userContext?.userRole === 'admin' && userContext?.impersonatedDoctorId;
+  const doctorToDisplayId = isAdminImpersonating ? userContext.impersonatedDoctorId : userContext?.doctorId;
 
   // Doctor information with admin impersonation support
   const { data: doctor, isLoading: isLoadingDoctor } = useQuery({
-    queryKey: ["/api/doctor/profile", impersonateDoctorId],
+    queryKey: ["/api/doctor/profile"],
     queryFn: async () => {
       const url = impersonateDoctorId 
         ? `/api/doctor/profile?impersonateDoctor=${impersonateDoctorId}`

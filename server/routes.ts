@@ -3992,7 +3992,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const relationships = await db.select()
         .from(doctorPatients)
         .where(and(
-          eq(doctorPatients.doctorId, targetDoctorId),
+          eq(doctorPatients.doctorId, activeDoctorId),
           eq(doctorPatients.active, true)
         ));
       

@@ -213,6 +213,33 @@ export default function AdminDashboard() {
     retry: false
   });
 
+  // Admin impersonation function
+  const handleViewDoctorDashboard = async (doctor: Doctor) => {
+    try {
+      const response = await fetch('/api/admin/set-impersonated-doctor', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ doctorIdToImpersonate: doctor.id }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to set impersonation context.');
+      }
+
+      // On success, redirect to the doctor's dashboard
+      console.log(`[FRONTEND DEBUG] Admin set impersonation. Redirecting to /doctor-dashboard`);
+      navigate('/doctor-dashboard');
+    } catch (error: any) {
+      console.error('Error setting impersonation:', error);
+      toast({
+        title: "Impersonation Failed",
+        description: error.message || "Could not set admin impersonation for doctor.",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Add doctor mutation
   const addDoctorMutation = useMutation({
     mutationFn: (data: z.infer<typeof newDoctorSchema>) => {
@@ -888,17 +915,7 @@ export default function AdminDashboard() {
                     <TableRow key={doctor.id}>
                       <TableCell className="font-medium">
                         <button 
-                          onClick={() => {
-                            // Save the doctor's info for admin impersonation
-                            localStorage.setItem('adminViewingDoctor', JSON.stringify({
-                              id: doctor.id,
-                              name: doctor.name,
-                              uin: doctor.uin,
-                              email: doctor.email
-                            }));
-                            // Navigate to doctor dashboard
-                            navigate('/doctor-dashboard');
-                          }}
+                          onClick={() => handleViewDoctorDashboard(doctor)}
                           className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
                         >
                           {doctor.name}
