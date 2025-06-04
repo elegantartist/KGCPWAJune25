@@ -18,6 +18,7 @@ import DoctorDashboard from "@/pages/doctor-dashboard";
 import DoctorSetup from "@/pages/DoctorSetup";
 import DoctorLogin from "@/pages/DoctorLogin";
 import AdminDashboard from "@/pages/admin-dashboard";
+import AdminLogin from "@/pages/admin-login";
 import Login from "@/pages/login";
 import PatientLogin from "@/pages/patient-login";
 import { AuthProvider, useAuth } from "@/context/auth-context";
@@ -106,6 +107,7 @@ function Router() {
       
       <Route path="/login" component={Login} />
       <Route path="/patient-login" component={PatientLogin} />
+      <Route path="/admin-login" component={AdminLogin} />
       
       {/* Patient routes */}
       <Route path="/patient-dashboard">
