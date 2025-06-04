@@ -818,9 +818,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Process each local milestone
       const results: {
-        created: ProgressMilestone[],
-        updated: ProgressMilestone[],
-        unchanged: ProgressMilestone[]
+        created: any[],
+        updated: any[],
+        unchanged: any[]
       } = {
         created: [],
         updated: [],
@@ -4979,9 +4979,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const milestones = await db
         .select()
-        .from(schema.progressMilestones)
-        .where(eq(schema.progressMilestones.userId, userId))
-        .orderBy(desc(schema.progressMilestones.updatedAt));
+        .from(progressMilestones)
+        .where(eq(progressMilestones.userId, userId))
+        .orderBy(desc(progressMilestones.updatedAt));
       
       res.json(milestones);
     } catch (error) {
@@ -5023,7 +5023,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       
       // Insert into database
-      const [milestone] = await db.insert(schema.progressMilestones).values(newMilestone).returning();
+      const [milestone] = await db.insert(progressMilestones).values(newMilestone).returning();
       
       res.status(201).json(milestone);
     } catch (error) {
