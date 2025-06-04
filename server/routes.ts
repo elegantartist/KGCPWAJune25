@@ -6325,6 +6325,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin login endpoint
+  app.post("/api/admin/login", async (req, res) => {
+    try {
+      const { username, password } = req.body;
+      
+      if (!username || !password) {
+        return res.status(400).json({ message: "Username and password are required" });
+      }
+      
+      // Find admin user
+      const [admin] = await db
+        .select()
+        .from(users)
+        .where(and(
+          or(eq(users.username, username), eq(users.email, username)),
+          eq(users.roleId, 1) // Admin role
+        ))
+        .limit(1);
+      
+      if (!admin) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+      
+      // In production, this should use proper password hashing
+      // For now, we'll use simple comparison
+      if (admin.password !== password) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+      
+      // Update last login
+      await db
+        .update(users)
+        .set({ lastLogin: new Date() })
+        .where(eq(users.id, admin.id));
+      
+      // Set session with admin role
+      if (!req.session) {
+        req.session = {};
+      }
+      req.session.userId = admin.id;
+      req.session.userRole = 'admin';
+      req.session.lastActivity = Date.now();
+      
+      console.log(`[ADMIN LOGIN] Admin ${admin.id} logged in successfully. Session role: ${req.session.userRole}`);
+      
+      res.json({ 
+        success: true, 
+        message: "Admin login successful",
+        admin: {
+          id: admin.id,
+          name: admin.name,
+          email: admin.email,
+          uin: admin.uin
+        }
+      });
+      
+    } catch (error) {
+      console.error("Admin login error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   // Validate setup token
   app.post("/api/doctor/setup/validate-token", async (req, res) => {
     try {
