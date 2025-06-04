@@ -6700,8 +6700,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const encodedToken = Buffer.from(JSON.stringify(mcaToken)).toString('base64');
       
       // Your MCA app URL - can be updated when you have the Replit URL
-      const mcaAppUrl = process.env.MCA_APP_URL || 'https://your-mca-app.replit.app';
-      const mcaAccessUrl = `${mcaAppUrl}?source=kgc&token=${encodeURIComponent(encodedToken)}&return_url=${encodeURIComponent(req.protocol + '://' + req.get('host') + returnUrl)}`;
+      const mcaAppUrl = process.env.MCA_APP_URL || 'https://self-reported-mini-clinical-audit-program-dashboard-admin1023.replit.app';
+      const fullReturnUrl = req.protocol + '://' + req.get('host') + returnUrl;
+      const mcaAccessUrl = `${mcaAppUrl}?source=kgc&token=${encodeURIComponent(encodedToken)}&return_url=${encodeURIComponent(fullReturnUrl)}`;
+      
+      console.log('[MCA DEBUG] Generated MCA Access URL:', mcaAccessUrl);
+      console.log('[MCA DEBUG] Full Return URL:', fullReturnUrl);
+      console.log('[MCA DEBUG] MCA App Base URL:', mcaAppUrl);
       
       res.json({
         success: true,
