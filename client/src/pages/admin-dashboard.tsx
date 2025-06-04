@@ -889,12 +889,12 @@ export default function AdminDashboard() {
                       <TableCell className="font-medium">
                         <button 
                           onClick={() => {
-                            // Save the doctor's info in localStorage
-                            localStorage.setItem('currentUser', JSON.stringify({
+                            // Save the doctor's info for admin impersonation
+                            localStorage.setItem('adminViewingDoctor', JSON.stringify({
                               id: doctor.id,
                               name: doctor.name,
-                              role: 'doctor',
-                              uin: doctor.uin
+                              uin: doctor.uin,
+                              email: doctor.email
                             }));
                             // Navigate to doctor dashboard
                             navigate('/doctor-dashboard');
