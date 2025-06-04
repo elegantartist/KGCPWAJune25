@@ -99,7 +99,7 @@ export default function DoctorDashboard() {
   // Admin return function
   const handleReturnToAdminDashboard = async () => {
     try {
-      const response = await fetch('/api/admin/clear-impersonated-doctor', {
+      const response = await fetch('/api/admin/clear-impersonation', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
@@ -441,24 +441,18 @@ export default function DoctorDashboard() {
 
   return (
     <div className="container mx-auto px-4 py-6">
-      <div className="flex justify-between items-center mb-3">
-        <Button 
-          variant="outline" 
-          className="flex items-center text-gray-600 hover:text-gray-900"
-          onClick={() => {
-            // Store the current user role as admin in localStorage
-            localStorage.setItem('currentUser', JSON.stringify({
-              id: 1, // Admin ID 
-              name: 'Admin User',
-              role: 'admin'
-            }));
-            window.location.href = '/admin-dashboard';
-          }}
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Return to Admin
-        </Button>
-      </div>
+      {isAdminImpersonating && (
+        <div className="flex justify-between items-center mb-3">
+          <Button 
+            variant="outline" 
+            className="flex items-center text-gray-600 hover:text-gray-900"
+            onClick={handleReturnToAdminDashboard}
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Return to Admin Dashboard
+          </Button>
+        </div>
+      )}
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-3xl font-bold text-[#2E8BC0]">Doctor Dashboard</h1>

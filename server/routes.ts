@@ -6647,10 +6647,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         targetDoctor = adminTargetDoctor;
-        returnUrl = `/admin-dashboard?doctorView=${targetDoctorId}`;
+        // SECURITY FIX: Always return to doctor dashboard for impersonated sessions
+        // This ensures doctors never see the admin interface
+        returnUrl = '/doctor-dashboard';
         accessContext = 'admin_superuser';
         
-        console.log(`Admin ${userId} accessing MCA for doctor ${targetDoctorId} (${adminTargetDoctor.name})`);
+        console.log(`Admin ${userId} accessing MCA for doctor ${targetDoctorId} (${adminTargetDoctor.name}) - Return URL: ${returnUrl}`);
       } else if (doctorId) {
         // Doctor accessing their own MCA
         const [doctorData] = await db
