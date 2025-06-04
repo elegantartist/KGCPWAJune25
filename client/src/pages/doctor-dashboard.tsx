@@ -74,6 +74,7 @@ const updateDoctorProfileSchema = z.object({
 export default function DoctorDashboard() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, navigate] = useLocation();
   const [currentTab, setCurrentTab] = useState("patients");
   const [selectedPatient, setSelectedPatient] = useState<number | null>(null);
   const [isAddingPatient, setIsAddingPatient] = useState(false);
@@ -95,17 +96,35 @@ export default function DoctorDashboard() {
   const isAdminImpersonating = userContext?.userRole === 'admin' && userContext?.impersonatedDoctorId;
   const doctorToDisplayId = isAdminImpersonating ? userContext.impersonatedDoctorId : userContext?.doctorId;
 
+  // Admin return function
+  const handleReturnToAdminDashboard = async () => {
+    try {
+      const response = await fetch('/api/admin/clear-impersonated-doctor', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to clear impersonation context.');
+      }
+
+      console.log('[FRONTEND DEBUG] Admin cleared impersonation. Redirecting to /admin-dashboard');
+      navigate('/admin-dashboard');
+    } catch (error: any) {
+      console.error('Error clearing impersonation:', error);
+      toast({
+        title: "Return Failed",
+        description: error.message || "Could not return to admin dashboard.",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Doctor information with admin impersonation support
   const { data: doctor, isLoading: isLoadingDoctor } = useQuery({
     queryKey: ["/api/doctor/profile"],
-    queryFn: async () => {
-      const url = impersonateDoctorId 
-        ? `/api/doctor/profile?impersonateDoctor=${impersonateDoctorId}`
-        : '/api/doctor/profile';
-      const res = await fetch(url);
-      if (!res.ok) throw new Error('Failed to fetch doctor profile');
-      return res.json();
-    },
+    enabled: !isLoadingContext,
     retry: false,
   });
 
@@ -115,16 +134,8 @@ export default function DoctorDashboard() {
     isLoading: isLoadingPatients,
     refetch: refetchPatients
   } = useQuery({
-    queryKey: ["/api/doctor/patients", doctor?.id, impersonateDoctorId],
-    queryFn: async () => {
-      const url = impersonateDoctorId 
-        ? `/api/doctor/patients?impersonateDoctor=${impersonateDoctorId}`
-        : '/api/doctor/patients';
-      const res = await fetch(url);
-      if (!res.ok) throw new Error('Failed to fetch patients');
-      return res.json();
-    },
-    enabled: !!doctor,
+    queryKey: ["/api/doctor/patients"],
+    enabled: !isLoadingContext && !!doctor,
     retry: false,
   });
 

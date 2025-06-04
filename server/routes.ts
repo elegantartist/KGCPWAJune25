@@ -15,6 +15,7 @@ declare module 'express-session' {
     patientId?: number;
     userRole?: string;
     lastActivity?: number;
+    impersonatedDoctorId?: number;
   }
 }
 import session from 'express-session';
@@ -2674,6 +2675,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ===== ADMIN DASHBOARD API =====
   
+  // User context endpoint for impersonation detection
+  app.get("/api/user/current-context", async (req, res) => {
+    try {
+      const session = req.session as SessionData;
+      
+      if (!session || (!session.userId && !session.doctorId)) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const response: any = {
+        userRole: session.userRole || 'unknown',
+      };
+
+      // If admin is impersonating
+      if (session.userRole === 'admin' && session.impersonatedDoctorId) {
+        response.impersonatedDoctorId = session.impersonatedDoctorId;
+        response.adminOriginalUserId = session.userId;
+      } else if (session.doctorId) {
+        response.doctorId = session.doctorId;
+      }
+
+      res.json(response);
+    } catch (error) {
+      console.error("Error getting user context:", error);
+      res.status(500).json({ message: "Failed to get user context" });
+    }
+  });
+
   // Admin impersonation endpoints
   app.post("/api/admin/set-impersonated-doctor", async (req, res) => {
     try {
