@@ -6779,22 +6779,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.redirect('/');
   });
 
-  // Intercept admin dashboard requests during MCA returns
-  app.get('/admin-dashboard', (req, res) => {
-    const session = req.session as Session & Partial<SessionData>;
-    const referer = req.get('Referer') || '';
-    
-    // Check if this request came from MCA and admin is impersonating
-    if (referer.includes('self-reported-mini-clinical-audit-program-dashboard-admin1023.replit.app') && 
-        session.userRole === 'admin' && 
-        session.impersonatedDoctorId) {
-      console.log('[ADMIN DASHBOARD INTERCEPT] MCA return detected during impersonation - redirecting to doctor dashboard');
-      return res.redirect('/doctor-dashboard');
-    }
-    
-    // Normal admin dashboard access - serve the React app
-    res.sendFile(path.join(__dirname, '../client/dist/index.html'));
-  });
+
 
   return httpServer;
 }
