@@ -6787,9 +6787,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Your MCA app URL - can be updated when you have the Replit URL
       const mcaAppUrl = process.env.MCA_APP_URL || 'https://self-reported-mini-clinical-audit-program-dashboard-admin1023.replit.app';
-      // Create a special return URL that handles impersonation context
-      const mcaReturnUrl = req.protocol + '://' + req.get('host') + '/mca-return';
-      const mcaAccessUrl = `${mcaAppUrl}?source=kgc&token=${encodeURIComponent(encodedToken)}&return_url=${encodeURIComponent(mcaReturnUrl)}`;
+      // CRITICAL FIX: Always return to doctor dashboard with the correct doctor ID
+      const mcaReturnUrl = req.protocol + '://' + req.get('host') + '/doctor-dashboard';
+      const mcaAccessUrl = `${mcaAppUrl}?source=kgc&token=${encodeURIComponent(encodedToken)}&return_url=${encodeURIComponent(mcaReturnUrl)}&doctor_id=${targetDoctor.id}`;
       
       console.log('[MCA DEBUG] Generated MCA Access URL:', mcaAccessUrl);
       console.log('[MCA DEBUG] MCA Return URL:', mcaReturnUrl);
