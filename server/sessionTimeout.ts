@@ -15,7 +15,17 @@ export interface SessionData {
 export function sessionTimeoutMiddleware(req: Request, res: Response, next: NextFunction) {
   const session = req.session as any;
   
-  if (!session || (!session.doctorId && !session.patientId && !session.userId && !session.userRole)) {
+  // Check if session exists and has any authentication data
+  const hasAuthData = session && (
+    session.doctorId || 
+    session.patientId || 
+    session.userId || 
+    session.userRole ||
+    session.impersonatedDoctorId ||
+    session.impersonatedPatientId
+  );
+  
+  if (!hasAuthData) {
     // No active session, continue
     return next();
   }
@@ -23,17 +33,18 @@ export function sessionTimeoutMiddleware(req: Request, res: Response, next: Next
   const now = Date.now();
   const lastActivity = session.lastActivity || now;
   
-  // Determine timeout based on user role
+  // Determine timeout based on user role - admin gets longer timeout especially during impersonation
   let timeoutDuration = PATIENT_TIMEOUT; // Default
   if (session.userRole === 'doctor') {
     timeoutDuration = DOCTOR_TIMEOUT;
   } else if (session.userRole === 'admin') {
-    timeoutDuration = 60 * 60 * 1000; // 1 hour for admin
+    // Extended timeout for admin, especially during impersonation
+    timeoutDuration = 2 * 60 * 60 * 1000; // 2 hours for admin
   }
   
   if (now - lastActivity > timeoutDuration) {
     // Session expired
-    console.log(`Session expired for ${session.userRole} ID: ${session.doctorId || session.patientId || session.userId}`);
+    console.log(`[SESSION TIMEOUT] Session expired for ${session.userRole} ID: ${session.doctorId || session.patientId || session.userId}, impersonating: ${session.impersonatedDoctorId || session.impersonatedPatientId || 'none'}`);
     
     // Clear session
     req.session.destroy((err: any) => {

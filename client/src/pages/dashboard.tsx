@@ -199,23 +199,46 @@ const Dashboard: React.FC = () => {
 
   return (
     <div className={cn("space-y-6", isMobile && "relative min-h-screen")}>
-      {/* Return to Admin Dashboard button - only show if admin is impersonating a patient */}
-      {isAdminImpersonatingPatient && (
+      {/* Admin Controls - Return to Admin Dashboard or Logout */}
+      {userContext?.userRole === 'admin' && (
         <div className={cn(
           "flex justify-between items-center mb-3",
           isMobile && "fixed top-0 left-0 right-0 z-50 px-4 py-2"
         )}>
-          <Button
-            variant="outline"
-            className={cn(
-              "flex items-center hover:text-gray-900",
-              isMobile ? "text-white bg-black/30 hover:bg-black/50 border-transparent" : "text-gray-600"
-            )}
-            onClick={handleReturnToAdminDashboard}
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Return to Admin Dashboard
-          </Button>
+          {userContext?.impersonatedPatientId ? (
+            <Button
+              variant="outline"
+              className={cn(
+                "flex items-center hover:text-gray-900",
+                isMobile ? "text-white bg-black/30 hover:bg-black/50 border-transparent" : "text-gray-600"
+              )}
+              onClick={handleReturnToAdminDashboard}
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Return to Admin Dashboard
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              className={cn(
+                "flex items-center hover:text-gray-900",
+                isMobile ? "text-white bg-black/30 hover:bg-black/50 border-transparent" : "text-gray-600"
+              )}
+              onClick={() => {
+                // Clear admin session and redirect to login
+                fetch('/api/logout', { method: 'POST' })
+                  .then(() => {
+                    setLocation('/login');
+                  })
+                  .catch(() => {
+                    setLocation('/login');
+                  });
+              }}
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Logout
+            </Button>
+          )}
         </div>
       )}
 

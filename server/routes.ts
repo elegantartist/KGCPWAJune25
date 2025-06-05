@@ -204,6 +204,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Apply session timeout middleware to all authenticated routes
   app.use("/api", sessionTimeoutMiddleware);
+
+  // Logout endpoint
+  app.post("/api/logout", async (req, res) => {
+    try {
+      const session = req.session as any;
+      console.log(`[LOGOUT] User logging out. Session role: ${session?.userRole}, ID: ${session?.userId}`);
+      
+      req.session.destroy((err: any) => {
+        if (err) {
+          console.error('Error destroying session during logout:', err);
+          return res.status(500).json({ message: "Logout failed" });
+        }
+        console.log('[LOGOUT] Session destroyed successfully');
+        res.json({ success: true, message: "Logged out successfully" });
+      });
+    } catch (error) {
+      console.error("Logout error:", error);
+      res.status(500).json({ message: "Logout failed" });
+    }
+  });
   
   // Get current user
   app.get("/api/user", async (req, res) => {
