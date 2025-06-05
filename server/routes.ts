@@ -2937,6 +2937,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const context = {
         userRole: session?.userRole,
+        userId: session?.userId,
         doctorId: session?.doctorId,
         patientId: session?.patientId,
         impersonatedDoctorId: session?.impersonatedDoctorId,
@@ -2945,6 +2946,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         adminOriginalUserId: session?.adminOriginalUserId
       };
       
+      console.log(`[IMPERSONATION DEBUG] Full session data:`, session);
       console.log(`[IMPERSONATION DEBUG] Current context for session ${req.session.id}:`, context);
       
       res.json(context);
