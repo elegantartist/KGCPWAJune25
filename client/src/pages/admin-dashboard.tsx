@@ -776,16 +776,47 @@ export default function AdminDashboard() {
                           <TableRow key={patient.id}>
                             <TableCell className="font-medium">
                               <button 
-                                onClick={() => {
-                                  // Save the patient's info in localStorage
-                                  localStorage.setItem('currentUser', JSON.stringify({
-                                    id: patient.id,
-                                    name: patient.name,
-                                    role: 'patient',
-                                    uin: patient.uin
-                                  }));
-                                  // Navigate to patient dashboard
-                                  navigate('/');
+                                onClick={async () => {
+                                  try {
+                                    const response = await fetch('/api/admin/set-impersonated-patient', {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ patientIdToImpersonate: patient.id }),
+                                    });
+
+                                    if (!response.ok) {
+                                      const errorData = await response.json();
+                                      
+                                      // If unauthorized (401), redirect to admin login for re-authentication
+                                      if (response.status === 401) {
+                                        console.log('[FRONTEND DEBUG] Admin session expired or invalid. Redirecting to admin login.');
+                                        toast({
+                                          title: "Authentication Required",
+                                          description: "Please log in as admin to access patient dashboard.",
+                                          variant: "destructive",
+                                        });
+                                        navigate('/admin-login');
+                                        return;
+                                      }
+                                      
+                                      throw new Error(errorData.message || 'Failed to set patient impersonation context.');
+                                    }
+
+                                    // On success, redirect to the patient's dashboard
+                                    console.log(`[FRONTEND DEBUG] Admin set patient impersonation. Redirecting to /patient-dashboard`);
+                                    navigate('/patient-dashboard');
+                                    toast({
+                                      title: "Viewing Patient Dashboard",
+                                      description: `You are now viewing the app as ${patient.name}. All data will be recorded as this patient.`,
+                                    });
+                                  } catch (error: any) {
+                                    console.error('Error setting patient impersonation:', error);
+                                    toast({
+                                      title: "Impersonation Failed",
+                                      description: error.message || "Could not set admin impersonation for patient.",
+                                      variant: "destructive",
+                                    });
+                                  }
                                 }}
                                 className="text-green-600 hover:text-green-800 hover:underline cursor-pointer"
                               >
@@ -1315,13 +1346,26 @@ export default function AdminDashboard() {
 
                               if (!response.ok) {
                                 const errorData = await response.json();
+                                
+                                // If unauthorized (401), redirect to admin login for re-authentication
+                                if (response.status === 401) {
+                                  console.log('[FRONTEND DEBUG] Admin session expired or invalid. Redirecting to admin login.');
+                                  toast({
+                                    title: "Authentication Required",
+                                    description: "Please log in as admin to access patient dashboard.",
+                                    variant: "destructive",
+                                  });
+                                  navigate('/admin-login');
+                                  return;
+                                }
+                                
                                 throw new Error(errorData.message || 'Failed to set patient impersonation context.');
                               }
 
-                              console.log(`[FRONTEND DEBUG] Admin set patient impersonation. Redirecting to /`);
-                              navigate('/'); // Navigate to patient dashboard
+                              console.log(`[FRONTEND DEBUG] Admin set patient impersonation. Redirecting to /patient-dashboard`);
+                              navigate('/patient-dashboard'); // Navigate to patient dashboard
                               toast({
-                                title: "Testing Patient View",
+                                title: "Viewing Patient Dashboard",
                                 description: `You are now viewing the app as ${patient.name}. All data will be recorded as this patient.`,
                               });
                             } catch (error: any) {
