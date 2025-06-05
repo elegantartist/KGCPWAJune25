@@ -291,7 +291,7 @@ const Dashboard: React.FC = () => {
               <div className="w-full">
                 {/* Our new safer Keep Going component */}
                 <KeepGoingFeature
-                  userId={user?.id || 1}
+                  userId={patient?.id || 1}
                   overlayImage={motivationalImage}
                 />
               </div>
@@ -340,7 +340,7 @@ const Dashboard: React.FC = () => {
               "text-2xl font-bold mb-2", 
               isMobile ? "text-[#2E8BC0]" : "text-[#676767]" 
             )}>
-              Welcome, {(user && user.name) ? user.name : (storedUser && storedUser.name) ? storedUser.name : 'User'}!
+              Welcome, {patient?.name || 'User'}!
             </h2>
             <p className={cn(
               "mb-2",
