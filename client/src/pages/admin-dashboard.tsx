@@ -1305,38 +1305,33 @@ export default function AdminDashboard() {
                     <TableRow key={patient.id}>
                       <TableCell className="font-medium">
                         <button 
-                          onClick={() => {
-                            // Save a more complete patient info to localStorage
-                            const patientData = {
-                              id: patient.id,
-                              name: patient.name,
-                              role: 'patient',
-                              uin: patient.uin,
-                              email: patient.email,
-                              isActive: patient.isActive,
-                              // Admin viewing patient dashboard for testing purposes
-                            };
-                            // Clear session storage data that might be persisted
-                            sessionStorage.clear();
-                            // Store in both localStorage and sessionStorage for redundancy
-                            localStorage.setItem('currentUser', JSON.stringify(patientData));
-                            sessionStorage.setItem('currentUser', JSON.stringify(patientData));
-                            
-                            // Use API to fetch data as this user
-                            apiRequest('GET', `/api/users/${patient.id}`)
-                              .then(userData => {
-                                // Store additional user data if available
-                                if (userData) {
-                                  console.log('Admin Dashboard: Stored extended user data for patient testing');
-                                }
-                              }).catch(err => console.error('Failed to fetch extended user data:', err));
-                                
-                            // Navigate to patient dashboard home page
-                            navigate('/');
-                            toast({
-                              title: "Testing Patient View",
-                              description: `You are now viewing the app as ${patient.name}. All data will be recorded as this patient.`,
-                            });
+                          onClick={async () => {
+                            try {
+                              const response = await fetch('/api/admin/set-impersonated-patient', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ patientIdToImpersonate: patient.id }),
+                              });
+
+                              if (!response.ok) {
+                                const errorData = await response.json();
+                                throw new Error(errorData.message || 'Failed to set patient impersonation context.');
+                              }
+
+                              console.log(`[FRONTEND DEBUG] Admin set patient impersonation. Redirecting to /`);
+                              navigate('/'); // Navigate to patient dashboard
+                              toast({
+                                title: "Testing Patient View",
+                                description: `You are now viewing the app as ${patient.name}. All data will be recorded as this patient.`,
+                              });
+                            } catch (error: any) {
+                              console.error('Error setting patient impersonation:', error);
+                              toast({
+                                title: "Impersonation Failed",
+                                description: error.message || "Could not set admin impersonation for patient.",
+                                variant: "destructive",
+                              });
+                            }
                           }}
                           className="text-green-600 hover:text-green-800 hover:underline cursor-pointer text-left font-medium"
                         >
