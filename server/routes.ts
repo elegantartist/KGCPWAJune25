@@ -2868,6 +2868,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Quick admin access for testing - direct browser route
+  app.get("/admin-quick-access", async (req, res) => {
+    try {
+      // Get admin user from database
+      const [adminUser] = await db
+        .select()
+        .from(users)
+        .where(eq(users.roleId, 1))
+        .limit(1);
+      
+      if (!adminUser) {
+        return res.status(404).send("Admin user not found");
+      }
+      
+      // Set session with admin user info
+      (req.session as any).userId = adminUser.id;
+      (req.session as any).userRole = 'admin';
+      (req.session as any).lastActivity = Date.now();
+      
+      console.log(`[QUICK ADMIN ACCESS] Admin ${adminUser.id} logged in via browser quick access`);
+      
+      // Save session and redirect
+      req.session.save((err) => {
+        if (err) {
+          console.error('Session save error:', err);
+          return res.status(500).send("Session save failed");
+        }
+        console.log(`[QUICK ADMIN ACCESS] Admin session saved successfully for user ${adminUser.id}`);
+        res.redirect('/admin-dashboard');
+      });
+    } catch (error) {
+      console.error("Quick admin access error:", error);
+      res.status(500).send("Quick access failed");
+    }
+  });
+
   // Get current user context (for impersonation detection)
   app.get("/api/user/current-context", async (req, res) => {
     try {
