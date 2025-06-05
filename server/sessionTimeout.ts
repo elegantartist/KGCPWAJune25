@@ -37,9 +37,16 @@ export function sessionTimeoutMiddleware(req: Request, res: Response, next: Next
   let timeoutDuration = PATIENT_TIMEOUT; // Default
   if (session.userRole === 'doctor') {
     timeoutDuration = DOCTOR_TIMEOUT;
-  } else if (session.userRole === 'admin') {
-    // Extended timeout for admin, especially during impersonation
-    timeoutDuration = 2 * 60 * 60 * 1000; // 2 hours for admin
+  } else if (session.userRole === 'admin' || session.adminOriginalUserId) {
+    // Extended timeout for admin, especially during impersonation - much longer to prevent rapid logout
+    timeoutDuration = 4 * 60 * 60 * 1000; // 4 hours for admin or during admin impersonation
+  }
+  
+  // Check if this is an API route - be more lenient with session timeouts for rapid API calls
+  const isApiRoute = req.path.startsWith('/api/');
+  if (isApiRoute && session.adminOriginalUserId) {
+    // During admin impersonation, be very lenient with API routes to prevent rapid logout
+    timeoutDuration = 8 * 60 * 60 * 1000; // 8 hours for API routes during admin impersonation
   }
   
   if (now - lastActivity > timeoutDuration) {
