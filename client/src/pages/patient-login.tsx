@@ -64,11 +64,16 @@ export default function PatientLogin() {
       const data = await response.json();
 
       if (response.ok) {
+        // Clear old user data from localStorage to force refresh
+        localStorage.removeItem('currentUser');
+        
         toast({
           title: "Login Successful",
           description: "Welcome to your KGC dashboard!",
         });
-        setLocation("/patient-dashboard");
+        
+        // Force page reload to refresh user context
+        window.location.href = "/patient-dashboard";
       } else {
         setError(data.message || "Invalid verification code");
       }
