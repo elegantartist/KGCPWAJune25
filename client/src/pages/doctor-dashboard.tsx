@@ -123,19 +123,32 @@ export default function DoctorDashboard() {
 
   // Doctor information with admin impersonation support
   const { data: doctor, isLoading: isLoadingDoctor } = useQuery({
-    queryKey: ["/api/doctor/profile"],
-    enabled: !isLoadingContext,
+    // CRITICAL FIX: Add doctorToDisplayId to queryKey to ensure re-fetch on impersonation switch
+    queryKey: ["/api/doctor/profile", doctorToDisplayId],
+    queryFn: async () => {
+      // Ensure the backend receives the correct ID if directly passed, or relies on session
+      const res = await fetch(`/api/doctor/profile?doctorId=${doctorToDisplayId}`);
+      if (!res.ok) throw new Error('Failed to fetch doctor profile');
+      return res.json();
+    },
+    enabled: !isLoadingContext && !!doctorToDisplayId, // Only enable if we have a doctor ID to display
     retry: false,
   });
 
   // Get doctor's patients with admin impersonation support
-  const { 
-    data: patients, 
+  const {
+    data: patients = [],
     isLoading: isLoadingPatients,
     refetch: refetchPatients
   } = useQuery({
-    queryKey: ["/api/doctor/patients"],
-    enabled: !isLoadingContext && !!doctor,
+    // CRITICAL FIX: Add doctorToDisplayId to queryKey to ensure re-fetch on impersonation switch
+    queryKey: ["/api/doctor/patients", doctorToDisplayId],
+    queryFn: async () => {
+      const res = await fetch(`/api/doctor/patients?doctorId=${doctorToDisplayId}`);
+      if (!res.ok) throw new Error('Failed to fetch patients');
+      return res.json();
+    },
+    enabled: !isLoadingContext && !!doctorToDisplayId, // Only enable if we have a doctor ID to display
     retry: false,
   });
 
@@ -158,13 +171,7 @@ export default function DoctorDashboard() {
     retry: false,
   });
 
-  // React to selectedPatient changes
-  useEffect(() => {
-    if (selectedPatient) {
-      console.log("Selected patient changed to:", selectedPatient);
-      refetchPatientDetails();
-    }
-  }, [selectedPatient, refetchPatientDetails]);
+  // Note: Removed manual refetch useEffect as the updated queryKey dependencies handle re-fetching automatically
 
   // Get patient reports when a patient is selected
   const { 
