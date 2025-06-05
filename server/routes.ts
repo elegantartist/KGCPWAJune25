@@ -2786,6 +2786,88 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Patient impersonation endpoints
+  app.post("/api/admin/set-impersonated-patient", async (req, res) => {
+    try {
+      const session = req.session as any;
+      const adminUserId = session?.userId;
+      const userRole = session?.userRole;
+      
+      console.log(`[PATIENT IMPERSONATION DEBUG] Full session object:`, JSON.stringify(session, null, 2));
+      console.log(`[PATIENT IMPERSONATION DEBUG] Admin User ID: ${adminUserId}, User Role: ${userRole}`);
+      
+      // Verify admin authentication
+      if (!adminUserId || userRole !== 'admin') {
+        console.error(`[PATIENT IMPERSONATION DEBUG] Authentication failed - Admin ID: ${adminUserId}, Role: ${userRole}`);
+        return res.status(401).json({ message: "Unauthorized: Admin access required" });
+      }
+      
+      const { patientIdToImpersonate } = req.body;
+      
+      console.log(`[PATIENT IMPERSONATION DEBUG] Admin ${adminUserId} attempting to set impersonation for patient: ${patientIdToImpersonate}`);
+      console.log(`[PATIENT IMPERSONATION DEBUG] Current session ID: ${req.session.id}`);
+
+      if (typeof patientIdToImpersonate !== 'number' || patientIdToImpersonate <= 0) {
+        console.error(`[PATIENT IMPERSONATION DEBUG] Invalid patient ID provided: ${patientIdToImpersonate}`);
+        return res.status(400).json({ message: "Invalid patient ID provided for impersonation." });
+      }
+
+      // Verify the patient exists
+      const [patient] = await db
+        .select()
+        .from(users)
+        .where(and(eq(users.id, patientIdToImpersonate), eq(users.roleId, 3))); // roleId 3 for patients
+      
+      if (!patient) {
+        console.error(`[PATIENT IMPERSONATION DEBUG] Patient ID ${patientIdToImpersonate} not found`);
+        return res.status(404).json({ message: "Patient not found" });
+      }
+
+      session.impersonatedPatientId = patientIdToImpersonate;
+      session.adminOriginalUserId = adminUserId;
+      session.adminOriginalUserRole = 'admin';
+
+      // Save session manually to ensure persistence
+      req.session.save((err: any) => {
+        if (err) {
+          console.error('[PATIENT IMPERSONATION DEBUG] Error saving session during set-impersonation:', err);
+          return res.status(500).json({ message: "Failed to save session for patient impersonation." });
+        }
+        console.log(`[PATIENT IMPERSONATION DEBUG] Admin ${adminUserId} successfully set impersonation to Patient ${patientIdToImpersonate}. Session saved.`);
+        res.json({ success: true, message: `Successfully set impersonation to patient ID ${patientIdToImpersonate}` });
+      });
+    } catch (error) {
+      console.error("Error setting patient impersonation:", error);
+      res.status(500).json({ message: "Failed to set patient impersonation" });
+    }
+  });
+
+  app.post("/api/admin/clear-impersonation-patient", async (req, res) => {
+    try {
+      const session = req.session as any;
+      const adminUserId = session?.adminOriginalUserId || session?.userId;
+      
+      console.log(`[PATIENT IMPERSONATION DEBUG] Clearing patient impersonation for admin ${adminUserId}`);
+      
+      // Clear patient impersonation data
+      delete session.impersonatedPatientId;
+      delete session.adminOriginalUserId;
+      delete session.adminOriginalUserRole;
+
+      req.session.save((err: any) => {
+        if (err) {
+          console.error('[PATIENT IMPERSONATION DEBUG] Error saving session during clear-patient-impersonation:', err);
+          return res.status(500).json({ message: "Failed to clear patient impersonation." });
+        }
+        console.log(`[PATIENT IMPERSONATION DEBUG] Admin ${adminUserId} successfully cleared patient impersonation. Session saved.`);
+        res.json({ success: true, message: "Patient impersonation cleared successfully" });
+      });
+    } catch (error) {
+      console.error("Error clearing patient impersonation:", error);
+      res.status(500).json({ message: "Failed to clear patient impersonation" });
+    }
+  });
+
   // Get current user context (for impersonation detection)
   app.get("/api/user/current-context", async (req, res) => {
     try {
@@ -2794,7 +2876,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const context = {
         userRole: session?.userRole,
         doctorId: session?.doctorId,
+        patientId: session?.patientId,
         impersonatedDoctorId: session?.impersonatedDoctorId,
+        impersonatedPatientId: session?.impersonatedPatientId,
+        isImpersonatingPatient: !!session?.impersonatedPatientId,
         adminOriginalUserId: session?.adminOriginalUserId
       };
       
