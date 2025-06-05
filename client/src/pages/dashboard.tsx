@@ -39,48 +39,64 @@ const Dashboard: React.FC = () => {
 
   // Connectivity change listener removed - app now requires internet connection
 
-  // Fetch user data from session storage or API
-  const [storedUser, setStoredUser] = useState<any>(null);
-
-  useEffect(() => {
-    // Check localStorage first for admin testing mode
-    const storedUserData = localStorage.getItem('currentUser');
-    if (storedUserData) {
-      try {
-        const parsedUser = JSON.parse(storedUserData);
-        console.log('Dashboard: Found stored user in localStorage:', parsedUser);
-        if (parsedUser.id && parsedUser.role === 'patient') {
-          setStoredUser(parsedUser);
-        }
-      } catch (e) {
-        console.error('Error parsing stored user data:', e);
-      }
-    }
-  }, []);
-
-  // Still query the API to ensure we have server-side data as well
-  const { data: user, isLoading: isLoadingUser } = useQuery<User>({
-    queryKey: ["/api/user"],
-    onSuccess: (userData) => {
-      // If we have user data from API but not from localStorage, store it
-      if (userData && !storedUser) {
-        console.log('Dashboard: Storing user data from API:', userData);
-        localStorage.setItem('currentUser', JSON.stringify({
-          id: userData.id,
-          name: userData.name,
-          role: 'patient',
-          email: userData.email
-        }));
-      }
-    }
+  // Fetch current user context (for impersonation detection)
+  const { data: userContext, isLoading: isLoadingUserContext } = useQuery<{
+    userRole: string;
+    userId?: number; // Patient ID
+    isImpersonatingPatient?: boolean;
+    impersonatedPatientId?: number;
+    adminOriginalUserId?: number; // Original Admin ID
+  }>({
+    queryKey: ["/api/user/current-context"],
+    staleTime: 0,
   });
+
+  const isAdminImpersonatingPatient = userContext?.userRole === 'admin' && userContext?.isImpersonatingPatient;
+  const patientToDisplayId = isAdminImpersonatingPatient ? userContext.impersonatedPatientId : userContext?.userId;
+
+  // Fetch actual patient data using the determined ID
+  const { data: patient, isLoading: isLoadingPatient } = useQuery<User>({
+    queryKey: ["/api/user", patientToDisplayId],
+    queryFn: async () => {
+      const res = await fetch(`/api/user/${patientToDisplayId}`);
+      if (!res.ok) throw new Error('Failed to fetch patient data');
+      return res.json();
+    },
+    enabled: !!patientToDisplayId,
+    retry: false,
+  });
+
+  // Handle returning to admin dashboard (clear patient impersonation)
+  const handleReturnToAdminDashboard = async () => {
+    try {
+      const response = await fetch('/api/admin/clear-impersonation-patient', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to clear patient impersonation context.');
+      }
+
+      console.log('[FRONTEND DEBUG] Admin cleared patient impersonation. Redirecting to /admin-dashboard');
+      setLocation('/admin-dashboard');
+    } catch (error: any) {
+      console.error('Error clearing patient impersonation:', error);
+      toast({
+        title: "Return Failed",
+        description: error.message || "Could not return to admin dashboard.",
+        variant: "destructive",
+      });
+    }
+  };
 
   // Fetch the motivational image from the database
   const { data: savedImage } = useQuery({
-    queryKey: ['/api/users', user?.id || 1, 'motivational-image'],
+    queryKey: ['/api/users', patient?.id || 1, 'motivational-image'],
     queryFn: async () => {
       try {
-        const response = await fetch(`/api/users/${user?.id || 1}/motivational-image`);
+        const response = await fetch(`/api/users/${patient?.id || 1}/motivational-image`);
         if (!response.ok) {
           if (response.status === 404) {
             return null;
@@ -93,7 +109,7 @@ const Dashboard: React.FC = () => {
         return null;
       }
     },
-    enabled: !!user,
+    enabled: !!patient,
     retry: false,
     refetchOnWindowFocus: false,
   });
@@ -168,7 +184,7 @@ const Dashboard: React.FC = () => {
   };
 
   // Show loading state while user data is being fetched
-  if (isLoadingUser) {
+  if (isLoadingUserContext || isLoadingPatient) {
     return (
       <div className="space-y-4">
         <Card>
@@ -183,56 +199,25 @@ const Dashboard: React.FC = () => {
 
   return (
     <div className={cn("space-y-6", isMobile && "relative min-h-screen")}>
-      {/* Admin button - positioned on top for mobile and desktop */}
-      <div className={cn(
-        "flex justify-between items-center mb-3",
-        isMobile && "fixed top-0 left-0 right-0 z-50 px-4 py-2"
-      )}>
-        <Button 
-          variant="outline" 
-          className={cn(
-            "flex items-center hover:text-gray-900",
-            isMobile ? "text-white bg-black/30 hover:bg-black/50 border-transparent" : "text-gray-600"
-          )}
-          onClick={(e) => {
-            e.preventDefault(); // Prevent any default behavior
-
-            // Direct approach - Store the current user role as admin in localStorage
-            localStorage.setItem('currentUser', JSON.stringify({
-              id: 1, // Admin ID 
-              name: 'Admin User',
-              role: 'admin'
-            }));
-
-            // Clear any previous data from session storage that might interfere
-            sessionStorage.clear();
-
-            // Direct URL navigation using multiple approaches to ensure it works
-            try {
-              console.log("Navigating to Admin Dashboard");
-
-              // Use the most direct method - doesn't rely on React router
-              document.location.href = '/admin-dashboard';
-
-              // Failsafe approach
-              setTimeout(() => {
-                // If we're still not on the admin dashboard, try a direct reload
-                if (window.location.pathname !== '/admin-dashboard') {
-                  console.log("Failsafe navigation to Admin Dashboard");
-                  window.location.replace('/admin-dashboard');
-                }
-              }, 200);
-            } catch (error) {
-              console.error("Navigation failed:", error);
-              // Final fallback - hardcoded URL
-              window.location.href = '/admin-dashboard';
-            }
-          }}
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Return to Admin
-        </Button>
-      </div>
+      {/* Return to Admin Dashboard button - only show if admin is impersonating a patient */}
+      {isAdminImpersonatingPatient && (
+        <div className={cn(
+          "flex justify-between items-center mb-3",
+          isMobile && "fixed top-0 left-0 right-0 z-50 px-4 py-2"
+        )}>
+          <Button
+            variant="outline"
+            className={cn(
+              "flex items-center hover:text-gray-900",
+              isMobile ? "text-white bg-black/30 hover:bg-black/50 border-transparent" : "text-gray-600"
+            )}
+            onClick={handleReturnToAdminDashboard}
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Return to Admin Dashboard
+          </Button>
+        </div>
+      )}
 
       {/* The carousel should go here but we'll move it back into the card */}
 
@@ -268,17 +253,16 @@ const Dashboard: React.FC = () => {
                   onClick={() => {
                     try {
                       triggerVibration('chat');
-                      // Ensure current user is stored properly for the chatbot page
-                      if (user || storedUser) {
-                        const userToStore = user || storedUser;
+                      // Ensure current patient is stored properly for the chatbot page
+                      if (patient) {
                         localStorage.setItem('currentUser', JSON.stringify({
-                          id: userToStore.id,
-                          name: userToStore.name,
+                          id: patient.id,
+                          name: patient.name,
                           role: 'patient',
-                          email: userToStore.email,
-                          uin: userToStore.uin
+                          email: patient.email,
+                          uin: patient.uin
                         }));
-                        console.log('Dashboard: Stored user data for chatbot:', userToStore);
+                        console.log('Dashboard: Stored patient data for chatbot:', patient);
                       }
 
                       // Longer delay before navigation to allow full therapeutic gong sound and animation to complete
