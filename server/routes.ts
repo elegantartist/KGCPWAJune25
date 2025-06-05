@@ -226,21 +226,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Get user by ID
+  // Get user by ID - with admin impersonation support
   app.get("/api/users/:id", async (req, res) => {
-    const id = parseInt(req.params.id);
-    
-    if (isNaN(id)) {
-      return res.status(400).json({ message: "Invalid ID format" });
+    try {
+      const id = parseInt(req.params.id);
+      const session = req.session as any;
+      
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid ID format" });
+      }
+      
+      // Check authentication - allow admin impersonation access
+      const isAuthenticated = session?.userId || session?.doctorId || session?.patientId;
+      const isAdminImpersonating = session?.userRole === 'admin' && session?.impersonatedPatientId;
+      
+      if (!isAuthenticated && !isAdminImpersonating) {
+        console.log(`[USER ACCESS DEBUG] Unauthorized access attempt to user ${id}. Session:`, {
+          userId: session?.userId,
+          userRole: session?.userRole,
+          isAdminImpersonating
+        });
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      // For admin impersonation, verify they're accessing the correct patient
+      if (isAdminImpersonating && session.impersonatedPatientId !== id) {
+        console.log(`[USER ACCESS DEBUG] Admin ${session.userId} trying to access patient ${id} but impersonating patient ${session.impersonatedPatientId}`);
+        return res.status(403).json({ message: "Access denied: Can only access impersonated patient data" });
+      }
+      
+      const user = await storage.getUser(id);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      console.log(`[USER ACCESS DEBUG] Successfully fetched user ${id} data. Admin impersonation: ${isAdminImpersonating}`);
+      return res.json(user);
+    } catch (error) {
+      console.error("Error fetching user by ID:", error);
+      return res.status(500).json({ message: "Failed to fetch user" });
     }
-    
-    const user = await storage.getUser(id);
-    
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-    
-    return res.json(user);
   });
   
   // Get health metrics for a user
