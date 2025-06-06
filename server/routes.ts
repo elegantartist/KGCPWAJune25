@@ -196,8 +196,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       saveUninitialized: false,
       cookie: {
         secure: NODE_ENV === 'production',
-        httpOnly: true,
-        maxAge: 24 * 60 * 60 * 1000
+        httpOnly: false, // Allow JavaScript access in development for debugging
+        maxAge: 24 * 60 * 60 * 1000,
+        sameSite: NODE_ENV === 'production' ? 'strict' : 'lax'
       }
     })
   );
