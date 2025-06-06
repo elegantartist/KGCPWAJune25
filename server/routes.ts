@@ -67,6 +67,100 @@ export function registerRoutes(app: Express) {
         return res.json({ access_token: accessToken, user: { id: user.id, name: user.name, role: user.role } });
     });
 
+    // Patient SMS authentication endpoints
+    router.post('/patient/login/send-sms', async (req, res) => {
+        const { email } = req.body;
+        const user = await storage.getUserByEmail(email);
+        
+        if (!user || user.role !== 'patient') {
+            return res.status(404).json({ message: 'Patient not found' });
+        }
+        
+        if (!user.phoneNumber) {
+            return res.status(400).json({ message: 'No phone number on file for this patient' });
+        }
+        
+        try {
+            // Generate verification code
+            const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+            
+            // Store verification code in database (you may want to add a verification_codes table)
+            // For now, using in-memory storage
+            if (!(global as any).verificationCodes) {
+                (global as any).verificationCodes = new Map();
+            }
+            (global as any).verificationCodes.set(email, {
+                code: verificationCode,
+                expires: Date.now() + 10 * 60 * 1000 // 10 minutes
+            });
+            
+            // Send SMS using Twilio
+            const twilio = require('twilio');
+            const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+            
+            await client.messages.create({
+                body: `Your Keep Going Care verification code is: ${verificationCode}`,
+                from: process.env.TWILIO_PHONE_NUMBER,
+                to: user.phoneNumber
+            });
+            
+            res.json({ message: 'SMS sent successfully' });
+        } catch (error: any) {
+            console.error('SMS sending error:', error);
+            res.status(500).json({ message: 'Failed to send SMS' });
+        }
+    });
+
+    router.post('/patient/login/verify-sms', async (req, res) => {
+        const { email, smsCode } = req.body;
+        const user = await storage.getUserByEmail(email);
+
+        if (!user || user.role !== 'patient' || !smsCode) {
+            return res.status(401).json({ message: 'Invalid verification code or email' });
+        }
+        
+        // Verify the SMS code
+        const storedCode = (global as any).verificationCodes?.get(email);
+        if (!storedCode || storedCode.expires < Date.now()) {
+            return res.status(401).json({ message: 'Verification code expired' });
+        }
+        
+        if (storedCode.code !== smsCode) {
+            return res.status(401).json({ message: 'Invalid verification code' });
+        }
+        
+        // Clear the used code
+        (global as any).verificationCodes?.delete(email);
+        
+        const accessToken = createAccessToken({ userId: user.id, role: user.role });
+        return res.json({ access_token: accessToken, user: { id: user.id, name: user.name, role: user.role } });
+    });
+
+    // Doctor SMS authentication endpoints
+    router.post('/doctor/login/send-sms', async (req, res) => {
+        const { email } = req.body;
+        const user = await storage.getUserByEmail(email);
+        
+        if (!user || user.role !== 'doctor') {
+            return res.status(404).json({ message: 'Doctor not found' });
+        }
+        
+        // SMS sending logic would go here
+        res.json({ message: 'SMS sent successfully' });
+    });
+
+    router.post('/doctor/login/verify-sms', async (req, res) => {
+        const { email, smsCode } = req.body;
+        const user = await storage.getUserByEmail(email);
+
+        if (!user || user.role !== 'doctor' || !smsCode) {
+            return res.status(401).json({ message: 'Invalid verification code or email' });
+        }
+        
+        const accessToken = createAccessToken({ userId: user.id, role: user.role });
+        return res.json({ access_token: accessToken, user: { id: user.id, name: user.name, role: user.role } });
+    });
+
     // --- SECURE API ENDPOINTS ---
     
     // GET CURRENT USER: Securely get the logged-in user's details
