@@ -128,9 +128,7 @@ function Router() {
         <DefaultRedirect />
       </Route>
       
-      <Route path="/login" component={Login} />
-      <Route path="/patient-login" component={PatientLogin} />
-      <Route path="/admin-login" component={AdminLogin} />
+      <Route path="/login" component={UnifiedLogin} />
       
       {/* Patient routes */}
       <Route path="/patient-dashboard">
