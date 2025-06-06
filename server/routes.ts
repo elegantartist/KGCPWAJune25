@@ -2958,6 +2958,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Quick patient access for testing - direct browser route
+  app.get("/patient-quick-access", async (req, res) => {
+    try {
+      // Get patient user from database
+      const [patientUser] = await db
+        .select()
+        .from(users)
+        .where(and(eq(users.roleId, 3), eq(users.email, 'reuben.collins@keepgoingcare.com')))
+        .limit(1);
+      
+      if (!patientUser) {
+        return res.status(404).send("Patient user not found");
+      }
+      
+      // Set session with patient user info
+      (req.session as any).patientId = patientUser.id;
+      (req.session as any).userRole = 'patient';
+      (req.session as any).lastActivity = Date.now();
+      
+      console.log(`[QUICK PATIENT ACCESS] Patient ${patientUser.id} logged in via browser quick access`);
+      
+      // Save session and redirect
+      req.session.save((err) => {
+        if (err) {
+          console.error('Session save error:', err);
+          return res.status(500).send("Session save failed");
+        }
+        console.log(`[QUICK PATIENT ACCESS] Patient session saved successfully for user ${patientUser.id}`);
+        res.redirect('/patient-dashboard');
+      });
+    } catch (error) {
+      console.error("Quick patient access error:", error);
+      res.status(500).send("Quick access failed");
+    }
+  });
+
   // Quick admin access for testing - direct browser route
   app.get("/admin-quick-access", async (req, res) => {
     try {
@@ -6438,6 +6474,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("SMS verification error:", error);
       res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Test patient login without SMS for debugging
+  app.post("/api/patient/test-login", async (req, res) => {
+    try {
+      const { email } = req.body;
+      
+      if (!email) {
+        return res.status(400).json({ message: "Email is required" });
+      }
+
+      // Find patient by email
+      const patient = await db
+        .select()
+        .from(users)
+        .where(and(eq(users.email, email), eq(users.roleId, 3)))
+        .limit(1);
+
+      if (patient.length === 0) {
+        return res.status(404).json({ message: "Patient not found" });
+      }
+
+      // Set session directly for testing
+      if (!req.session) {
+        req.session = {};
+      }
+      req.session.patientId = patient[0].id;
+      req.session.userRole = 'patient';
+      req.session.lastActivity = Date.now();
+
+      // Save session explicitly
+      req.session.save((err: any) => {
+        if (err) {
+          console.error('Error saving test session:', err);
+          return res.status(500).json({ message: "Failed to save session" });
+        }
+        
+        console.log(`[TEST LOGIN] Session saved for patient ${patient[0].id} (${patient[0].name})`);
+        res.json({ 
+          success: true, 
+          message: "Test login successful",
+          redirectTo: "/patient-dashboard",
+          patient: {
+            id: patient[0].id,
+            name: patient[0].name,
+            email: patient[0].email
+          }
+        });
+      });
+      
+    } catch (error) {
+      console.error("Test patient login error:", error);
+      res.status(500).json({ message: "Failed to test login" });
     }
   });
 
