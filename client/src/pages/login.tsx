@@ -6,13 +6,15 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
-import { User, Stethoscope, Loader2 } from "lucide-react";
+import { User, Stethoscope, Shield, Loader2 } from "lucide-react";
 
 export default function CentralizedLogin() {
   const [email, setEmail] = useState("");
   const [smsCode, setSmsCode] = useState("");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [step, setStep] = useState<"email" | "sms">("email");
-  const [userType, setUserType] = useState<"patient" | "doctor">("patient");
+  const [userType, setUserType] = useState<"patient" | "doctor" | "admin">("patient");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const { toast } = useToast();
@@ -34,7 +36,6 @@ export default function CentralizedLogin() {
         case "doctor":
           endpoint = "/api/doctor/login/send-sms";
           break;
-
       }
 
       const response = await fetch(endpoint, {
@@ -53,6 +54,38 @@ export default function CentralizedLogin() {
         });
       } else {
         setError(data.message || "Failed to send SMS");
+      }
+    } catch (error) {
+      setError("Network error. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleAdminLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!username || !password) return;
+
+    setIsLoading(true);
+    setError("");
+
+    try {
+      const response = await fetch("/api/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        toast({
+          title: "Login Successful",
+          description: "Welcome to Keep Going Care Admin!",
+        });
+        setLocation("/admin-dashboard");
+      } else {
+        setError(data.message || "Invalid username or password");
       }
     } catch (error) {
       setError("Network error. Please try again.");
@@ -136,63 +169,121 @@ export default function CentralizedLogin() {
         </CardHeader>
 
         <CardContent>
-          {step === "email" ? (
-            <form onSubmit={handleSendSMS} className="space-y-4">
-              <div>
-                <label className="text-sm font-medium text-gray-700 mb-2 block">
-                  I am a:
-                </label>
-                <Tabs value={userType} onValueChange={(value: any) => setUserType(value)} className="w-full">
-                  <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="patient" className="flex items-center gap-2">
-                      <User className="w-4 h-4" />
-                      Patient
-                    </TabsTrigger>
-                    <TabsTrigger value="doctor" className="flex items-center gap-2">
-                      <Stethoscope className="w-4 h-4" />
-                      Doctor
-                    </TabsTrigger>
-                  </TabsList>
-                </Tabs>
-              </div>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700 mb-2 block">
+                I am a:
+              </label>
+              <Tabs value={userType} onValueChange={(value: any) => setUserType(value)} className="w-full">
+                <TabsList className="grid w-full grid-cols-3">
+                  <TabsTrigger value="patient" className="flex items-center gap-2">
+                    <User className="w-4 h-4" />
+                    Patient
+                  </TabsTrigger>
+                  <TabsTrigger value="doctor" className="flex items-center gap-2">
+                    <Stethoscope className="w-4 h-4" />
+                    Doctor
+                  </TabsTrigger>
+                  <TabsTrigger value="admin" className="flex items-center gap-2">
+                    <Shield className="w-4 h-4" />
+                    Admin
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
 
-              <div>
-                <label htmlFor="email" className="text-sm font-medium text-gray-700 mb-2 block">
-                  Email Address
-                </label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter your email address"
-                  required
-                  className="w-full"
-                />
-              </div>
+            {userType === "admin" ? (
+              <form onSubmit={handleAdminLogin} className="space-y-4">
+                <div>
+                  <label htmlFor="username" className="text-sm font-medium text-gray-700 mb-2 block">
+                    Username
+                  </label>
+                  <Input
+                    id="username"
+                    type="text"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="Enter admin username"
+                    required
+                    className="w-full"
+                  />
+                </div>
 
-              {error && (
-                <Alert variant="destructive">
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
+                <div>
+                  <label htmlFor="password" className="text-sm font-medium text-gray-700 mb-2 block">
+                    Password
+                  </label>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Enter admin password"
+                    required
+                    className="w-full"
+                  />
+                </div>
 
-              <Button 
-                type="submit" 
-                className="w-full" 
-                disabled={isLoading || !email}
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Sending SMS...
-                  </>
-                ) : (
-                  "Send SMS Code"
+                {error && (
+                  <Alert variant="destructive">
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
                 )}
-              </Button>
-            </form>
-          ) : (
+
+                <Button 
+                  type="submit" 
+                  className="w-full" 
+                  disabled={isLoading || !username || !password}
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Logging in...
+                    </>
+                  ) : (
+                    "Login as Admin"
+                  )}
+                </Button>
+              </form>
+            ) : step === "email" ? (
+              <form onSubmit={handleSendSMS} className="space-y-4">
+                <div>
+                  <label htmlFor="email" className="text-sm font-medium text-gray-700 mb-2 block">
+                    Email Address
+                  </label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="Enter your email address"
+                    required
+                    className="w-full"
+                  />
+                </div>
+
+                {error && (
+                  <Alert variant="destructive">
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
+
+                <Button 
+                  type="submit" 
+                  className="w-full" 
+                  disabled={isLoading || !email}
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Sending SMS...
+                    </>
+                  ) : (
+                    "Send SMS Code"
+                  )}
+                </Button>
+              </form>
+            ) : (
             <form onSubmit={handleVerifySMS} className="space-y-4">
               <div>
                 <label htmlFor="smsCode" className="text-sm font-medium text-gray-700 mb-2 block">
@@ -246,7 +337,8 @@ export default function CentralizedLogin() {
                 </Button>
               </div>
             </form>
-          )}
+            )}
+          </div>
         </CardContent>
       </Card>
     </div>
