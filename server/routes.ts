@@ -6547,6 +6547,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get patient details by ID
+  app.get("/api/patients/:id", async (req, res) => {
+    try {
+      const patientId = parseInt(req.params.id);
+      
+      if (isNaN(patientId)) {
+        return res.status(400).json({ message: "Invalid patient ID" });
+      }
+
+      const [patient] = await db
+        .select()
+        .from(users)
+        .where(and(eq(users.id, patientId), eq(users.roleId, 3)));
+      
+      if (!patient) {
+        return res.status(404).json({ message: "Patient not found" });
+      }
+
+      res.json({
+        id: patient.id,
+        name: patient.name,
+        email: patient.email,
+        uin: patient.uin
+      });
+      
+    } catch (error) {
+      console.error("Error fetching patient details:", error);
+      res.status(500).json({ message: "Failed to fetch patient details" });
+    }
+  });
+
   // TEST ENDPOINT: Direct patient login for testing without SMS costs
   app.post("/api/patient/test-login", async (req, res) => {
     try {

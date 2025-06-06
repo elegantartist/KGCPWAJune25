@@ -21,18 +21,59 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [user, setUser] = useState<User | null>(null);
   const [, setLocation] = useLocation();
   
-  // Check for existing user on initial load
+  // Check for existing user on initial load - prioritize session over localStorage
   useEffect(() => {
-    const storedUser = localStorage.getItem('currentUser');
-    if (storedUser) {
+    const checkAuthentication = async () => {
       try {
-        const parsedUser = JSON.parse(storedUser);
-        setUser(parsedUser);
+        // First check actual session from backend
+        const response = await fetch('/api/user/current-context');
+        if (response.ok) {
+          const context = await response.json();
+          
+          // Convert session context to user object
+          if (context.userRole === 'patient' && context.patientId) {
+            // Set patient user directly from session context
+            setUser({
+              id: context.patientId,
+              name: 'Patient User', // Will be updated when patient details are available
+              role: 'patient'
+            });
+            return;
+          } else if (context.userRole === 'doctor' && context.doctorId) {
+            // Similar for doctors...
+            setUser({
+              id: context.doctorId,
+              name: 'Doctor User', // Would fetch real name
+              role: 'doctor'
+            });
+            return;
+          } else if (context.userRole === 'admin') {
+            setUser({
+              id: context.userId || context.adminOriginalUserId,
+              name: 'Admin User',
+              role: 'admin'
+            });
+            return;
+          }
+        }
       } catch (error) {
-        console.error('Failed to parse stored user:', error);
-        localStorage.removeItem('currentUser');
+        console.log('Session check failed, checking localStorage');
       }
-    }
+      
+      // Fallback to localStorage if session check fails
+      const storedUser = localStorage.getItem('currentUser');
+      if (storedUser) {
+        try {
+          const parsedUser = JSON.parse(storedUser);
+          setUser(parsedUser);
+        } catch (error) {
+          console.error('Failed to parse stored user:', error);
+          localStorage.removeItem('currentUser');
+        }
+      }
+    };
+    
+    checkAuthentication();
   }, []);
 
   const login = (userData: User) => {

@@ -64,19 +64,16 @@ export default function PatientLogin() {
       const data = await response.json();
 
       if (response.ok) {
-        // Clear old user data from localStorage to force refresh
-        localStorage.removeItem('currentUser');
+        // Clear ALL localStorage data to remove admin session conflicts
+        localStorage.clear();
         
         toast({
           title: "Login Successful",
           description: "Welcome to your KGC dashboard!",
         });
         
-        // Use programmatic navigation instead of window.location.href
-        // Wait a moment for the session to be fully established
-        setTimeout(() => {
-          window.location.href = data.redirectTo || "/patient-dashboard";
-        }, 100);
+        // Force complete page reload to refresh authentication context
+        window.location.href = data.redirectTo || "/patient-dashboard";
       } else {
         setError(data.message || "Invalid verification code");
       }
