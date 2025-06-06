@@ -27,14 +27,13 @@ export function LogoutButton({ userRole, variant = "ghost", size = "sm", classNa
   const { toast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
 
-  // Don't show logout button for admin until AWS Cognito is implemented
-  if (userRole === 'admin') {
-    return null;
-  }
-
   const logoutMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("POST", "/api/auth/logout", {});
+      let endpoint = "/api/auth/logout";
+      if (userRole === 'admin') {
+        endpoint = "/api/admin/logout";
+      }
+      const response = await apiRequest("POST", endpoint, {});
       return response;
     },
     onSuccess: () => {
@@ -42,14 +41,8 @@ export function LogoutButton({ userRole, variant = "ghost", size = "sm", classNa
         title: "Logged out successfully",
         description: "You have been securely logged out.",
       });
-      // Redirect to appropriate login page
-      if (userRole === 'doctor') {
-        window.location.href = '/doctor-login';
-      } else if (userRole === 'patient') {
-        window.location.href = '/patient-login';
-      } else {
-        window.location.href = '/';
-      }
+      // Redirect to centralized login page
+      window.location.href = '/login';
     },
     onError: (error: any) => {
       toast({

@@ -55,6 +55,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { LogoutButton } from "@/components/ui/LogoutButton";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -551,6 +552,7 @@ export default function AdminDashboard() {
           <p className="text-gray-600">Manage users and system settings</p>
         </div>
         <div className="flex items-center space-x-4">
+          <LogoutButton userRole="admin" variant="outline" />
           <Card className="p-4 shadow-sm">
             <div className="flex items-center space-x-4">
               <Avatar className="h-16 w-16">

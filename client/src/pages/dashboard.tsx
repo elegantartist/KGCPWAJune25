@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MessageCircle, BarChart, ArrowRight, ArrowLeft } from 'lucide-react';
+import { LogoutButton } from "@/components/ui/LogoutButton";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { createHapticFeedback } from "@/lib/hapticFeedback";
