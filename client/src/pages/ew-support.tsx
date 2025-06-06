@@ -13,6 +13,7 @@ import { Search, MapPin, Phone, ExternalLink, Star, Heart, Trash2, List, X } fro
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { useQuery } from "@tanstack/react-query";
 
 // Define types
 interface Location {

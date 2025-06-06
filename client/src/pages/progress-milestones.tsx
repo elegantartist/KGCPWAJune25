@@ -410,6 +410,7 @@ const BadgeProgressCard: React.FC<BadgeProgressCardProps> = ({
 // Main component
 import { useBadges } from '@/hooks/useBadges';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { useQuery } from "@tanstack/react-query";
 
 const ProgressMilestones: React.FC = () => {
   // Get current authenticated user

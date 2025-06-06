@@ -62,6 +62,17 @@ const FoodDatabase = () => {
   });
 
   const userId = currentUser?.id;
+
+  // Don't render anything if not authenticated
+  if (!currentUser) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 p-4 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-600">Please log in to access the Food Database.</p>
+        </div>
+      </div>
+    );
+  }
   
   // Online/offline status detection
   useEffect(() => {
