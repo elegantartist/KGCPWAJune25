@@ -25,6 +25,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   useEffect(() => {
     const checkAuthentication = async () => {
       try {
+        // Clear any stale localStorage data before checking session
+        const currentPath = window.location.pathname;
+        if (currentPath === '/patient-dashboard' || currentPath === '/doctor-dashboard') {
+          localStorage.removeItem('currentUser');
+        }
+
         // First check actual session from backend
         const response = await fetch('/api/user/current-context');
         if (response.ok) {
@@ -40,32 +46,43 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               const userResponse = await fetch(`/api/users/${userId}`);
               if (userResponse.ok) {
                 const userData = await userResponse.json();
-                setUser({
+                const userObj = {
                   id: userData.id,
                   name: userData.name,
                   role: context.userRole,
                   uin: userData.uin
-                });
+                };
+                setUser(userObj);
+                
+                // Update localStorage with fresh data
+                localStorage.setItem('currentUser', JSON.stringify(userObj));
                 return;
               }
             } catch (error) {
               console.error('Failed to fetch user data:', error);
             }
           }
+        } else if (response.status === 401) {
+          // Clear stale data on 401
+          localStorage.removeItem('currentUser');
+          setUser(null);
+          return;
         }
       } catch (error) {
         console.log('Session check failed, checking localStorage');
       }
       
-      // Fallback to localStorage if session check fails
-      const storedUser = localStorage.getItem('currentUser');
-      if (storedUser) {
-        try {
-          const parsedUser = JSON.parse(storedUser);
-          setUser(parsedUser);
-        } catch (error) {
-          console.error('Failed to parse stored user:', error);
-          localStorage.removeItem('currentUser');
+      // Only use localStorage as fallback for admin dashboard
+      if (window.location.pathname === '/admin-dashboard') {
+        const storedUser = localStorage.getItem('currentUser');
+        if (storedUser) {
+          try {
+            const parsedUser = JSON.parse(storedUser);
+            setUser(parsedUser);
+          } catch (error) {
+            console.error('Failed to parse stored user:', error);
+            localStorage.removeItem('currentUser');
+          }
         }
       }
     };

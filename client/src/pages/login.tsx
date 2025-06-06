@@ -121,16 +121,25 @@ export default function CentralizedLogin() {
       const data = await response.json();
 
       if (response.ok) {
+        // Clear all cached authentication data to prevent admin session interference
+        localStorage.clear();
+        sessionStorage.clear();
+        
+        // Clear any cached user context
+        if (window.__KGC_USER_CONTEXT__) {
+          delete window.__KGC_USER_CONTEXT__;
+        }
+        
         toast({
           title: "Login Successful",
           description: `Welcome to Keep Going Care!`,
         });
 
-        // Navigate to appropriate dashboard
+        // Force a complete page reload to ensure clean authentication state
         if (userType === "patient") {
-          setLocation("/patient-dashboard");
+          window.location.href = "/patient-dashboard";
         } else if (userType === "doctor") {
-          setLocation("/doctor-dashboard");
+          window.location.href = "/doctor-dashboard";
         }
       } else {
         setError(data.message || "Invalid verification code");
