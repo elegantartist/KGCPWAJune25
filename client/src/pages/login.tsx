@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -103,27 +103,19 @@ export default function CentralizedLogin() {
 
     try {
       let endpoint = "";
-      let redirectPath = "";
-      
       switch (userType) {
         case "patient":
           endpoint = "/api/patient/login/verify-sms";
-          redirectPath = "/patient-dashboard";
           break;
         case "doctor":
           endpoint = "/api/doctor/login/verify-sms";
-          redirectPath = "/doctor-dashboard";
           break;
       }
 
       const response = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          email, 
-          smsCode: userType === "patient" ? smsCode : undefined,
-          code: userType === "doctor" ? smsCode : undefined
-        }),
+        body: JSON.stringify({ email, code: smsCode }),
       });
 
       const data = await response.json();
@@ -133,7 +125,13 @@ export default function CentralizedLogin() {
           title: "Login Successful",
           description: `Welcome to Keep Going Care!`,
         });
-        setLocation(redirectPath);
+
+        // Navigate to appropriate dashboard
+        if (userType === "patient") {
+          setLocation("/patient-dashboard");
+        } else if (userType === "doctor") {
+          setLocation("/doctor-dashboard");
+        }
       } else {
         setError(data.message || "Invalid verification code");
       }
@@ -148,6 +146,8 @@ export default function CentralizedLogin() {
     setStep("email");
     setEmail("");
     setSmsCode("");
+    setUsername("");
+    setPassword("");
     setError("");
   };
 
@@ -284,59 +284,59 @@ export default function CentralizedLogin() {
                 </Button>
               </form>
             ) : (
-            <form onSubmit={handleVerifySMS} className="space-y-4">
-              <div>
-                <label htmlFor="smsCode" className="text-sm font-medium text-gray-700 mb-2 block">
-                  SMS Verification Code
-                </label>
-                <Input
-                  id="smsCode"
-                  type="text"
-                  value={smsCode}
-                  onChange={(e) => setSmsCode(e.target.value)}
-                  placeholder="Enter 6-digit code"
-                  maxLength={6}
-                  required
-                  className="w-full text-center text-lg tracking-widest"
-                />
-                <p className="text-sm text-gray-500 mt-2">
-                  We sent a verification code to your phone
-                </p>
-              </div>
+              <form onSubmit={handleVerifySMS} className="space-y-4">
+                <div>
+                  <label htmlFor="smsCode" className="text-sm font-medium text-gray-700 mb-2 block">
+                    SMS Verification Code
+                  </label>
+                  <Input
+                    id="smsCode"
+                    type="text"
+                    value={smsCode}
+                    onChange={(e) => setSmsCode(e.target.value)}
+                    placeholder="Enter 6-digit code"
+                    maxLength={6}
+                    required
+                    className="w-full text-center text-lg tracking-widest"
+                  />
+                  <p className="text-sm text-gray-500 mt-2">
+                    We sent a verification code to your phone
+                  </p>
+                </div>
 
-              {error && (
-                <Alert variant="destructive">
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
+                {error && (
+                  <Alert variant="destructive">
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
 
-              <div className="space-y-2">
-                <Button 
-                  type="submit" 
-                  className="w-full" 
-                  disabled={isLoading || !smsCode}
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Verifying...
-                    </>
-                  ) : (
-                    "Verify & Login"
-                  )}
-                </Button>
+                <div className="space-y-2">
+                  <Button 
+                    type="submit" 
+                    className="w-full" 
+                    disabled={isLoading || !smsCode}
+                  >
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Verifying...
+                      </>
+                    ) : (
+                      "Verify & Login"
+                    )}
+                  </Button>
 
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  className="w-full" 
-                  onClick={resetForm}
-                  disabled={isLoading}
-                >
-                  Back to Email
-                </Button>
-              </div>
-            </form>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    className="w-full" 
+                    onClick={resetForm}
+                    disabled={isLoading}
+                  >
+                    Back to Email
+                  </Button>
+                </div>
+              </form>
             )}
           </div>
         </CardContent>
