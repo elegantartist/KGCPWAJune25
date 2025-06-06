@@ -1,214 +1,261 @@
-import React, { useState, useEffect } from 'react';
-import { useLocation } from 'wouter';
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Lock, User, UserCog, UserPlus } from 'lucide-react';
-import axios from 'axios';
+import { useLocation } from "wouter";
+import { User, Stethoscope, Shield, Loader2 } from "lucide-react";
 
-interface UserOption {
-  id: number;
-  name: string;
-  role: 'admin' | 'doctor' | 'patient';
-  uin: string;
-  redirectPath: string;
-}
-
-const Login: React.FC = () => {
-  const [selectedUser, setSelectedUser] = useState<UserOption | null>(null);
-  const [isLoggingIn, setIsLoggingIn] = useState(false);
-  const [isLoaded, setIsLoaded] = useState(false);
-  const [userOptions, setUserOptions] = useState<UserOption[]>([]);
-  const [, setLocation] = useLocation();
+export default function CentralizedLogin() {
+  const [email, setEmail] = useState("");
+  const [smsCode, setSmsCode] = useState("");
+  const [step, setStep] = useState<"email" | "sms">("email");
+  const [userType, setUserType] = useState<"patient" | "doctor" | "admin">("patient");
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
   const { toast } = useToast();
-  
-  // Testing mode: Auto-redirect to admin dashboard
-  useEffect(() => {
-    // For quick testing: auto-login as admin
-    const adminUser = { id: 4, name: 'Admin User', role: 'admin' as const, uin: 'ADM-789012', redirectPath: '/admin-dashboard' };
-    
-    // Auto login after a short delay to ensure component is fully mounted
-    const timer = setTimeout(() => {
-      // Store admin user info directly
-      localStorage.setItem('currentUser', JSON.stringify({
-        id: adminUser.id,
-        name: adminUser.name,
-        role: adminUser.role,
-        uin: adminUser.uin
-      }));
-      
-      // Redirect to admin dashboard
-      setLocation('/admin-dashboard');
-    }, 100);
-    
-    return () => clearTimeout(timer);
-  }, [setLocation]);
+  const [, setLocation] = useLocation();
 
-  // Fetch user data from the database
-  useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        // Convert database users to user options with proper UINs
-        const users: UserOption[] = [
-          { id: 4, name: 'Admin User', role: 'admin', uin: 'ADM-789012', redirectPath: '/admin-dashboard' },
-          { id: 3, name: 'Dr. Adel El-Mezin', role: 'doctor', uin: 'DOC-462690', redirectPath: '/doctor-dashboard' },
-          { id: 1, name: 'Bill Smith', role: 'patient', uin: 'PAT-123456', redirectPath: '/' }
-        ];
-        
-        setUserOptions(users);
-        setIsLoaded(true);
-      } catch (error) {
-        console.error('Failed to fetch users:', error);
-        toast({
-          title: "Error",
-          description: "Failed to load user options",
-          variant: "destructive",
-        });
-        
-        // Fallback options in case API fails
-        setUserOptions([
-          { id: 4, name: 'Admin User', role: 'admin', uin: 'ADM-789012', redirectPath: '/admin-dashboard' },
-          { id: 3, name: 'Dr. Adel El-Mezin', role: 'doctor', uin: 'DOC-462690', redirectPath: '/doctor-dashboard' },
-          { id: 1, name: 'Bill Smith', role: 'patient', uin: 'PAT-123456', redirectPath: '/' }
-        ]);
-        setIsLoaded(true);
-      }
-    };
+  const handleSendSMS = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) return;
 
-    fetchUsers();
-  }, [toast]);
-
-  const handleUserSelect = (user: UserOption) => {
-    setSelectedUser(user);
-  };
-
-  const handleLogin = async (user: UserOption | null = selectedUser) => {
-    if (!user) {
-      toast({
-        title: "Error",
-        description: "Please select a user to continue",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsLoggingIn(true);
+    setIsLoading(true);
+    setError("");
 
     try {
-      // Store complete user info in localStorage for persistence with UIN
-      localStorage.setItem('currentUser', JSON.stringify({
-        id: user.id,
-        name: user.name,
-        role: user.role,
-        uin: user.uin
-      }));
-
-      // If doctor, get associated patients to make them available in session
-      if (user.role === 'doctor') {
-        try {
-          // This would be a real API call in production
-          const doctorPatients = [
-            { id: 1, name: 'Bill Smith', uin: 'PAT-123456' }
-          ];
-          localStorage.setItem('doctorPatients', JSON.stringify(doctorPatients));
-        } catch (error) {
-          console.error('Failed to fetch doctor patients:', error);
-        }
+      let endpoint = "";
+      switch (userType) {
+        case "patient":
+          endpoint = "/api/patient/login/send-sms";
+          break;
+        case "doctor":
+          endpoint = "/api/doctor/login/send-sms";
+          break;
+        case "admin":
+          // Admin uses password-based login, redirect to admin login
+          setLocation("/admin-login");
+          return;
       }
 
-      toast({
-        title: "Logged In",
-        description: user.role === 'admin' 
-          ? `Welcome, ${user.name} (${user.uin})`
-          : `Welcome, ${user.name}`,
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
       });
-      
-      // Redirect to appropriate dashboard
-      setLocation(user.redirectPath);
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setStep("sms");
+        toast({
+          title: "SMS Sent",
+          description: `Please check your phone for the verification code`,
+        });
+      } else {
+        setError(data.message || "Failed to send SMS");
+      }
     } catch (error) {
-      console.error('Login error:', error);
-      toast({
-        title: "Login Failed",
-        description: "An error occurred during login",
-        variant: "destructive",
-      });
+      setError("Network error. Please try again.");
     } finally {
-      setIsLoggingIn(false);
+      setIsLoading(false);
     }
+  };
+
+  const handleVerifySMS = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!smsCode) return;
+
+    setIsLoading(true);
+    setError("");
+
+    try {
+      let endpoint = "";
+      let redirectPath = "";
+      
+      switch (userType) {
+        case "patient":
+          endpoint = "/api/patient/login/verify-sms";
+          redirectPath = "/patient-dashboard";
+          break;
+        case "doctor":
+          endpoint = "/api/doctor/login/verify-sms";
+          redirectPath = "/doctor-dashboard";
+          break;
+      }
+
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          email, 
+          smsCode: userType === "patient" ? smsCode : undefined,
+          code: userType === "doctor" ? smsCode : undefined
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        toast({
+          title: "Login Successful",
+          description: `Welcome to Keep Going Care!`,
+        });
+        setLocation(redirectPath);
+      } else {
+        setError(data.message || "Invalid verification code");
+      }
+    } catch (error) {
+      setError("Network error. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const resetForm = () => {
+    setStep("email");
+    setEmail("");
+    setSmsCode("");
+    setError("");
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gradient-to-b from-blue-50 to-blue-100">
-      <Card className="w-[380px] shadow-lg">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 flex items-center justify-center p-4">
+      <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold text-blue-800">Keep Going Care</CardTitle>
-          <CardDescription>Select a user to access the application</CardDescription>
+          <div className="mx-auto mb-4 w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
+            <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+              <span className="text-white font-bold text-sm">KGC</span>
+            </div>
+          </div>
+          <CardTitle className="text-2xl font-bold text-gray-900">
+            Keep Going Care
+          </CardTitle>
+          <CardDescription>
+            Your Personal Health Assistant
+          </CardDescription>
         </CardHeader>
 
         <CardContent>
-          {isLoaded ? (
-            <div className="space-y-4">
-              {userOptions.map((user) => (
-                <div
-                  key={user.id}
-                  className={`flex items-center gap-4 p-4 border rounded-lg cursor-pointer transition-all ${
-                    selectedUser?.id === user.id
-                      ? 'border-blue-500 bg-blue-50'
-                      : 'border-gray-200 hover:border-blue-300'
-                  }`}
-                  onClick={() => handleUserSelect(user)}
-                >
-                  {user.role === 'admin' && (
-                    <UserPlus className="h-8 w-8 text-purple-500" />
-                  )}
-                  {user.role === 'doctor' && (
-                    <UserCog className="h-8 w-8 text-blue-500" />
-                  )}
-                  {user.role === 'patient' && (
-                    <User className="h-8 w-8 text-green-500" />
-                  )}
-                  <div>
-                    <p className="font-medium">{user.name}</p>
-                    <div className="flex flex-col">
-                      <p className="text-sm text-gray-500 capitalize">{user.role}</p>
-                      {user.role === 'admin' && (
-                        <p className="text-xs text-gray-400">{user.uin}</p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+          {step === "email" ? (
+            <form onSubmit={handleSendSMS} className="space-y-4">
+              <div>
+                <label className="text-sm font-medium text-gray-700 mb-2 block">
+                  I am a:
+                </label>
+                <Tabs value={userType} onValueChange={(value: any) => setUserType(value)} className="w-full">
+                  <TabsList className="grid w-full grid-cols-3">
+                    <TabsTrigger value="patient" className="flex items-center gap-2">
+                      <User className="w-4 h-4" />
+                      Patient
+                    </TabsTrigger>
+                    <TabsTrigger value="doctor" className="flex items-center gap-2">
+                      <Stethoscope className="w-4 h-4" />
+                      Doctor
+                    </TabsTrigger>
+                    <TabsTrigger value="admin" className="flex items-center gap-2">
+                      <Shield className="w-4 h-4" />
+                      Admin
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </div>
+
+              <div>
+                <label htmlFor="email" className="text-sm font-medium text-gray-700 mb-2 block">
+                  Email Address
+                </label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Enter your email address"
+                  required
+                  className="w-full"
+                />
+              </div>
+
+              {error && (
+                <Alert variant="destructive">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+
+              <Button 
+                type="submit" 
+                className="w-full" 
+                disabled={isLoading || !email}
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {userType === "admin" ? "Redirecting..." : "Sending SMS..."}
+                  </>
+                ) : (
+                  userType === "admin" ? "Continue to Admin Login" : "Send SMS Code"
+                )}
+              </Button>
+            </form>
           ) : (
-            <div className="flex justify-center py-6">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-            </div>
+            <form onSubmit={handleVerifySMS} className="space-y-4">
+              <div>
+                <label htmlFor="smsCode" className="text-sm font-medium text-gray-700 mb-2 block">
+                  SMS Verification Code
+                </label>
+                <Input
+                  id="smsCode"
+                  type="text"
+                  value={smsCode}
+                  onChange={(e) => setSmsCode(e.target.value)}
+                  placeholder="Enter 6-digit code"
+                  maxLength={6}
+                  required
+                  className="w-full text-center text-lg tracking-widest"
+                />
+                <p className="text-sm text-gray-500 mt-2">
+                  We sent a verification code to your phone
+                </p>
+              </div>
+
+              {error && (
+                <Alert variant="destructive">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+
+              <div className="space-y-2">
+                <Button 
+                  type="submit" 
+                  className="w-full" 
+                  disabled={isLoading || !smsCode}
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Verifying...
+                    </>
+                  ) : (
+                    "Verify & Login"
+                  )}
+                </Button>
+
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  className="w-full" 
+                  onClick={resetForm}
+                  disabled={isLoading}
+                >
+                  Back to Email
+                </Button>
+              </div>
+            </form>
           )}
         </CardContent>
-
-        <CardFooter>
-          <Button 
-            className="w-full" 
-            size="lg"
-            disabled={!selectedUser || isLoggingIn}
-            onClick={() => handleLogin()}
-          >
-            {isLoggingIn ? (
-              <div className="flex items-center gap-2">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                <span>Logging in...</span>
-              </div>
-            ) : (
-              <>
-                <Lock className="mr-2 h-4 w-4" />
-                Continue as {selectedUser?.name || "Selected User"}
-              </>
-            )}
-          </Button>
-        </CardFooter>
       </Card>
     </div>
   );
-};
-
-export default Login;
+}
