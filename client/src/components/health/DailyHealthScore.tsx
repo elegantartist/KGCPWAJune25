@@ -21,10 +21,20 @@ const DailyHealthScore: React.FC<DailyHealthScoreProps> = ({ metric }) => {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   
+  // Provide default values if metric is undefined or properties are missing
+  const defaultMetric = {
+    medicationScore: metric?.medicationScore || 5,
+    dietScore: metric?.dietScore || 5,
+    exerciseScore: metric?.exerciseScore || 5,
+    userId: metric?.userId || 0,
+    id: metric?.id || 0,
+    date: metric?.date || new Date()
+  };
+  
   // State for slider values
-  const [medicationScore, setMedicationScore] = useState<number>(metric.medicationScore);
-  const [dietScore, setDietScore] = useState<number>(metric.dietScore);
-  const [exerciseScore, setExerciseScore] = useState<number>(metric.exerciseScore);
+  const [medicationScore, setMedicationScore] = useState<number>(defaultMetric.medicationScore || 5);
+  const [dietScore, setDietScore] = useState<number>(defaultMetric.dietScore || 5);
+  const [exerciseScore, setExerciseScore] = useState<number>(defaultMetric.exerciseScore || 5);
   
   // State to track if user has submitted today
   const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
@@ -43,9 +53,9 @@ const DailyHealthScore: React.FC<DailyHealthScoreProps> = ({ metric }) => {
   }, []);
   
   // Calculate the width percentage for progress bars
-  const medicationWidth = `${(metric.medicationScore / 10) * 100}%`;
-  const dietWidth = `${(metric.dietScore / 10) * 100}%`;
-  const exerciseWidth = `${(metric.exerciseScore / 10) * 100}%`;
+  const medicationWidth = `${(defaultMetric.medicationScore / 10) * 100}%`;
+  const dietWidth = `${(defaultMetric.dietScore / 10) * 100}%`;
+  const exerciseWidth = `${(defaultMetric.exerciseScore / 10) * 100}%`;
   
   // Function to handle submission
   const handleSubmit = async () => {
@@ -56,7 +66,7 @@ const DailyHealthScore: React.FC<DailyHealthScoreProps> = ({ metric }) => {
       // Since we're using in-memory storage, we'll simulate the update
       await apiRequest(
         'POST',
-        `/api/users/${metric.userId}/health-metrics`,
+        `/api/users/${defaultMetric.userId}/health-metrics`,
         {
           medicationScore,
           dietScore,
@@ -86,7 +96,7 @@ const DailyHealthScore: React.FC<DailyHealthScoreProps> = ({ metric }) => {
       
       // Initialize a conversation about the health scores
       // Mark this feature usage in MCP
-      ModelContextProtocol.getInstance(metric.userId).recordFeatureUsage('health-metrics');
+      ModelContextProtocol.getInstance(defaultMetric.userId).recordFeatureUsage('health-metrics');
       
       // Show the discussion dialog after a short delay
       setTimeout(() => {
