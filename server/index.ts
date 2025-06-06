@@ -1,5 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
-import { registerSecureRoutes } from "./routes-secure";
+import { registerSecureRoutes } from "./routes-secure.js";
 import { setupVite, serveStatic, log } from "./vite";
 
 // Load environment variables

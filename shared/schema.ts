@@ -6,6 +6,7 @@ import { z } from "zod";
 export const users = pgTable('users', {
   id: serial('id').primaryKey(),
   email: varchar('email', { length: 255 }).notNull().unique(),
+  name: varchar('name', { length: 255 }).notNull(),
   // Password hash is for admin only. Doctors/Patients use passwordless SMS.
   passwordHash: text('password_hash'), 
   role: text('role', { enum: ['admin', 'doctor', 'patient'] }).notNull(),

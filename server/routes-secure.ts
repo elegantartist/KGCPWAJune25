@@ -99,6 +99,7 @@ export function registerSecureRoutes(app: Express): Server {
             // Create user account for patient
             const newUser = await storage.createUser({
                 email,
+                name: fullName,
                 phoneNumber,
                 role: 'patient',
                 isActive: true
@@ -211,6 +212,7 @@ export async function createPatientAndLinkToDoctor(patientData: any, doctorUserI
         // Create user account for patient
         const newUser = await storage.createUser({
             email: patientData.email,
+            name: patientData.fullName,
             phoneNumber: patientData.phoneNumber,
             role: 'patient',
             isActive: true
