@@ -208,7 +208,7 @@ export default function DoctorDashboard() {
     mutationFn: (data: z.infer<typeof newPatientSchema>) => {
       return apiRequest(
         "POST",
-        "/api/doctor/patients",
+        "/api/doctors/me/patients",
         data
       );
     },
@@ -218,7 +218,7 @@ export default function DoctorDashboard() {
         description: "An invitation email has been sent to the patient",
       });
       setIsAddingPatient(false);
-      queryClient.invalidateQueries({ queryKey: ["/api/doctor/patients", doctor?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/doctors/me/patients"] });
     },
     onError: (error) => {
       toast({

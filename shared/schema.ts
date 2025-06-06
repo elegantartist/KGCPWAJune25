@@ -2,40 +2,35 @@ import { pgTable, serial, text, varchar, integer, timestamp, boolean } from 'dri
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-// This central table holds login information for ALL users, simplifying authentication.
+// Central table for ALL user login and role information.
 export const users = pgTable('users', {
   id: serial('id').primaryKey(),
-  email: varchar('email', { length: 255 }).notNull().unique(),
   name: varchar('name', { length: 255 }).notNull(),
-  // Password hash is for admin only. Doctors/Patients use passwordless SMS.
-  passwordHash: text('password_hash'), 
-  role: text('role', { enum: ['admin', 'doctor', 'patient'] }).notNull(),
+  email: varchar('email', { length: 255 }).notNull().unique(),
   phoneNumber: varchar('phone_number', { length: 50 }),
-  isActive: boolean('is_active').default(false), // Accounts are inactive until verified
+  passwordHash: text('password_hash'), // For admin username/password login
+  role: text('role', { enum: ['admin', 'doctor', 'patient'] }).notNull(),
+  isActive: boolean('is_active').default(false),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
-// This table holds data specific to doctors.
+// Table for doctor-specific data, linked to a user account.
 export const doctors = pgTable('doctors', {
   id: serial('id').primaryKey(),
-  // This links the doctor profile to a user login.
   userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
-  fullName: varchar('full_name', { length: 255 }),
-  // Add any other doctor-specific fields here
+  // Add any other doctor-specific fields here, e.g., qualifications, practice name.
 });
 
-// This table holds data specific to patients and creates the ownership link.
+// Table for patient-specific data, linked to a user account AND a doctor.
 export const patients = pgTable('patients', {
   id: serial('id').primaryKey(),
-  // This links the patient profile to a user login.
   userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   // THIS IS THE CRITICAL OWNERSHIP LINK.
   doctorId: integer('doctor_id').notNull().references(() => doctors.id, { onDelete: 'cascade' }),
-  fullName: varchar('full_name', { length: 255 }),
-  // Add any other patient-specific fields here
+  // Add any other patient-specific fields here.
 });
 
-// This table holds the Care Plan Directives (CPDs) for each patient.
+// Care Plan Directives linked to a patient.
 export const carePlanDirectives = pgTable('care_plan_directives', {
     id: serial('id').primaryKey(),
     patientId: integer('patient_id').notNull().references(() => patients.id, { onDelete: 'cascade' }),
@@ -45,7 +40,7 @@ export const carePlanDirectives = pgTable('care_plan_directives', {
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
-// Link health metrics to patients table instead of users directly
+// Health metrics linked to a patient.
 export const healthMetrics = pgTable("health_metrics", {
   id: serial("id").primaryKey(),
   patientId: integer("patient_id").notNull().references(() => patients.id, { onDelete: 'cascade' }),
@@ -55,21 +50,20 @@ export const healthMetrics = pgTable("health_metrics", {
   exerciseScore: integer("exercise_score").notNull(),
 });
 
-// Insert schemas for validation
+// Zod schemas for validation
 export const insertUserSchema = createInsertSchema(users);
 export const insertDoctorSchema = createInsertSchema(doctors);
 export const insertPatientSchema = createInsertSchema(patients);
 export const insertCarePlanDirectiveSchema = createInsertSchema(carePlanDirectives);
 export const insertHealthMetricSchema = createInsertSchema(healthMetrics);
 
-// Select types
+// TypeScript types for type safety
 export type User = typeof users.$inferSelect;
 export type Doctor = typeof doctors.$inferSelect;
 export type Patient = typeof patients.$inferSelect;
 export type CarePlanDirective = typeof carePlanDirectives.$inferSelect;
 export type HealthMetric = typeof healthMetrics.$inferSelect;
 
-// Insert types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertDoctor = z.infer<typeof insertDoctorSchema>;
 export type InsertPatient = z.infer<typeof insertPatientSchema>;
