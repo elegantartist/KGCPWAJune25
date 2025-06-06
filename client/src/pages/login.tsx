@@ -121,13 +121,14 @@ export default function CentralizedLogin() {
       const data = await response.json();
 
       if (response.ok) {
-        // Clear all cached authentication data to prevent admin session interference
-        localStorage.clear();
-        sessionStorage.clear();
+        // Clear only admin-specific cached data, preserve session cookies
+        localStorage.removeItem('currentUser');
+        localStorage.removeItem('adminToken');
+        localStorage.removeItem('adminSession');
         
         // Clear any cached user context
-        if (window.__KGC_USER_CONTEXT__) {
-          delete window.__KGC_USER_CONTEXT__;
+        if ((window as any).__KGC_USER_CONTEXT__) {
+          delete (window as any).__KGC_USER_CONTEXT__;
         }
         
         toast({
@@ -135,11 +136,11 @@ export default function CentralizedLogin() {
           description: `Welcome to Keep Going Care!`,
         });
 
-        // Force a complete page reload to ensure clean authentication state
+        // Navigate using React Router to preserve session state
         if (userType === "patient") {
-          window.location.href = "/patient-dashboard";
+          setLocation("/");
         } else if (userType === "doctor") {
-          window.location.href = "/doctor-dashboard";
+          setLocation("/doctor-dashboard");
         }
       } else {
         setError(data.message || "Invalid verification code");
