@@ -2746,34 +2746,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         patientId: session.patientId,
       };
 
-      // Set the primary ID based on user role and get user data
+      // Set the primary ID based on user role and get user data from users table
+      let userData = null;
       if (session.userRole === 'patient' && session.patientId) {
         response.id = session.patientId;
-        // Get patient data
-        const [patient] = await db.select().from(patients).where(eq(patients.id, session.patientId));
-        if (patient) {
-          response.name = patient.name;
-          response.email = patient.email;
-          response.uin = patient.uin;
-        }
+        const [patient] = await db.select().from(users).where(eq(users.id, session.patientId));
+        userData = patient;
       } else if (session.userRole === 'doctor' && session.doctorId) {
         response.id = session.doctorId;
-        // Get doctor data
-        const [doctor] = await db.select().from(doctors).where(eq(doctors.id, session.doctorId));
-        if (doctor) {
-          response.name = doctor.name;
-          response.email = doctor.email;
-          response.uin = doctor.uin;
-        }
+        const [doctor] = await db.select().from(users).where(eq(users.id, session.doctorId));
+        userData = doctor;
       } else if (session.userRole === 'admin' && session.userId) {
         response.id = session.userId;
-        // Get admin data
         const [admin] = await db.select().from(users).where(eq(users.id, session.userId));
-        if (admin) {
-          response.name = admin.name;
-          response.email = admin.email;
-          response.uin = admin.uin;
-        }
+        userData = admin;
+      }
+
+      // Add user data to response
+      if (userData) {
+        response.name = userData.name;
+        response.email = userData.email;
+        response.uin = userData.uin;
+        response.username = userData.username;
+        response.phoneNumber = userData.phoneNumber;
+        response.roleId = userData.roleId;
       }
 
       // If admin is impersonating
