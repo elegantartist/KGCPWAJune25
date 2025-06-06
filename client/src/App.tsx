@@ -18,9 +18,7 @@ import DoctorDashboard from "@/pages/doctor-dashboard";
 import DoctorSetup from "@/pages/DoctorSetup";
 import DoctorLogin from "@/pages/DoctorLogin";
 import AdminDashboard from "@/pages/admin-dashboard";
-import AdminLogin from "@/pages/admin-login";
-import Login from "@/pages/login";
-import PatientLogin from "@/pages/patient-login";
+import UnifiedLogin from "@/pages/unified-login";
 import { AuthProvider, useAuth } from "@/context/auth-context";
 import { useEffect } from "react";
 
