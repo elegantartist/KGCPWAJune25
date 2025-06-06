@@ -6531,6 +6531,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.json({ 
           success: true, 
           message: "Login successful",
+          redirectTo: "/patient-dashboard",
           patient: {
             id: patient.id,
             name: patient.name,
@@ -6542,6 +6543,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Patient SMS verification error:", error);
       res.status(500).json({ message: "Failed to verify SMS code" });
+    }
+  });
+
+  // TEST ENDPOINT: Direct patient login for testing without SMS costs
+  app.post("/api/patient/test-login", async (req, res) => {
+    try {
+      const { email } = req.body;
+      
+      if (!email) {
+        return res.status(400).json({ message: "Email is required" });
+      }
+
+      // Find patient by email
+      const [patient] = await db
+        .select()
+        .from(users)
+        .where(and(eq(users.email, email), eq(users.roleId, 3)));
+      
+      if (!patient) {
+        return res.status(404).json({ message: "Patient not found" });
+      }
+
+      // Set session directly for testing
+      if (!req.session) {
+        req.session = {};
+      }
+      req.session.patientId = patient.id;
+      req.session.userRole = 'patient';
+      req.session.lastActivity = Date.now();
+
+      // Save session explicitly to ensure persistence
+      req.session.save((err: any) => {
+        if (err) {
+          console.error('Error saving test patient session:', err);
+          return res.status(500).json({ message: "Failed to save session" });
+        }
+        
+        console.log(`[TEST PATIENT LOGIN] Session saved for patient ${patient.id} (${patient.name})`);
+        res.json({ 
+          success: true, 
+          message: "Test login successful",
+          redirectTo: "/patient-dashboard",
+          patient: {
+            id: patient.id,
+            name: patient.name,
+            email: patient.email
+          }
+        });
+      });
+      
+    } catch (error) {
+      console.error("Test patient login error:", error);
+      res.status(500).json({ message: "Failed to test login" });
     }
   });
 
