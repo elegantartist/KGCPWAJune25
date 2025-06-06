@@ -28,7 +28,7 @@ const HealthSnapshots: React.FC = () => {
   const isMobile = useIsMobile();
   const { toast } = useToast();
   const [userId, setUserId] = useState<number | null>(null);
-  const { recordFeatureUsage } = useMCP(userId || 1);
+  const { recordFeatureUsage } = useMCP(userId);
 
   // Get the current user
   useEffect(() => {

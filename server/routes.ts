@@ -5096,8 +5096,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get CPD-aligned foods
   app.get("/api/food-database/cpd-aligned", async (req, res) => {
     try {
-      // Get user ID from session or use Bill Smith's ID for demo purposes
-      const userId = req.user?.id || 1; // Default to Bill Smith (ID 1) if not authenticated
+      // Get user ID from session - require authentication
+      const session = req.session as any;
+      const userId = session?.patientId || session?.userId;
+      
+      if (!userId) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
       
       // Get user's CPDs
       let userCpds;
@@ -5268,8 +5273,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get user's favourite foods
   app.get("/api/food-database/favourites", async (req, res) => {
     try {
-      // Get user ID from session or use Bill Smith's ID for demo purposes
-      const userId = req.user?.id || 1; // Default to Bill Smith (ID 1) if not authenticated
+      // Get user ID from session - require authentication
+      const session = req.session as any;
+      const userId = session?.patientId || session?.userId;
+      
+      if (!userId) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
       
       try {
         const favourites = await foodDatabaseService.getUserFavourites(userId);
@@ -5288,8 +5298,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get user's recently viewed foods
   app.get("/api/food-database/recently-viewed", async (req, res) => {
     try {
-      // Get user ID from session or use Bill Smith's ID for demo purposes
-      const userId = req.user?.id || 1; // Default to Bill Smith (ID 1) if not authenticated
+      // Get user ID from session - require authentication
+      const session = req.session as any;
+      const userId = session?.patientId || session?.userId;
+      
+      if (!userId) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
       
       const limit = req.query.limit ? parseInt(req.query.limit as string) : 10;
       
