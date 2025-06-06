@@ -5,85 +5,68 @@ interface User {
   id: number;
   name: string;
   role: 'admin' | 'doctor' | 'patient';
-  uin?: string; // Optional UIN for user identification (visible only to admin)
+  uin?: string;
+  token?: string; // JWT token for authenticated requests
 }
 
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
-  login: (user: User) => void;
+  login: (userData: any) => void;
   logout: () => void;
+  loading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
   const [, setLocation] = useLocation();
   
-  // Check for existing user on initial load - prioritize session over localStorage
+  // Check for existing token on initial load
   useEffect(() => {
     const checkAuthentication = async () => {
       try {
-        // Clear any stale localStorage data before checking session
-        const currentPath = window.location.pathname;
-        if (currentPath === '/patient-dashboard' || currentPath === '/doctor-dashboard') {
-          localStorage.removeItem('currentUser');
-        }
-
-        // First check actual session from backend
-        const response = await fetch('/api/user/current-context');
-        if (response.ok) {
-          const context = await response.json();
-          
-          // Convert session context to user object - fetch actual user data
-          const userId = context.userRole === 'patient' ? context.patientId :
-                        context.userRole === 'doctor' ? context.doctorId :
-                        context.userRole === 'admin' ? context.userId : null;
-
-          if (userId) {
-            try {
-              const userResponse = await fetch(`/api/users/${userId}`);
-              if (userResponse.ok) {
-                const userData = await userResponse.json();
-                const userObj = {
-                  id: userData.id,
-                  name: userData.name,
-                  role: context.userRole,
-                  uin: userData.uin
-                };
-                setUser(userObj);
-                
-                // Update localStorage with fresh data
-                localStorage.setItem('currentUser', JSON.stringify(userObj));
-                return;
-              }
-            } catch (error) {
-              console.error('Failed to fetch user data:', error);
-            }
-          }
-        } else if (response.status === 401) {
-          // Clear stale data on 401
-          localStorage.removeItem('currentUser');
-          setUser(null);
+        const token = localStorage.getItem('auth_token');
+        
+        if (!token) {
+          setLoading(false);
           return;
         }
-      } catch (error) {
-        console.log('Session check failed, checking localStorage');
-      }
-      
-      // Only use localStorage as fallback for admin dashboard
-      if (window.location.pathname === '/admin-dashboard') {
-        const storedUser = localStorage.getItem('currentUser');
-        if (storedUser) {
-          try {
-            const parsedUser = JSON.parse(storedUser);
-            setUser(parsedUser);
-          } catch (error) {
-            console.error('Failed to parse stored user:', error);
-            localStorage.removeItem('currentUser');
+        
+        // Validate token with backend
+        const response = await fetch('/api/auth/validate', {
+          headers: {
+            'Authorization': `Bearer ${token}`
           }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          const userObj = {
+            id: data.user.id,
+            name: data.user.name,
+            role: data.user.role,
+            uin: data.user.uin,
+            token: token
+          };
+          setUser(userObj);
+        } else {
+          // Token invalid, clear it
+          localStorage.removeItem('auth_token');
+          localStorage.removeItem('user_role');
+          localStorage.removeItem('user_id');
+          setUser(null);
         }
+      } catch (error) {
+        console.error('Authentication check failed:', error);
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('user_role');
+        localStorage.removeItem('user_id');
+        setUser(null);
+      } finally {
+        setLoading(false);
       }
     };
     

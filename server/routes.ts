@@ -11,6 +11,7 @@ import { envManager } from "./environmentConfig";
 import { auditLogger } from "./auditLogger";
 import { securityManager } from "./securityManager";
 import { encryptionService } from "./encryptionService";
+import { createAccessToken, verifyToken, authMiddleware, getCurrentUser, type AuthenticatedRequest } from "./auth";
 
 // Extend Express session interface
 declare module 'express-session' {
@@ -22,6 +23,7 @@ declare module 'express-session' {
     lastActivity?: number;
     impersonatedDoctorId?: number;
     impersonatedPatientId?: number;
+    id?: string;
   }
 }
 import { 
@@ -206,6 +208,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Apply session timeout middleware to all authenticated routes
   app.use("/api", sessionTimeoutMiddleware);
+
+  // JWT Token Generation endpoint - called after SMS verification
+  app.post("/api/auth/generate-token", async (req, res) => {
+    try {
+      const { userId, role, verificationToken } = req.body;
+      
+      if (!userId || !role) {
+        return res.status(400).json({ message: "User ID and role are required" });
+      }
+      
+      // Verify the user exists in database
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Generate JWT token
+      const accessToken = createAccessToken({ userId, role });
+      
+      console.log(`[AUTH] Generated JWT token for user ${userId} with role ${role}`);
+      
+      res.json({
+        access_token: accessToken,
+        token_type: "bearer",
+        user_id: userId,
+        role: role,
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: role,
+          uin: user.uin
+        }
+      });
+    } catch (error) {
+      console.error("Token generation error:", error);
+      res.status(500).json({ message: "Failed to generate token" });
+    }
+  });
+
+  // Secure token validation endpoint
+  app.get("/api/auth/validate", authMiddleware(), async (req: AuthenticatedRequest, res) => {
+    try {
+      const user = getCurrentUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Invalid token" });
+      }
+      
+      const userData = await storage.getUser(user.userId);
+      if (!userData) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      res.json({
+        valid: true,
+        user: {
+          id: userData.id,
+          name: userData.name,
+          email: userData.email,
+          role: user.role,
+          uin: userData.uin
+        }
+      });
+    } catch (error) {
+      console.error("Token validation error:", error);
+      res.status(401).json({ message: "Invalid token" });
+    }
+  });
 
   // Logout endpoint
   app.post("/api/logout", async (req, res) => {
