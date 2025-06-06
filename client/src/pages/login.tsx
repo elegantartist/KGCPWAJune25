@@ -121,22 +121,12 @@ export default function CentralizedLogin() {
       const data = await response.json();
 
       if (response.ok) {
-        // Clear only admin-specific cached data, preserve session cookies
-        localStorage.removeItem('currentUser');
-        localStorage.removeItem('adminToken');
-        localStorage.removeItem('adminSession');
-        
-        // Clear any cached user context
-        if ((window as any).__KGC_USER_CONTEXT__) {
-          delete (window as any).__KGC_USER_CONTEXT__;
-        }
-        
         toast({
           title: "Login Successful",
           description: `Welcome to Keep Going Care!`,
         });
 
-        // Navigate using React Router to preserve session state
+        // Navigate to appropriate dashboard
         if (userType === "patient") {
           setLocation("/patient-dashboard");
         } else if (userType === "doctor") {

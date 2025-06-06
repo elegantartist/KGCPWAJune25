@@ -10,28 +10,8 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { ArrowLeft } from "lucide-react";
 
 const Profile: React.FC = () => {
-  // Fetch current user context (works for all user types)
-  const { data: userContext, isLoading: isLoadingUserContext } = useQuery({
-    queryKey: ["/api/user/current-context"],
-    staleTime: 0,
-  });
-
-  // Determine the user ID to fetch data for
-  const userId = userContext?.userRole === 'patient' ? userContext.patientId : 
-                 userContext?.userRole === 'doctor' ? userContext.doctorId : 
-                 userContext?.userRole === 'admin' ? userContext.userId : null;
-
-  // Fetch user data using the determined ID
   const { data: user, isLoading: isLoadingUser } = useQuery({
-    queryKey: ["/api/users", userId],
-    queryFn: async () => {
-      if (!userId) throw new Error('No user ID available');
-      const res = await fetch(`/api/users/${userId}`);
-      if (!res.ok) throw new Error('Failed to fetch user data');
-      return res.json();
-    },
-    enabled: !!userId,
-    retry: false,
+    queryKey: ["/api/user"],
   });
   
   const { data: healthMetrics, isLoading: isLoadingMetrics } = useQuery({
@@ -69,16 +49,12 @@ const Profile: React.FC = () => {
           onClick={(e) => {
             e.preventDefault(); // Prevent any default behavior
             
-            // Store the current authenticated user's information
-            if (user) {
-              localStorage.setItem('currentUser', JSON.stringify({
-                id: user.id,
-                name: user.name,
-                role: userContext?.userRole || 'patient',
-                uin: user.uin,
-                email: user.email
-              }));
-            }
+            // Direct approach - Store the current user role as admin in localStorage
+            localStorage.setItem('currentUser', JSON.stringify({
+              id: 1, // Admin ID 
+              name: 'Admin User',
+              role: 'admin'
+            }));
             
             // Clear any previous data from session storage that might interfere
             sessionStorage.clear();
