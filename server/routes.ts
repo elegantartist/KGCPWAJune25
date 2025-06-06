@@ -2727,7 +2727,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const session = req.session as SessionData;
       
-      if (!session || (!session.userId && !session.doctorId)) {
+      if (!session || (!session.userId && !session.doctorId && !session.patientId)) {
         return res.status(401).json({ message: "Not authenticated" });
       }
 
@@ -2739,8 +2739,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (session.userRole === 'admin' && session.impersonatedDoctorId) {
         response.impersonatedDoctorId = session.impersonatedDoctorId;
         response.adminOriginalUserId = session.userId;
+      } else if (session.userRole === 'admin' && session.impersonatedPatientId) {
+        response.impersonatedPatientId = session.impersonatedPatientId;
+        response.adminOriginalUserId = session.userId;
       } else if (session.doctorId) {
         response.doctorId = session.doctorId;
+      } else if (session.patientId) {
+        response.patientId = session.patientId;
       }
 
       res.json(response);

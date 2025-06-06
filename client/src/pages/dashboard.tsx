@@ -52,7 +52,7 @@ const Dashboard: React.FC = () => {
   });
 
   const isAdminImpersonatingPatient = userContext?.userRole === 'admin' && userContext?.isImpersonatingPatient;
-  const patientToDisplayId = isAdminImpersonatingPatient ? userContext.impersonatedPatientId : userContext?.userId;
+  const patientToDisplayId = isAdminImpersonatingPatient ? userContext.impersonatedPatientId : (userContext?.patientId || userContext?.userId);
 
   // Fetch actual patient data using the determined ID
   const { data: patient, isLoading: isLoadingPatient } = useQuery<User>({
