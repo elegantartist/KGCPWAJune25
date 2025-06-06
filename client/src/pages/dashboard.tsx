@@ -95,10 +95,11 @@ const Dashboard: React.FC = () => {
 
   // Fetch the motivational image from the database
   const { data: savedImage } = useQuery({
-    queryKey: ['/api/users', patient?.id || 1, 'motivational-image'],
+    queryKey: ['/api/users', patient?.id, 'motivational-image'],
     queryFn: async () => {
       try {
-        const response = await fetch(`/api/users/${patient?.id || 1}/motivational-image`);
+        if (!patient?.id) return null;
+        const response = await fetch(`/api/users/${patient.id}/motivational-image`);
         if (!response.ok) {
           if (response.status === 404) {
             return null;
@@ -315,10 +316,12 @@ const Dashboard: React.FC = () => {
               </div>
               <div className="w-full">
                 {/* Our new safer Keep Going component */}
-                <KeepGoingFeature
-                  userId={patient?.id || 1}
-                  overlayImage={motivationalImage}
-                />
+                {patient?.id && (
+                  <KeepGoingFeature
+                    userId={patient.id}
+                    overlayImage={motivationalImage}
+                  />
+                )}
               </div>
             </div>
 
