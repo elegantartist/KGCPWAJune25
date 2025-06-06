@@ -30,30 +30,27 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (response.ok) {
           const context = await response.json();
           
-          // Convert session context to user object
-          if (context.userRole === 'patient' && context.patientId) {
-            // Set patient user directly from session context
-            setUser({
-              id: context.patientId,
-              name: 'Patient User', // Will be updated when patient details are available
-              role: 'patient'
-            });
-            return;
-          } else if (context.userRole === 'doctor' && context.doctorId) {
-            // Similar for doctors...
-            setUser({
-              id: context.doctorId,
-              name: 'Doctor User', // Would fetch real name
-              role: 'doctor'
-            });
-            return;
-          } else if (context.userRole === 'admin') {
-            setUser({
-              id: context.userId || context.adminOriginalUserId,
-              name: 'Admin User',
-              role: 'admin'
-            });
-            return;
+          // Convert session context to user object - fetch actual user data
+          const userId = context.userRole === 'patient' ? context.patientId :
+                        context.userRole === 'doctor' ? context.doctorId :
+                        context.userRole === 'admin' ? context.userId : null;
+
+          if (userId) {
+            try {
+              const userResponse = await fetch(`/api/users/${userId}`);
+              if (userResponse.ok) {
+                const userData = await userResponse.json();
+                setUser({
+                  id: userData.id,
+                  name: userData.name,
+                  role: context.userRole,
+                  uin: userData.uin
+                });
+                return;
+              }
+            } catch (error) {
+              console.error('Failed to fetch user data:', error);
+            }
           }
         }
       } catch (error) {
