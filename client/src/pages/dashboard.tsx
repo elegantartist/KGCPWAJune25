@@ -58,9 +58,9 @@ const Dashboard: React.FC = () => {
 
   // Fetch actual patient data using the determined ID
   const { data: patient, isLoading: isLoadingPatient } = useQuery<User>({
-    queryKey: ["/api/user", patientToDisplayId],
+    queryKey: ["/api/users", patientToDisplayId],
     queryFn: async () => {
-      const res = await fetch(`/api/user/${patientToDisplayId}`);
+      const res = await fetch(`/api/users/${patientToDisplayId}`);
       if (!res.ok) throw new Error('Failed to fetch patient data');
       return res.json();
     },
