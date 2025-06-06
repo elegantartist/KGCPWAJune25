@@ -115,7 +115,7 @@ export default function CentralizedLogin() {
       const response = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, code: smsCode }),
+        body: JSON.stringify({ email, smsCode }),
       });
 
       const data = await response.json();

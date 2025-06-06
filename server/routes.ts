@@ -6377,10 +6377,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Verify SMS code and login
   app.post("/api/doctor/login/verify-sms", async (req, res) => {
     try {
-      const { email, code } = req.body;
+      const { email, smsCode } = req.body;
       
-      if (!email || !code) {
-        return res.status(400).json({ message: "Email and code are required" });
+      if (!email || !smsCode) {
+        return res.status(400).json({ message: "Email and SMS code are required" });
       }
       
       // Find doctor to get ID for verification service
@@ -6400,7 +6400,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "No verification code found. Please request a new code." });
       }
       
-      if (storedCode.code !== code) {
+      if (storedCode.code !== smsCode) {
         await VerificationCodeStorageService.incrementAttempts(doctor.id, email, 'sms', storedCode);
         return res.status(400).json({ message: "Invalid verification code" });
       }
