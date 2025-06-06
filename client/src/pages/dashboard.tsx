@@ -246,6 +246,16 @@ const Dashboard: React.FC = () => {
         </div>
       )}
 
+      {/* Patient Logout Button - for regular patient users (not admin impersonating) */}
+      {userContext?.userRole === 'patient' && !userContext?.impersonatedPatientId && (
+        <div className={cn(
+          "flex justify-end mb-3",
+          isMobile && "fixed top-4 right-4 z-50"
+        )}>
+          <LogoutButton userRole="patient" variant="outline" size="sm" />
+        </div>
+      )}
+
       {/* The carousel should go here but we'll move it back into the card */}
 
       <Card className={cn(

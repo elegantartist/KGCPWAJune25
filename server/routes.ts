@@ -6727,6 +6727,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin logout route
+  app.post("/api/admin/logout", async (req, res) => {
+    try {
+      const session = req.session as SessionData;
+      
+      if (session?.userId) {
+        console.log(`[ADMIN LOGOUT] Admin ${session.userId} logging out`);
+        
+        // Destroy session
+        req.session.destroy((err: any) => {
+          if (err) {
+            console.error('[ADMIN LOGOUT] Session destruction error:', err);
+            return res.status(500).json({ error: 'Logout failed' });
+          }
+          
+          res.clearCookie('connect.sid');
+          res.json({ success: true, message: 'Admin logged out successfully' });
+        });
+      } else {
+        res.json({ success: true, message: 'No active admin session' });
+      }
+      
+    } catch (error) {
+      console.error("Admin logout error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   // Validate setup token
   app.post("/api/doctor/setup/validate-token", async (req, res) => {
     try {
