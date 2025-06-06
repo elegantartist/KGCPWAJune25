@@ -50,14 +50,15 @@ export default function DoctorLogin() {
       const response = await fetch('/api/doctor/login/verify-sms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, code: smsCode })
+        body: JSON.stringify({ email, smsCode })
       });
 
       const data = await response.json();
 
-      if (response.ok) {
-        // Redirect to doctor dashboard
-        setLocation('/doctor-dashboard');
+      if (response.ok && data.access_token) {
+        // Use the JWT-based login system
+        login(data);
+        console.log('Doctor logged in successfully with JWT token');
       } else {
         setError(data.message || 'Invalid SMS code');
       }

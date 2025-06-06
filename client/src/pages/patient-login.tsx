@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
+import { useAuth } from "@/context/auth-context";
 
 export default function PatientLogin() {
   const [email, setEmail] = useState("");
@@ -14,6 +15,7 @@ export default function PatientLogin() {
   const [error, setError] = useState("");
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const { login } = useAuth();
 
   const handleSendSMS = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,17 +65,15 @@ export default function PatientLogin() {
 
       const data = await response.json();
 
-      if (response.ok) {
-        // Clear ALL localStorage data to remove admin session conflicts
-        localStorage.clear();
+      if (response.ok && data.access_token) {
+        // Use the JWT-based login system
+        login(data);
+        console.log('Patient logged in successfully with JWT token');
         
         toast({
           title: "Login Successful",
           description: "Welcome to your KGC dashboard!",
         });
-        
-        // Force complete page reload to refresh authentication context
-        window.location.href = data.redirectTo || "/patient-dashboard";
       } else {
         setError(data.message || "Invalid verification code");
       }
