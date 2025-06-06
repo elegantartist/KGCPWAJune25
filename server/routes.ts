@@ -84,7 +84,7 @@ export function registerRoutes(app: Express) {
             // Generate verification code
             const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
             
-            // Store verification code in memory for testing
+            // Store verification code in memory
             if (!(global as any).verificationCodes) {
                 (global as any).verificationCodes = new Map();
             }
@@ -93,14 +93,46 @@ export function registerRoutes(app: Express) {
                 expires: Date.now() + 10 * 60 * 1000 // 10 minutes
             });
             
-            console.log(`SMS verification code for ${email}: ${verificationCode}`);
-            
-            // For development/testing - log the code instead of sending SMS
-            res.json({ 
-                message: 'SMS sent successfully',
-                // Remove this in production - only for testing
-                verificationCode: verificationCode
-            });
+            // Send actual SMS using Twilio directly
+            if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_PHONE_NUMBER) {
+                try {
+                    // Import Twilio directly
+                    const twilio = (await import('twilio')).default;
+                    const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+                    
+                    // Format the phone number properly for Australia
+                    let formattedPhone = user.phoneNumber!;
+                    if (formattedPhone.startsWith('0')) {
+                        formattedPhone = '+61' + formattedPhone.substring(1);
+                    } else if (!formattedPhone.startsWith('+')) {
+                        formattedPhone = '+61' + formattedPhone;
+                    }
+                    
+                    const message = `Hello ${user.name}, your Keep Going Care verification code is: ${verificationCode}. This code expires in 10 minutes. Do not share this code.`;
+                    
+                    console.log(`Sending SMS to ${formattedPhone} from ${process.env.TWILIO_PHONE_NUMBER}`);
+                    
+                    const smsResponse = await client.messages.create({
+                        body: message,
+                        from: process.env.TWILIO_PHONE_NUMBER,
+                        to: formattedPhone
+                    });
+                    
+                    console.log(`SMS sent successfully to ${formattedPhone} for ${email}, Message ID: ${smsResponse.sid}`);
+                    res.json({ message: 'SMS sent successfully' });
+                    
+                } catch (smsError: any) {
+                    console.error('SMS sending error:', smsError);
+                    res.status(500).json({ message: 'Failed to send SMS: ' + smsError.message });
+                }
+            } else {
+                // Development mode - log the code
+                console.log(`SMS verification code for ${email}: ${verificationCode}`);
+                res.json({ 
+                    message: 'SMS sent successfully (development mode)',
+                    verificationCode: verificationCode
+                });
+            }
         } catch (error: any) {
             console.error('SMS sending error:', error);
             res.status(500).json({ message: 'Failed to send SMS' });
