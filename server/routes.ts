@@ -2728,7 +2728,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const session = req.session as SessionData;
       
+      console.log(`[DEBUG] Full session object:`, JSON.stringify(session, null, 2));
+      
       if (!session || (!session.userId && !session.doctorId && !session.patientId)) {
+        console.log(`[DEBUG] Authentication failed - no valid session IDs found`);
         return res.status(401).json({ message: "Not authenticated" });
       }
 
