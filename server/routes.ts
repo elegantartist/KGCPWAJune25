@@ -1,6 +1,10 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import path from "path";
+import fs from "fs";
+import session from 'express-session';
+import { RedisStore } from 'connect-redis';
+import { Redis } from 'ioredis';
 import { storage } from "./storage";
 import { sessionTimeoutMiddleware, updateSessionActivity, SessionData } from "./sessionTimeout";
 import { envManager } from "./environmentConfig";
@@ -17,13 +21,9 @@ declare module 'express-session' {
     userRole?: string;
     lastActivity?: number;
     impersonatedDoctorId?: number;
+    impersonatedPatientId?: number;
   }
 }
-import session from 'express-session';
-import { RedisStore } from 'connect-redis';
-import { Redis } from 'ioredis';
-import path from "path";
-import fs from "fs";
 import { 
   determineConnectivityLevel, 
   adaptResponseForConnectivity,
@@ -62,6 +62,7 @@ import {
   patientEvents,
   insertPatientScoreSchema
 } from "@shared/schema";
+import * as schema from "@shared/schema";
 import { eq, desc, and, avg, between, or, sql, like, gte, lte } from "drizzle-orm";
 import { inArray } from "drizzle-orm/expressions";
 import { db } from "./db";
@@ -5805,10 +5806,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Check if a score for this date already exists
+      const scoreDateTime = new Date(scoreDate || new Date());
+      const scoreDateString = scoreDateTime.toISOString().split('T')[0]; // Get YYYY-MM-DD format
+      
       const existingScores = await db.select().from(patientScores)
         .where(and(
           eq(patientScores.patientId, patientId),
-          eq(patientScores.scoreDate, new Date(scoreDate || new Date()))
+          eq(sql`DATE(${patientScores.scoreDate})`, scoreDateString)
         ));
       
       let result;
@@ -5828,7 +5832,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         result = await db.insert(patientScores)
           .values({
             patientId,
-            scoreDate: new Date(scoreDate || new Date()),
+            scoreDate: scoreDateTime.toISOString().split('T')[0],
             exerciseSelfScore,
             mealPlanSelfScore,
             medicationSelfScore,
