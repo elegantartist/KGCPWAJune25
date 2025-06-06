@@ -166,13 +166,18 @@ export function registerRoutes(app: Express) {
     // GET CURRENT USER: Securely get the logged-in user's details
     router.get('/users/me', authMiddleware(), async (req: AuthenticatedRequest, res) => {
         const currentUser = req.user!;
-        const userData = await db.query.users.findFirst({
-            where: eq(schema.users.id, currentUser.userId),
-            columns: { passwordHash: false } // Exclude sensitive data
-        });
+        const userData = await db.select({
+            id: schema.users.id,
+            name: schema.users.name,
+            email: schema.users.email,
+            phoneNumber: schema.users.phoneNumber,
+            role: schema.users.role,
+            isActive: schema.users.isActive,
+            createdAt: schema.users.createdAt
+        }).from(schema.users).where(eq(schema.users.id, currentUser.userId)).limit(1);
 
-        if (!userData) return res.status(404).json({ message: "User not found" });
-        res.json(userData);
+        if (!userData.length) return res.status(404).json({ message: "User not found" });
+        res.json(userData[0]);
     });
 
     // GET DOCTOR'S PATIENTS: Securely get ONLY the logged-in doctor's patients

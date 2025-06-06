@@ -5,13 +5,19 @@ import { z } from "zod";
 // Central table for ALL user login and role information.
 export const users = pgTable('users', {
   id: serial('id').primaryKey(),
-  name: varchar('name', { length: 255 }).notNull(),
-  email: varchar('email', { length: 255 }).notNull().unique(),
-  phoneNumber: varchar('phone_number', { length: 50 }),
-  passwordHash: text('password_hash'), // For admin username/password login
-  role: text('role', { enum: ['admin', 'doctor', 'patient'] }).notNull(),
+  name: text('name').notNull(),
+  email: text('email').notNull().unique(),
+  joinedDate: timestamp('joined_date').defaultNow().notNull(),
+  username: text('username'),
+  password: text('password'),
+  uin: varchar('uin'),
+  roleId: integer('role_id'),
+  phoneNumber: text('phone_number'),
   isActive: boolean('is_active').default(false),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
+  lastLogin: timestamp('last_login'),
+  currentChallenge: text('current_challenge'),
+  challengeTimestamp: timestamp('challenge_timestamp'),
+  role: text('role', { enum: ['admin', 'doctor', 'patient'] }),
 });
 
 // Table for doctor-specific data. It only needs to store the link to the user.
