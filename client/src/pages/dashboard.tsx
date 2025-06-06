@@ -42,7 +42,9 @@ const Dashboard: React.FC = () => {
   // Fetch current user context (for impersonation detection)
   const { data: userContext, isLoading: isLoadingUserContext } = useQuery<{
     userRole: string;
-    userId?: number; // Patient ID
+    userId?: number;
+    doctorId?: number;
+    patientId?: number;
     isImpersonatingPatient?: boolean;
     impersonatedPatientId?: number;
     adminOriginalUserId?: number; // Original Admin ID

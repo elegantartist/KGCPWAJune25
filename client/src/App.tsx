@@ -72,25 +72,50 @@ function DefaultRedirect() {
   const [, setLocation] = useLocation();
   
   useEffect(() => {
-    // For testing purposes: redirect to admin dashboard or login
-    const user = localStorage.getItem('currentUser');
-    if (user) {
-      try {
-        const userData = JSON.parse(user);
-        if (userData.role === 'admin') {
-          setLocation('/admin-dashboard');
-        } else if (userData.role === 'doctor') {
-          setLocation('/doctor-dashboard');
-        } else {
-          setLocation('/dashboard');
+    // Check session-based authentication first, then localStorage
+    fetch('/api/user/current-context')
+      .then(response => {
+        if (response.ok) {
+          return response.json();
         }
-      } catch (e) {
-        // If JSON parsing fails, just go to admin dashboard
-        setLocation('/admin-dashboard');
-      }
-    } else {
-      setLocation('/login');
-    }
+        throw new Error('Not authenticated');
+      })
+      .then(context => {
+        // Route based on actual session data
+        if (context.userRole === 'admin' && context.impersonatedDoctorId) {
+          setLocation('/doctor-dashboard');
+        } else if (context.userRole === 'admin' && context.impersonatedPatientId) {
+          setLocation('/patient-dashboard');
+        } else if (context.userRole === 'admin') {
+          setLocation('/admin-dashboard');
+        } else if (context.userRole === 'doctor') {
+          setLocation('/doctor-dashboard');
+        } else if (context.userRole === 'patient') {
+          setLocation('/patient-dashboard');
+        } else {
+          setLocation('/login');
+        }
+      })
+      .catch(() => {
+        // Fallback to localStorage if session check fails
+        const user = localStorage.getItem('currentUser');
+        if (user) {
+          try {
+            const userData = JSON.parse(user);
+            if (userData.role === 'admin') {
+              setLocation('/admin-dashboard');
+            } else if (userData.role === 'doctor') {
+              setLocation('/doctor-dashboard');
+            } else {
+              setLocation('/patient-dashboard');
+            }
+          } catch (e) {
+            setLocation('/login');
+          }
+        } else {
+          setLocation('/login');
+        }
+      });
   }, [setLocation]);
   
   return null;
