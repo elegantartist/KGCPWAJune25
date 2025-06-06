@@ -6,13 +6,13 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
-import { User, Stethoscope, Shield, Loader2 } from "lucide-react";
+import { User, Stethoscope, Loader2 } from "lucide-react";
 
 export default function CentralizedLogin() {
   const [email, setEmail] = useState("");
   const [smsCode, setSmsCode] = useState("");
   const [step, setStep] = useState<"email" | "sms">("email");
-  const [userType, setUserType] = useState<"patient" | "doctor" | "admin">("patient");
+  const [userType, setUserType] = useState<"patient" | "doctor">("patient");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const { toast } = useToast();
@@ -34,10 +34,7 @@ export default function CentralizedLogin() {
         case "doctor":
           endpoint = "/api/doctor/login/send-sms";
           break;
-        case "admin":
-          // Admin uses password-based login, redirect to admin login
-          setLocation("/admin-login");
-          return;
+
       }
 
       const response = await fetch(endpoint, {
@@ -146,7 +143,7 @@ export default function CentralizedLogin() {
                   I am a:
                 </label>
                 <Tabs value={userType} onValueChange={(value: any) => setUserType(value)} className="w-full">
-                  <TabsList className="grid w-full grid-cols-3">
+                  <TabsList className="grid w-full grid-cols-2">
                     <TabsTrigger value="patient" className="flex items-center gap-2">
                       <User className="w-4 h-4" />
                       Patient
@@ -154,10 +151,6 @@ export default function CentralizedLogin() {
                     <TabsTrigger value="doctor" className="flex items-center gap-2">
                       <Stethoscope className="w-4 h-4" />
                       Doctor
-                    </TabsTrigger>
-                    <TabsTrigger value="admin" className="flex items-center gap-2">
-                      <Shield className="w-4 h-4" />
-                      Admin
                     </TabsTrigger>
                   </TabsList>
                 </Tabs>
@@ -192,10 +185,10 @@ export default function CentralizedLogin() {
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    {userType === "admin" ? "Redirecting..." : "Sending SMS..."}
+                    Sending SMS...
                   </>
                 ) : (
-                  userType === "admin" ? "Continue to Admin Login" : "Send SMS Code"
+                  "Send SMS Code"
                 )}
               </Button>
             </form>
