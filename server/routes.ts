@@ -6520,14 +6520,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       req.session.userRole = 'patient';
       req.session.lastActivity = Date.now();
 
-      res.json({ 
-        success: true, 
-        message: "Login successful",
-        patient: {
-          id: patient.id,
-          name: patient.name,
-          email: patient.email
+      // Save session explicitly to ensure persistence
+      req.session.save((err: any) => {
+        if (err) {
+          console.error('Error saving patient session:', err);
+          return res.status(500).json({ message: "Failed to save session" });
         }
+        
+        console.log(`[PATIENT LOGIN] Session saved for patient ${patient.id} (${patient.name})`);
+        res.json({ 
+          success: true, 
+          message: "Login successful",
+          patient: {
+            id: patient.id,
+            name: patient.name,
+            email: patient.email
+          }
+        });
       });
       
     } catch (error) {
