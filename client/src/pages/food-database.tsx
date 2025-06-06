@@ -55,7 +55,13 @@ const FoodDatabase = () => {
   const [dietPlanDirective, setDietPlanDirective] = useState<string>('');
   const [loadingCPD, setLoadingCPD] = useState<boolean>(true);
   
-  const userId = 1; // Default to Bill Smith (userId=1) for demo purposes
+  // Get current authenticated user
+  const { data: currentUser } = useQuery({
+    queryKey: ['/api/user/current-context'],
+    retry: false
+  });
+
+  const userId = currentUser?.id;
   
   // Online/offline status detection
   useEffect(() => {

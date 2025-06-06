@@ -190,7 +190,13 @@ const EWSupport: React.FC = () => {
   const [loadingCPD, setLoadingCPD] = useState<boolean>(true);
 
   // Default user ID (should be replaced with actual user ID from context/auth)
-  const userId = 1;
+  // Get current authenticated user
+  const { data: currentUser } = useQuery({
+    queryKey: ['/api/user/current-context'],
+    retry: false
+  });
+
+  const userId = currentUser?.id;
 
   // Load favorites from localStorage on component mount
   useEffect(() => {

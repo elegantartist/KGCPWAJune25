@@ -26,7 +26,13 @@ const KeepGoingWithMIP: React.FC<KeepGoingWithMIPProps> = ({ onClose }) => {
   const queryClient = useQueryClient();
   
   // User ID for demo purposes (in a real app, this would be from auth)
-  const userId = 1;
+  // Get current authenticated user
+  const { data: currentUser } = useQuery({
+    queryKey: ['/api/user/current-context'],
+    retry: false
+  });
+
+  const userId = currentUser?.id;
   
   // Query for getting the saved motivational image from the database
   const { data: savedImage, isLoading: isLoadingImage } = useQuery({

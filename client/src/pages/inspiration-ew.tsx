@@ -78,7 +78,13 @@ const InspirationEW: React.FC = () => {
   const isMobile = useIsMobile();
 
   // Default user ID (should be replaced with actual user ID from context/auth)
-  const userId = 1;
+  // Get current authenticated user
+  const { data: currentUser } = useQuery({
+    queryKey: ['/api/user/current-context'],
+    retry: false
+  });
+
+  const userId = currentUser?.id;
 
   // Setup mutation for searching videos
   const videoSearchMutation = useMutation<VideoSearchResponse, Error, any>({

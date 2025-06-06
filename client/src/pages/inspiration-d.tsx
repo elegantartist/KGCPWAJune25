@@ -88,7 +88,13 @@ const InspirationD: React.FC = () => {
   const isMobile = useIsMobile();
   
   // Default userId - in a real app, this would come from auth
-  const userId = 1;
+  // Get current authenticated user
+  const { data: currentUser } = useQuery({
+    queryKey: ['/api/user/current-context'],
+    retry: false
+  });
+
+  const userId = currentUser?.id;
 
   // Functions to interact with the API
   // These are stub implementations for type checking purposes

@@ -412,7 +412,13 @@ import { useBadges } from '@/hooks/useBadges';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 const ProgressMilestones: React.FC = () => {
-  const userId = 1; // This would normally come from auth context
+  // Get current authenticated user
+  const { data: currentUser } = useQuery({
+    queryKey: ['/api/user/current-context'],
+    retry: false
+  });
+
+  const userId = currentUser?.id;
   const { 
     badges: fetchedBadges, 
     badgeProgress, 

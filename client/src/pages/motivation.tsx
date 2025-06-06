@@ -25,8 +25,25 @@ const Motivation: React.FC = () => {
   const isMobile = useIsMobile();
   const queryClient = useQueryClient();
   
-  // User ID for demo purposes (in a real app, this would be from auth)
-  const userId = 1;
+  // Get current authenticated user
+  const { data: currentUser, isLoading: userLoading } = useQuery({
+    queryKey: ['/api/user/current-context'],
+    retry: false
+  });
+
+  const userId = currentUser?.id;
+
+  // Don't render if user is not authenticated
+  if (!userId && !userLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold mb-2">Authentication Required</h2>
+          <p className="text-gray-600">Please log in to access this feature.</p>
+        </div>
+      </div>
+    );
+  }
   
   // Query for getting the saved motivational image from the database
   const { data: savedImage, isLoading: isLoadingImage } = useQuery({
