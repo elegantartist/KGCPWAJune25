@@ -27,21 +27,14 @@ import { useQuery } from "@tanstack/react-query";
 const HealthSnapshots: React.FC = () => {
   const isMobile = useIsMobile();
   const { toast } = useToast();
-  const [userId, setUserId] = useState<number | null>(null);
-  const { recordFeatureUsage } = useMCP(userId);
+  // Get current authenticated user
+  const { data: currentUser, isLoading: userLoading } = useQuery({
+    queryKey: ['/api/user/current-context'],
+    retry: false
+  });
 
-  // Get the current user
-  useEffect(() => {
-    const userString = localStorage.getItem('currentUser');
-    if (userString) {
-      try {
-        const userData = JSON.parse(userString);
-        setUserId(userData.id);
-      } catch (error) {
-        console.error('Error parsing user data:', error);
-      }
-    }
-  }, []);
+  const userId = currentUser?.id;
+  const { recordFeatureUsage } = useMCP(userId);
 
   // Record feature usage
   useEffect(() => {

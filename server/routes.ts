@@ -2734,19 +2734,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const response: any = {
         userRole: session.userRole || 'unknown',
+        userId: session.userId,
+        doctorId: session.doctorId,
+        patientId: session.patientId,
       };
+
+      // Set the primary ID based on user role
+      if (session.userRole === 'patient' && session.patientId) {
+        response.id = session.patientId;
+      } else if (session.userRole === 'doctor' && session.doctorId) {
+        response.id = session.doctorId;
+      } else if (session.userRole === 'admin' && session.userId) {
+        response.id = session.userId;
+      }
 
       // If admin is impersonating
       if (session.userRole === 'admin' && session.impersonatedDoctorId) {
         response.impersonatedDoctorId = session.impersonatedDoctorId;
         response.adminOriginalUserId = session.userId;
+        response.id = session.impersonatedDoctorId; // Override ID to impersonated doctor
       } else if (session.userRole === 'admin' && session.impersonatedPatientId) {
         response.impersonatedPatientId = session.impersonatedPatientId;
         response.adminOriginalUserId = session.userId;
-      } else if (session.doctorId) {
-        response.doctorId = session.doctorId;
-      } else if (session.patientId) {
-        response.patientId = session.patientId;
+        response.id = session.impersonatedPatientId; // Override ID to impersonated patient
       }
 
       res.json(response);
