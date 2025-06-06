@@ -73,22 +73,58 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     checkAuthentication();
   }, []);
 
-  const login = (userData: User) => {
-    setUser(userData);
-    localStorage.setItem('currentUser', JSON.stringify(userData));
+  const login = (userData: any) => {
+    // Handle JWT login response
+    if (userData.access_token && userData.user) {
+      const userObj = {
+        id: userData.user.id,
+        name: userData.user.name,
+        role: userData.user.role,
+        uin: userData.user.uin,
+        token: userData.access_token
+      };
+      
+      setUser(userObj);
+      localStorage.setItem('auth_token', userData.access_token);
+      localStorage.setItem('user_role', userData.user.role);
+      localStorage.setItem('user_id', userData.user.id.toString());
+      
+      // Redirect based on role
+      switch (userData.user.role) {
+        case 'admin':
+          setLocation('/admin-dashboard');
+          break;
+        case 'doctor':
+          setLocation('/doctor-dashboard');
+          break;
+        case 'patient':
+          setLocation('/patient-dashboard');
+          break;
+        default:
+          setLocation('/');
+      }
+    } else {
+      // Handle legacy user object
+      setUser(userData);
+      localStorage.setItem('currentUser', JSON.stringify(userData));
+    }
   };
 
   const logout = () => {
     setUser(null);
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('user_role');
+    localStorage.removeItem('user_id');
     localStorage.removeItem('currentUser');
-    setLocation('/login');
+    setLocation('/');
   };
 
   const value = {
     user,
     isAuthenticated: !!user,
     login,
-    logout
+    logout,
+    loading
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

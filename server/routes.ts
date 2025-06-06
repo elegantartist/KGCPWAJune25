@@ -6528,21 +6528,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .set({ lastLogin: new Date() })
         .where(eq(users.id, doctor.id));
 
-      // Set session with timeout tracking for doctors
-      if (!req.session) {
-        req.session = {};
-      }
-      req.session.doctorId = doctor.id;
-      req.session.userRole = 'doctor';
-      req.session.lastActivity = Date.now();
+      // Generate JWT token for secure authentication
+      const accessToken = createAccessToken({ userId: doctor.id, role: 'doctor' });
+      
+      console.log(`[DOCTOR LOGIN] Doctor ${doctor.id} logged in successfully via SMS with JWT token`);
       
       res.json({ 
         success: true, 
         message: "Login successful",
-        doctor: {
+        access_token: accessToken,
+        token_type: "bearer",
+        user_id: doctor.id,
+        role: 'doctor',
+        user: {
           id: doctor.id,
           name: doctor.name,
           email: doctor.email,
+          role: 'doctor',
           uin: doctor.uin
         }
       });
@@ -6706,32 +6708,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .set({ lastLogin: new Date() })
         .where(eq(users.id, patient.id));
 
-      // Set session with timeout tracking
-      if (!req.session) {
-        req.session = {};
-      }
-      req.session.patientId = patient.id;
-      req.session.userRole = 'patient';
-      req.session.lastActivity = Date.now();
-
-      // Save session explicitly to ensure persistence
-      req.session.save((err: any) => {
-        if (err) {
-          console.error('Error saving patient session:', err);
-          return res.status(500).json({ message: "Failed to save session" });
+      // Generate JWT token for secure authentication
+      const accessToken = createAccessToken({ userId: patient.id, role: 'patient' });
+      
+      console.log(`[PATIENT LOGIN] Patient ${patient.id} logged in successfully via SMS with JWT token`);
+      
+      res.json({ 
+        success: true, 
+        message: "Login successful",
+        access_token: accessToken,
+        token_type: "bearer",
+        user_id: patient.id,
+        role: 'patient',
+        user: {
+          id: patient.id,
+          name: patient.name,
+          email: patient.email,
+          role: 'patient',
+          uin: patient.uin
         }
-        
-        console.log(`[PATIENT LOGIN] Session saved for patient ${patient.id} (${patient.name})`);
-        res.json({ 
-          success: true, 
-          message: "Login successful",
-          redirectTo: "/patient-dashboard",
-          patient: {
-            id: patient.id,
-            name: patient.name,
-            email: patient.email
-          }
-        });
       });
       
     } catch (error) {

@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useLocation } from 'wouter';
+import { useAuth } from '@/context/auth-context';
 
 export default function DoctorLogin() {
   const [step, setStep] = useState<'email' | 'sms' | 'dashboard'>('email');
@@ -12,6 +13,7 @@ export default function DoctorLogin() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [, setLocation] = useLocation();
+  const { login } = useAuth();
 
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
