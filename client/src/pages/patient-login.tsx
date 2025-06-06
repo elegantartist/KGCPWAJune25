@@ -60,7 +60,7 @@ export default function PatientLogin() {
       const response = await fetch("/api/patient/login/verify-sms", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, smsCode }),
+        body: JSON.stringify({ email, code: smsCode }),
       });
 
       const data = await response.json();
@@ -74,6 +74,9 @@ export default function PatientLogin() {
           title: "Login Successful",
           description: "Welcome to your KGC dashboard!",
         });
+        
+        // Navigate to patient dashboard
+        setLocation('/patient-dashboard');
       } else {
         setError(data.message || "Invalid verification code");
       }

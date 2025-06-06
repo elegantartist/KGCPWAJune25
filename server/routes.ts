@@ -140,10 +140,11 @@ export function registerRoutes(app: Express) {
     });
 
     router.post('/patient/login/verify-sms', async (req, res) => {
-        const { email, smsCode } = req.body;
+        const { email, smsCode, code } = req.body;
+        const verificationCode = smsCode || code;
         const user = await storage.getUserByEmail(email);
 
-        if (!user || user.role !== 'patient' || !smsCode) {
+        if (!user || user.role !== 'patient' || !verificationCode) {
             return res.status(401).json({ message: 'Invalid verification code or email' });
         }
         
@@ -153,7 +154,7 @@ export function registerRoutes(app: Express) {
             return res.status(401).json({ message: 'Verification code expired' });
         }
         
-        if (storedCode.code !== smsCode) {
+        if (storedCode.code !== verificationCode) {
             return res.status(401).json({ message: 'Invalid verification code' });
         }
         
