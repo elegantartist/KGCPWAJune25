@@ -138,7 +138,7 @@ export default function CentralizedLogin() {
 
         // Navigate using React Router to preserve session state
         if (userType === "patient") {
-          setLocation("/");
+          setLocation("/patient-dashboard");
         } else if (userType === "doctor") {
           setLocation("/doctor-dashboard");
         }
