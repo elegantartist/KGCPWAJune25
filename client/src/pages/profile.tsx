@@ -31,11 +31,11 @@ const Profile: React.FC = () => {
     );
   }
   
-  if (!user || !healthMetrics || !Array.isArray(healthMetrics) || healthMetrics.length === 0) {
+  if (!user) {
     return (
       <div className="text-center py-10">
-        <h2 className="text-2xl font-bold text-gray-800">No data available</h2>
-        <p className="text-gray-600 mt-2">User profile or health metrics not found.</p>
+        <h2 className="text-2xl font-bold text-gray-800">User not found</h2>
+        <p className="text-gray-600 mt-2">Please log in to access your profile.</p>
       </div>
     );
   }

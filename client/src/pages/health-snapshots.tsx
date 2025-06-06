@@ -59,41 +59,21 @@ const HealthSnapshots: React.FC = () => {
         console.error('Error fetching health metrics:', error);
         toast({
           title: "Error",
-          description: "Could not load health metrics. Using sample data instead.",
+          description: "Could not load health metrics.",
           variant: "destructive",
         });
-        return null;
+        return [];
       }
     },
     enabled: !!userId,
   });
 
-  // Use the data from the API if available, otherwise use sample data
-  const healthProgressData = healthMetricsData?.healthProgressData || [
-    { name: 'Jan', mealPlan: 6, exercise: 4, medication: 8 },
-    { name: 'Feb', mealPlan: 7, exercise: 5, medication: 9 },
-    { name: 'Mar', mealPlan: 7, exercise: 6, medication: 9 },
-    { name: 'Apr', mealPlan: 8, exercise: 7, medication: 10 },
-    { name: 'May', mealPlan: 9, exercise: 8, medication: 10 },
-    { name: 'Jun', mealPlan: 9, exercise: 8, medication: 10 },
-  ];
+  // Use only authentic patient data from the API
+  const healthProgressData = healthMetricsData?.healthProgressData || [];
 
-  const weeklyScoreData = healthMetricsData?.weeklyScoreData || [
-    { name: 'Mon', score: 7 },
-    { name: 'Tue', score: 8 },
-    { name: 'Wed', score: 6 },
-    { name: 'Thu', score: 9 },
-    { name: 'Fri', score: 8 },
-    { name: 'Sat', score: 7 },
-    { name: 'Sun', score: 8 },
-  ];
+  const weeklyScoreData = healthMetricsData?.weeklyScoreData || [];
 
-  const activityDistributionData = healthMetricsData?.activityDistributionData || [
-    { name: 'Diet', value: 35 },
-    { name: 'Exercise', value: 25 },
-    { name: 'Medication', value: 20 },
-    { name: 'General Wellness', value: 20 },
-  ];
+  const activityDistributionData = healthMetricsData?.activityDistributionData || [];
 
   const COLORS = ['#2E8BC0', '#2E8BC0', '#ff6b6b', '#a4a4a4'];
 
