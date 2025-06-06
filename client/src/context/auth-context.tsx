@@ -1,17 +1,15 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useLocation } from 'wouter';
 
 interface User {
   id: number;
-  name?: string;
+  name: string;
   role: 'admin' | 'doctor' | 'patient';
-  email?: string;
-  token?: string;
+  token: string;
 }
 
 interface AuthContextType {
   user: User | null;
-  isAuthenticated: boolean;
   login: (userData: any) => void;
   logout: () => void;
   loading: boolean;
@@ -24,6 +22,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [loading, setLoading] = useState(true);
   const [, setLocation] = useLocation();
 
+  const logout = useCallback(() => {
+    setUser(null);
+    localStorage.removeItem('auth_token');
+    setLocation('/');
+  }, [setLocation]);
+
   useEffect(() => {
     const validateToken = async () => {
       const token = localStorage.getItem('auth_token');
@@ -32,35 +36,32 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return;
       }
       try {
-        const response = await fetch('/api/user/current-context', {
+        const response = await fetch('/api/users/me', {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (response.ok) {
-          const data = await response.json();
-          setUser({ ...data.user, token });
+          const userData = await response.json();
+          setUser({ ...userData, token });
         } else {
-          localStorage.removeItem('auth_token');
-          setUser(null);
+          logout(); // Token is invalid or expired
         }
       } catch (error) {
         console.error("Token validation failed", error);
-        localStorage.removeItem('auth_token');
-        setUser(null);
+        logout();
       } finally {
         setLoading(false);
       }
     };
     validateToken();
-  }, []);
+  }, [logout]);
 
-  const login = (userData: any) => {
+  const login = (userData: { access_token: string; user: { id: number; name: string; role: 'admin' | 'doctor' | 'patient' } }) => {
     if (userData.access_token && userData.user) {
-      const userObj = { ...userData.user, token: userData.access_token };
+      const userWithToken = { ...userData.user, token: userData.access_token };
       localStorage.setItem('auth_token', userData.access_token);
-      setUser(userObj);
+      setUser(userWithToken);
       
-      // Redirect based on role
-      switch (userObj.role) {
+      switch (userWithToken.role) {
         case 'admin': setLocation('/admin-dashboard'); break;
         case 'doctor': setLocation('/doctor-dashboard'); break;
         case 'patient': setLocation('/patient-dashboard'); break;
@@ -69,21 +70,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('auth_token');
-    setLocation('/');
-  };
+  const value = { user, login, logout, loading };
 
-  const value = {
-    user,
-    isAuthenticated: !!user,
-    login,
-    logout,
-    loading
-  };
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      {loading ? <div>Loading Application...</div> : children}
+    </AuthContext.Provider>
+  );
 };
 
 export const useAuth = (): AuthContextType => {
@@ -92,23 +85,4 @@ export const useAuth = (): AuthContextType => {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
-};
-
-// Custom hook to redirect if not authenticated
-export const useRequireAuth = (
-  requiredRole?: 'admin' | 'doctor' | 'patient',
-  redirectPath: string = '/login'
-) => {
-  const { user, isAuthenticated } = useAuth();
-  const [, setLocation] = useLocation();
-
-  useEffect(() => {
-    if (!isAuthenticated) {
-      setLocation(redirectPath);
-    } else if (requiredRole && user?.role !== requiredRole) {
-      setLocation('/unauthorized');
-    }
-  }, [isAuthenticated, user, requiredRole, redirectPath, setLocation]);
-
-  return { user, isAuthenticated };
 };

@@ -14,20 +14,20 @@ export const users = pgTable('users', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
-// Table for doctor-specific data, linked to a user account.
+// Table for doctor-specific data. It only needs to store the link to the user.
 export const doctors = pgTable('doctors', {
   id: serial('id').primaryKey(),
   userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
-  // Add any other doctor-specific fields here, e.g., qualifications, practice name.
+  // fullName is removed from here. We will get it from the 'users' table via the relationship.
 });
 
-// Table for patient-specific data, linked to a user account AND a doctor.
+// Table for patient-specific data.
 export const patients = pgTable('patients', {
   id: serial('id').primaryKey(),
   userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   // THIS IS THE CRITICAL OWNERSHIP LINK.
   doctorId: integer('doctor_id').notNull().references(() => doctors.id, { onDelete: 'cascade' }),
-  // Add any other patient-specific fields here.
+  // fullName is removed from here. We will get it from the 'users' table.
 });
 
 // Care Plan Directives linked to a patient.
