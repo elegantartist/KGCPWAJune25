@@ -72,8 +72,11 @@ export default function PatientLogin() {
           description: "Welcome to your KGC dashboard!",
         });
         
-        // Force page reload to refresh user context
-        window.location.href = "/patient-dashboard";
+        // Use programmatic navigation instead of window.location.href
+        // Wait a moment for the session to be fully established
+        setTimeout(() => {
+          window.location.href = data.redirectTo || "/patient-dashboard";
+        }, 100);
       } else {
         setError(data.message || "Invalid verification code");
       }
