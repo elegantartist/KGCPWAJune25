@@ -190,7 +190,7 @@ const Dashboard: React.FC = () => {
         "flex justify-end mb-3",
         isMobile && "fixed top-4 right-4 z-50"
       )}>
-        <LogoutButton />
+        <LogoutButton userRole="patient" />
       </div>
 
       {/* The carousel should go here but we'll move it back into the card */}
