@@ -109,9 +109,11 @@ export default function DailySelfScores() {
 
   // Load historical health metrics
   useEffect(() => {
+    console.log('Loading health metrics...');
     fetch('/api/patients/me/health-metrics/history')
       .then(res => res.json())
       .then(data => {
+        console.log('Raw health metrics data:', data);
         // Convert database format to chart format
         const formattedMetrics = data.map((metric: any) => ({
           createdAt: metric.date,
@@ -119,9 +121,12 @@ export default function DailySelfScores() {
           exercise: metric.exerciseScore,
           medication: metric.medicationScore
         }));
+        console.log('Formatted metrics for chart:', formattedMetrics);
         setMetrics(formattedMetrics);
       })
-      .catch(console.error);
+      .catch(err => {
+        console.error('Error loading metrics:', err);
+      });
   }, []);
 
   const handleSlider = (field: keyof Scores, value: number) => {
@@ -182,7 +187,13 @@ export default function DailySelfScores() {
         <h1 className="text-2xl font-bold mt-8 mb-4 text-center">Daily Self-Scores</h1>
         
         {/* Progress Chart - Only show if historical data exists */}
-        {metrics.length > 0 && <HealthProgressChart metrics={metrics} />}
+        {metrics.length > 0 ? (
+          <HealthProgressChart metrics={metrics} />
+        ) : (
+          <div className="mb-6 bg-yellow-50 p-4 rounded border">
+            <p className="text-sm text-gray-600">No historical data yet. Submit your first scores to see the progress chart!</p>
+          </div>
+        )}
         
         {/* Daily Self-Scores Input Form */}
         <div className="p-4 bg-white rounded shadow max-w-md mx-auto">
