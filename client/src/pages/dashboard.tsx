@@ -78,11 +78,11 @@ const Dashboard: React.FC = () => {
 
   // Fetch the motivational image from the database
   const { data: savedImage } = useQuery({
-    queryKey: ['/api/users', patient?.id, 'motivational-image'],
+    queryKey: ['/api/users', user?.id, 'motivational-image'],
     queryFn: async () => {
       try {
-        if (!patient?.id) return null;
-        const response = await fetch(`/api/users/${patient.id}/motivational-image`);
+        if (!user?.id) return null;
+        const response = await fetch(`/api/users/${user.id}/motivational-image`);
         if (!response.ok) {
           if (response.status === 404) {
             return null;
@@ -95,7 +95,7 @@ const Dashboard: React.FC = () => {
         return null;
       }
     },
-    enabled: !!patient,
+    enabled: !!user,
     retry: false,
     refetchOnWindowFocus: false,
   });
@@ -170,7 +170,7 @@ const Dashboard: React.FC = () => {
   };
 
   // Show loading state while user data is being fetched
-  if (isLoadingUserContext || isLoadingPatient) {
+  if (isLoading) {
     return (
       <div className="space-y-4">
         <Card>
@@ -361,7 +361,7 @@ const Dashboard: React.FC = () => {
               "text-2xl font-bold mb-2", 
               isMobile ? "text-[#2E8BC0]" : "text-[#676767]" 
             )}>
-              Welcome, {patient?.name || 'User'}!
+              Welcome, {user?.name}!
             </h2>
             <p className={cn(
               "mb-2",

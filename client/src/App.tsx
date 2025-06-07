@@ -4,7 +4,7 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider, useAuth } from './context/auth-context';
-import UnifiedLoginPage from './pages/Login'; // Import the new unified login page
+import LoginPage from './pages/login';
 import DoctorDashboard from './pages/doctor-dashboard';
 import Dashboard from './pages/dashboard'; // Patient dashboard
 import AdminDashboard from './pages/admin-dashboard';
@@ -31,7 +31,7 @@ const ProtectedRoute = ({ component: Component, requiredRole, ...rest }: any) =>
 function AppRoutes() {
     return (
         <Switch>
-            <Route path="/login" component={UnifiedLoginPage} />
+            <Route path="/login" component={LoginPage} />
             
             <ProtectedRoute path="/doctor-dashboard" component={DoctorDashboard} requiredRole="doctor" />
             <ProtectedRoute path="/patient-dashboard" component={Dashboard} requiredRole="patient" />
