@@ -33,7 +33,7 @@ export function LogoutButton({ userRole, variant = "ghost", size = "sm", classNa
       if (userRole === 'admin') {
         endpoint = "/api/admin/logout";
       }
-      const response = await apiRequest(endpoint, "POST", {});
+      const response = await apiRequest("POST", endpoint, {});
       return response;
     },
     onSuccess: () => {
