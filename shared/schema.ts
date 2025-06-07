@@ -8,6 +8,7 @@ export const users = pgTable('users', {
   role: text('role', { enum: ['admin', 'doctor', 'patient'] }).notNull(),
   phoneNumber: varchar('phone_number', { length: 50 }),
   passwordHash: text('password_hash'),
+  uin: varchar('uin', { length: 20 }).unique(), // Unique Identification Number
   isActive: boolean('is_active').default(true),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
