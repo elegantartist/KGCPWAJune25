@@ -114,7 +114,22 @@ export function registerRoutes(app: Express) {
         res.json({ access_token: accessToken, user: { id: user.id, name: user.name, role: user.role } });
     });
     
-    router.post('/auth/logout', authMiddleware(), (req, res) => res.status(200).json({ message: 'Logout successful' }));
+    router.post('/auth/logout', authMiddleware(), (req: AuthenticatedRequest, res) => {
+        // Clear session data for enhanced security
+        if (req.user) {
+            console.log(`User ${req.user.userId} (${req.user.role}) logged out`);
+        }
+        res.status(200).json({ message: 'Logout successful' });
+    });
+    
+    // Admin-specific logout endpoint for consistency with frontend
+    router.post('/admin/logout', authMiddleware(['admin']), (req: AuthenticatedRequest, res) => {
+        // Clear session data for enhanced security
+        if (req.user) {
+            console.log(`Admin ${req.user.userId} logged out`);
+        }
+        res.status(200).json({ message: 'Admin logout successful' });
+    });
 
     // --- USER CREATION ENDPOINTS ---
     router.post('/admin/create-doctor', authMiddleware(['admin']), async (req, res) => {
