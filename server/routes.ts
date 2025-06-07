@@ -4,7 +4,7 @@ import type { Express } from 'express';
 import twilio from 'twilio';
 import { db } from './db';
 import * as schema from '@shared/schema';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { createAccessToken, authMiddleware, AuthenticatedRequest } from './auth';
 import { userCreationService } from './services/userCreationService';
 import { uinService } from './services/uinService';
@@ -263,6 +263,100 @@ export function registerRoutes(app: Express) {
         } catch (error) {
             console.error('Scores submission error:', error);
             res.status(500).json({ message: "Failed to submit scores." });
+        }
+    });
+
+    // --- ADMIN DATA ENDPOINTS ---
+    router.get('/admin/doctors', authMiddleware(['admin']), async (req, res) => {
+        try {
+            const doctors = await db.select({
+                id: schema.doctors.id,
+                name: schema.users.name,
+                userId: schema.doctors.userId,
+                email: schema.users.email,
+                phoneNumber: schema.users.phoneNumber,
+                isActive: schema.users.isActive,
+                createdAt: schema.users.createdAt
+            })
+            .from(schema.doctors)
+            .leftJoin(schema.users, eq(schema.doctors.userId, schema.users.id))
+            .where(eq(schema.users.role, 'doctor'));
+
+            res.json(doctors);
+        } catch (error) {
+            console.error('Error fetching doctors:', error);
+            res.status(500).json({ message: 'Internal server error' });
+        }
+    });
+
+    router.get('/admin/patients', authMiddleware(['admin']), async (req, res) => {
+        try {
+            const patients = await db.select({
+                id: schema.patients.id,
+                name: schema.users.name,
+                userId: schema.patients.userId,
+                doctorId: schema.patients.doctorId,
+                email: schema.users.email,
+                phoneNumber: schema.users.phoneNumber,
+                isActive: schema.users.isActive,
+                createdAt: schema.users.createdAt
+            })
+            .from(schema.patients)
+            .leftJoin(schema.users, eq(schema.patients.userId, schema.users.id))
+            .where(eq(schema.users.role, 'patient'));
+
+            res.json(patients);
+        } catch (error) {
+            console.error('Error fetching patients:', error);
+            res.status(500).json({ message: 'Internal server error' });
+        }
+    });
+
+    router.get('/admin/stats', authMiddleware(['admin']), async (req, res) => {
+        try {
+            const doctorCount = await db.select({ count: sql`count(*)` })
+                .from(schema.doctors)
+                .leftJoin(schema.users, eq(schema.doctors.userId, schema.users.id))
+                .where(eq(schema.users.role, 'doctor'));
+
+            const patientCount = await db.select({ count: sql`count(*)` })
+                .from(schema.patients)
+                .leftJoin(schema.users, eq(schema.patients.userId, schema.users.id))
+                .where(eq(schema.users.role, 'patient'));
+
+            const reportCount = await db.select({ count: sql`count(*)` })
+                .from(schema.healthMetrics);
+
+            res.json({
+                doctorCount: Number(doctorCount[0]?.count || 0),
+                patientCount: Number(patientCount[0]?.count || 0),
+                reportCount: Number(reportCount[0]?.count || 0)
+            });
+        } catch (error) {
+            console.error('Error fetching stats:', error);
+            res.status(500).json({ message: 'Internal server error' });
+        }
+    });
+
+    router.get('/admin/profile', authMiddleware(['admin']), async (req: AuthenticatedRequest, res) => {
+        try {
+            const adminUser = await db.query.users.findFirst({
+                where: eq(schema.users.id, req.user!.userId),
+            });
+
+            if (!adminUser) {
+                return res.status(404).json({ message: 'Admin profile not found' });
+            }
+
+            res.json({
+                id: adminUser.id,
+                name: adminUser.name,
+                email: adminUser.email,
+                role: adminUser.role
+            });
+        } catch (error) {
+            console.error('Error fetching admin profile:', error);
+            res.status(500).json({ message: 'Internal server error' });
         }
     });
 
