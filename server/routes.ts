@@ -53,6 +53,39 @@ export function registerRoutes(app: Express) {
     const router = Router();
 
     // --- AUTHENTICATION FLOW (SMS & Token Issuance) ---
+    
+    // Admin login endpoint
+    router.post('/auth/admin-login', async (req, res) => {
+        const { username, password } = req.body;
+        
+        if (username === 'admin' && password === 'admin123') {
+            // Find or create admin user
+            let adminUser = await storage.getUserByEmail('admin@keepgoingcare.com');
+            
+            if (!adminUser) {
+                // Create admin user if it doesn't exist
+                adminUser = await db.insert(schema.users).values({
+                    name: 'System Administrator',
+                    email: 'admin@keepgoingcare.com',
+                    role: 'admin',
+                    isActive: true
+                }).returning().then(result => result[0]);
+            }
+            
+            const accessToken = createAccessToken({ userId: adminUser.id, role: adminUser.role });
+            return res.json({ 
+                access_token: accessToken, 
+                user: { 
+                    id: adminUser.id, 
+                    name: adminUser.name, 
+                    role: adminUser.role 
+                } 
+            });
+        }
+        
+        return res.status(401).json({ message: 'Invalid admin credentials' });
+    });
+    
     router.post('/auth/verify-sms', async (req, res) => {
         const { email, smsCode } = req.body;
         // This is where your real SMS code verification logic must go.
