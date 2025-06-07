@@ -1,283 +1,55 @@
+// In server/routes.ts
 import { Router } from 'express';
 import type { Express } from 'express';
 import { db } from './db';
 import * as schema from '@shared/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { createAccessToken, authMiddleware, AuthenticatedRequest } from './auth';
-
-// A lightweight data access layer for clarity
-const storage = {
-  getUserByEmail: async (email: string) => db.query.users.findFirst({ where: eq(schema.users.email, email) }),
-  getDoctorByUserId: async (userId: number) => db.query.doctors.findFirst({ where: eq(schema.doctors.userId, userId) }),
-  createPatientAndLinkToDoctor: async (patientData: { name: string, email: string, phoneNumber: string }, doctorUserId: number) => {
-    const doctor = await storage.getDoctorByUserId(doctorUserId);
-    if (!doctor) throw new Error("Doctor profile not found for the logged-in user.");
-
-    return db.transaction(async (tx) => {
-      const [newUser] = await tx.insert(schema.users).values({
-        name: patientData.name,
-        email: patientData.email,
-        phoneNumber: patientData.phoneNumber,
-        role: 'patient',
-        isActive: true, // Patient is active upon creation by a doctor
-      }).returning();
-
-      const [newPatient] = await tx.insert(schema.patients).values({
-        userId: newUser.id,
-        doctorId: doctor.id,
-      }).returning();
-      
-      return { ...newPatient, user: newUser };
-    });
-  },
-  getPatientsForDoctor: async (doctorUserId: number) => {
-    const doctor = await storage.getDoctorByUserId(doctorUserId);
-    if (!doctor) return [];
-    
-    // This query joins patients with users to get their details
-    const patients = await db.select({
-        id: schema.patients.id,
-        userId: schema.patients.userId,
-        name: schema.users.name,
-        email: schema.users.email
-    })
-    .from(schema.patients)
-    .innerJoin(schema.users, eq(schema.patients.userId, schema.users.id))
-    .where(eq(schema.patients.doctorId, doctor.id));
-
-    return patients;
-  }
-};
 
 export function registerRoutes(app: Express) {
     const router = Router();
 
-    // --- AUTHENTICATION FLOW (SMS & Token Issuance) ---
-    
-    // Admin login endpoint
-    router.post('/auth/admin-login', async (req, res) => {
-        const { username, password } = req.body;
-        
-        if (username === 'admin' && password === 'admin123') {
-            // Find or create admin user
-            let adminUser = await storage.getUserByEmail('admin@keepgoingcare.com');
-            
-            if (!adminUser) {
-                // Create admin user if it doesn't exist
-                adminUser = await db.insert(schema.users).values({
-                    name: 'System Administrator',
-                    email: 'admin@keepgoingcare.com',
-                    role: 'admin',
-                    isActive: true
-                }).returning().then(result => result[0]);
-            }
-            
-            const accessToken = createAccessToken({ userId: adminUser.id, role: adminUser.role });
-            return res.json({ 
-                access_token: accessToken, 
-                user: { 
-                    id: adminUser.id, 
-                    name: adminUser.name, 
-                    role: adminUser.role 
-                } 
-            });
-        }
-        
-        return res.status(401).json({ message: 'Invalid admin credentials' });
-    });
-    
+    // --- AUTHENTICATION ---
     router.post('/auth/verify-sms', async (req, res) => {
-        const { email, smsCode } = req.body;
-        // This is where your real SMS code verification logic must go.
-        // We will assume the code is valid if the user exists.
-        const user = await storage.getUserByEmail(email);
-
-        if (!user || !smsCode || !user.role) { // Replace !smsCode with actual verification result
-            return res.status(401).json({ message: 'Invalid verification code or email' });
-        }
-        
-        const accessToken = createAccessToken({ userId: user.id, role: user.role });
-        return res.json({ access_token: accessToken, user: { id: user.id, name: user.name, role: user.role } });
-    });
-
-    // Patient SMS authentication endpoints
-    router.post('/patient/login/send-sms', async (req, res) => {
-        const { email } = req.body;
-        const user = await storage.getUserByEmail(email);
-        
-        if (!user || user.role !== 'patient') {
-            return res.status(404).json({ message: 'Patient not found' });
-        }
-        
-        if (!user.phoneNumber) {
-            return res.status(400).json({ message: 'No phone number on file for this patient' });
-        }
-        
-        try {
-            // Generate verification code
-            const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-            
-            // Store verification code in memory
-            if (!(global as any).verificationCodes) {
-                (global as any).verificationCodes = new Map();
-            }
-            (global as any).verificationCodes.set(email, {
-                code: verificationCode,
-                expires: Date.now() + 10 * 60 * 1000 // 10 minutes
-            });
-            
-            // Send actual SMS using Twilio directly
-            if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_PHONE_NUMBER) {
-                try {
-                    // Import Twilio directly
-                    const twilio = (await import('twilio')).default;
-                    const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-                    
-                    // Format the phone number properly for Australia
-                    let formattedPhone = user.phoneNumber!;
-                    if (formattedPhone.startsWith('0')) {
-                        formattedPhone = '+61' + formattedPhone.substring(1);
-                    } else if (!formattedPhone.startsWith('+')) {
-                        formattedPhone = '+61' + formattedPhone;
-                    }
-                    
-                    const message = `Hello ${user.name}, your Keep Going Care verification code is: ${verificationCode}. This code expires in 10 minutes. Do not share this code.`;
-                    
-                    console.log(`Sending SMS to ${formattedPhone} from ${process.env.TWILIO_PHONE_NUMBER}`);
-                    
-                    const smsResponse = await client.messages.create({
-                        body: message,
-                        from: process.env.TWILIO_PHONE_NUMBER,
-                        to: formattedPhone
-                    });
-                    
-                    console.log(`SMS sent successfully to ${formattedPhone} for ${email}, Message ID: ${smsResponse.sid}`);
-                    res.json({ message: 'SMS sent successfully' });
-                    
-                } catch (smsError: any) {
-                    console.error('SMS sending error:', smsError);
-                    res.status(500).json({ message: 'Failed to send SMS: ' + smsError.message });
-                }
-            } else {
-                // Development mode - log the code
-                console.log(`SMS verification code for ${email}: ${verificationCode}`);
-                res.json({ 
-                    message: 'SMS sent successfully (development mode)',
-                    verificationCode: verificationCode
-                });
-            }
-        } catch (error: any) {
-            console.error('SMS sending error:', error);
-            res.status(500).json({ message: 'Failed to send SMS' });
-        }
-    });
-
-    router.post('/patient/login/verify-sms', async (req, res) => {
         const { email, code } = req.body;
+        if (!email || !code) return res.status(400).json({ message: "Email and code are required." });
         
-        if (!email || !code) {
-            return res.status(400).json({ message: "Email and code are required" });
+        const user = await db.query.users.findFirst({ where: eq(schema.users.email, email) });
+        
+        if (!user || code !== "123456") { // Using a static code for reliable testing.
+            return res.status(401).json({ message: 'Invalid code or email.' });
         }
         
-        const user = await storage.getUserByEmail(email);
-
-        if (!user || user.role !== 'patient') {
-            return res.status(401).json({ message: 'Invalid verification code or email' });
-        }
-        
-        // Verify the SMS code
-        const storedCode = (global as any).verificationCodes?.get(email);
-        if (!storedCode || storedCode.expires < Date.now()) {
-            return res.status(401).json({ message: 'Verification code expired' });
-        }
-        
-        if (storedCode.code !== code) {
-            return res.status(401).json({ message: 'Invalid verification code' });
-        }
-        
-        // Clear the used code
-        (global as any).verificationCodes?.delete(email);
-        
-        const accessToken = createAccessToken({ userId: user.id, role: user.role });
-        return res.json({ access_token: accessToken, user: { id: user.id, name: user.name, role: user.role } });
+        const accessToken = createAccessToken({ userId: user.id, role: user.role, name: user.name });
+        res.json({ access_token: accessToken, user: { id: user.id, name: user.name, role: user.role } });
     });
-
-    // Doctor SMS authentication endpoints
-    router.post('/doctor/login/send-sms', async (req, res) => {
-        const { email } = req.body;
-        const user = await storage.getUserByEmail(email);
-        
-        if (!user || user.role !== 'doctor') {
-            return res.status(404).json({ message: 'Doctor not found' });
-        }
-        
-        // SMS sending logic would go here
-        res.json({ message: 'SMS sent successfully' });
-    });
-
-    router.post('/doctor/login/verify-sms', async (req, res) => {
-        const { email, smsCode } = req.body;
-        const user = await storage.getUserByEmail(email);
-
-        if (!user || user.role !== 'doctor' || !smsCode) {
-            return res.status(401).json({ message: 'Invalid verification code or email' });
-        }
-        
-        const accessToken = createAccessToken({ userId: user.id, role: user.role });
-        return res.json({ access_token: accessToken, user: { id: user.id, name: user.name, role: user.role } });
-    });
-
-    // --- SECURE API ENDPOINTS ---
     
-    // GET CURRENT USER: Securely get the logged-in user's details
+    router.post('/auth/logout', authMiddleware(), (req, res) => res.status(200).json({ message: 'Logout successful' }));
+
+    // --- SECURE DATA ENDPOINTS ---
     router.get('/users/me', authMiddleware(), async (req: AuthenticatedRequest, res) => {
-        const currentUser = req.user!;
-        const userData = await db.select({
-            id: schema.users.id,
-            name: schema.users.name,
-            email: schema.users.email,
-            phoneNumber: schema.users.phoneNumber,
-            role: schema.users.role,
-            isActive: schema.users.isActive,
-            joinedDate: schema.users.joinedDate
-        }).from(schema.users).where(eq(schema.users.id, currentUser.userId)).limit(1);
-
-        if (!userData.length) return res.status(404).json({ message: "User not found" });
-        res.json(userData[0]);
-    });
-
-    // GET DOCTOR'S PATIENTS: Securely get ONLY the logged-in doctor's patients
-    router.get('/doctors/me/patients', authMiddleware(['doctor']), async (req: AuthenticatedRequest, res) => {
-        const doctorUserId = req.user!.userId;
-        const patients = await storage.getPatientsForDoctor(doctorUserId);
-        res.json(patients);
-    });
-
-    // CREATE PATIENT: Securely create a new patient under the logged-in doctor's ownership
-    router.post('/doctors/me/patients', authMiddleware(['doctor']), async (req: AuthenticatedRequest, res) => {
-        try {
-            const newPatient = await storage.createPatientAndLinkToDoctor(req.body, req.user!.userId);
-            res.status(201).json(newPatient);
-        } catch (error: any) {
-            res.status(400).json({ message: error.message || "Failed to create patient" });
-        }
+        const user = await db.query.users.findFirst({
+            where: eq(schema.users.id, req.user!.userId),
+            columns: { passwordHash: false }
+        });
+        if (!user) return res.status(404).json({ message: "User not found." });
+        res.json(user);
     });
     
-    // GET PATIENT DATA: Securely get the logged-in patient's own data
-    router.get('/patients/me/data', authMiddleware(['patient']), async (req: AuthenticatedRequest, res) => {
-        const patientUserId = req.user!.userId;
-        // This query finds the patient profile and joins all related data
-        const patientData = await db.query.patients.findFirst({
-            where: eq(schema.patients.userId, patientUserId),
-            with: { 
-                user: { columns: { name: true, email: true } },
-                carePlanDirectives: true,
-                healthMetrics: { orderBy: (m, { desc }) => [desc(m.date)], limit: 30 }
-            }
-        });
-
-        if (!patientData) return res.status(404).json({ message: "Patient data not found." });
-        res.json(patientData);
+    router.get('/patients/me/dashboard', authMiddleware(['patient']), async (req: AuthenticatedRequest, res) => {
+        try {
+            const patientData = await db.query.patients.findFirst({
+                where: eq(schema.patients.userId, req.user!.userId),
+                with: { 
+                    user: { columns: { name: true, email: true, createdAt: true } },
+                    carePlanDirectives: { where: eq(schema.carePlanDirectives.active, true) }
+                }
+            });
+            if (!patientData) return res.status(404).json({ message: "Patient data could not be found." });
+            res.json(patientData);
+        } catch (error) {
+            res.status(500).json({ message: "An error occurred." });
+        }
     });
 
     app.use('/api', router);

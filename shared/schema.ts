@@ -1,53 +1,37 @@
+// In shared/schema.ts
 import { pgTable, serial, text, varchar, integer, timestamp, boolean } from 'drizzle-orm/pg-core';
-import { createInsertSchema } from "drizzle-zod";
-import { z } from "zod";
 
-// Central table for ALL user login and role information.
 export const users = pgTable('users', {
   id: serial('id').primaryKey(),
-  name: text('name').notNull(),
-  email: text('email').notNull().unique(),
-  joinedDate: timestamp('joined_date').defaultNow().notNull(),
-  username: text('username'),
-  password: text('password'),
-  uin: varchar('uin'),
-  roleId: integer('role_id'),
-  phoneNumber: text('phone_number'),
-  isActive: boolean('is_active').default(false),
-  lastLogin: timestamp('last_login'),
-  currentChallenge: text('current_challenge'),
-  challengeTimestamp: timestamp('challenge_timestamp'),
-  role: text('role', { enum: ['admin', 'doctor', 'patient'] }),
+  name: varchar('name', { length: 255 }).notNull(),
+  email: varchar('email', { length: 255 }).notNull().unique(),
+  role: text('role', { enum: ['admin', 'doctor', 'patient'] }).notNull(),
+  phoneNumber: varchar('phone_number', { length: 50 }),
+  passwordHash: text('password_hash'),
+  isActive: boolean('is_active').default(true),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
-// Table for doctor-specific data. It only needs to store the link to the user.
 export const doctors = pgTable('doctors', {
   id: serial('id').primaryKey(),
-  userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
-  // fullName is removed from here. We will get it from the 'users' table via the relationship.
+  userId: integer('user_id').notNull().unique().references(() => users.id, { onDelete: 'cascade' }),
 });
 
-// Table for patient-specific data.
 export const patients = pgTable('patients', {
   id: serial('id').primaryKey(),
-  userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
-  // THIS IS THE CRITICAL OWNERSHIP LINK.
+  userId: integer('user_id').notNull().unique().references(() => users.id, { onDelete: 'cascade' }),
   doctorId: integer('doctor_id').notNull().references(() => doctors.id, { onDelete: 'cascade' }),
-  // fullName is removed from here. We will get it from the 'users' table.
 });
 
-// Care Plan Directives linked to a patient.
 export const carePlanDirectives = pgTable('care_plan_directives', {
-    id: serial('id').primaryKey(),
-    patientId: integer('patient_id').notNull().references(() => patients.id, { onDelete: 'cascade' }),
-    dietDirective: text('diet_directive'),
-    exerciseDirective: text('exercise_directive'),
-    medicationDirective: text('medication_directive'),
-    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  id: serial('id').primaryKey(),
+  patientId: integer('patient_id').notNull().references(() => patients.id, { onDelete: 'cascade' }),
+  directive: text('directive').notNull(),
+  category: text('category').notNull(),
+  active: boolean('active').default(true),
 });
 
-// Health metrics linked to a patient.
-export const healthMetrics = pgTable("health_metrics", {
+export const healthMetrics = pgTable('health_metrics', {
   id: serial("id").primaryKey(),
   patientId: integer("patient_id").notNull().references(() => patients.id, { onDelete: 'cascade' }),
   date: timestamp("date").defaultNow().notNull(),
@@ -55,23 +39,3 @@ export const healthMetrics = pgTable("health_metrics", {
   dietScore: integer("diet_score").notNull(),
   exerciseScore: integer("exercise_score").notNull(),
 });
-
-// Zod schemas for validation
-export const insertUserSchema = createInsertSchema(users);
-export const insertDoctorSchema = createInsertSchema(doctors);
-export const insertPatientSchema = createInsertSchema(patients);
-export const insertCarePlanDirectiveSchema = createInsertSchema(carePlanDirectives);
-export const insertHealthMetricSchema = createInsertSchema(healthMetrics);
-
-// TypeScript types for type safety
-export type User = typeof users.$inferSelect;
-export type Doctor = typeof doctors.$inferSelect;
-export type Patient = typeof patients.$inferSelect;
-export type CarePlanDirective = typeof carePlanDirectives.$inferSelect;
-export type HealthMetric = typeof healthMetrics.$inferSelect;
-
-export type InsertUser = z.infer<typeof insertUserSchema>;
-export type InsertDoctor = z.infer<typeof insertDoctorSchema>;
-export type InsertPatient = z.infer<typeof insertPatientSchema>;
-export type InsertCarePlanDirective = z.infer<typeof insertCarePlanDirectiveSchema>;
-export type InsertHealthMetric = z.infer<typeof insertHealthMetricSchema>;

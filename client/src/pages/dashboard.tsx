@@ -13,6 +13,8 @@ import EnhancedImageStore from "@/lib/enhancedImageStore";
 import HealthImageCarousel from "@/components/health/HealthImageCarousel";
 import { KeepGoingFeature } from "@/components/keep-going/KeepGoingFeature";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/context/auth-context";
+import { apiRequest } from "@/lib/apiRequest";
 import { User } from "@/../../shared/schema";
 
 // Define global window types for TypeScript
@@ -40,34 +42,14 @@ const Dashboard: React.FC = () => {
 
   // Connectivity change listener removed - app now requires internet connection
 
-  // Fetch current user context (for impersonation detection)
-  const { data: userContext, isLoading: isLoadingUserContext } = useQuery<{
-    userRole: string;
-    userId?: number;
-    doctorId?: number;
-    patientId?: number;
-    isImpersonatingPatient?: boolean;
-    impersonatedPatientId?: number;
-    adminOriginalUserId?: number; // Original Admin ID
-  }>({
-    queryKey: ["/api/user/current-context"],
-    staleTime: 0,
+  // --- START: NEW DATA-FETCHING LOGIC ---
+  const { user } = useAuth();
+  const { data: patientData, isLoading, error } = useQuery({
+      queryKey: ['patientDashboardData', user?.id],
+      queryFn: () => apiRequest('/api/patients/me/dashboard'),
+      enabled: !!user,
   });
-
-  const isAdminImpersonatingPatient = userContext?.userRole === 'admin' && userContext?.isImpersonatingPatient;
-  const patientToDisplayId = isAdminImpersonatingPatient ? userContext.impersonatedPatientId : (userContext?.patientId || userContext?.userId);
-
-  // Fetch actual patient data using the determined ID
-  const { data: patient, isLoading: isLoadingPatient } = useQuery<User>({
-    queryKey: ["/api/users", patientToDisplayId],
-    queryFn: async () => {
-      const res = await fetch(`/api/users/${patientToDisplayId}`);
-      if (!res.ok) throw new Error('Failed to fetch patient data');
-      return res.json();
-    },
-    enabled: !!patientToDisplayId,
-    retry: false,
-  });
+  // --- END: NEW DATA-FETCHING LOGIC ---
 
   // Handle returning to admin dashboard (clear patient impersonation)
   const handleReturnToAdminDashboard = async () => {

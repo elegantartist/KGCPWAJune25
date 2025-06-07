@@ -1,19 +1,19 @@
+// In client/src/context/auth-context.tsx
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useLocation } from 'wouter';
+import { apiRequest } from '@/lib/apiRequest';
 
 interface User {
   id: number;
   name: string;
   role: 'admin' | 'doctor' | 'patient';
-  token: string;
 }
 
 interface AuthContextType {
   user: User | null;
-  login: (userData: any) => void;
+  login: (data: { access_token: string; user: User }) => void;
   logout: () => void;
   loading: boolean;
-  isAuthenticated: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -24,66 +24,47 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [, setLocation] = useLocation();
 
   const logout = useCallback(() => {
-    setUser(null);
     localStorage.removeItem('auth_token');
-    setLocation('/');
+    setUser(null);
+    setLocation('/login');
   }, [setLocation]);
 
   useEffect(() => {
-    const validateToken = async () => {
+    const validateSession = async () => {
       const token = localStorage.getItem('auth_token');
       if (!token) {
         setLoading(false);
         return;
       }
       try {
-        const response = await fetch('/api/users/me', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (response.ok) {
-          const userData = await response.json();
-          setUser({ ...userData, token });
-        } else {
-          logout(); // Token is invalid or expired
-        }
+        const userData = await apiRequest('/api/users/me');
+        setUser(userData);
       } catch (error) {
-        console.error("Token validation failed", error);
         logout();
       } finally {
         setLoading(false);
       }
     };
-    validateToken();
+    validateSession();
   }, [logout]);
 
-  const login = (userData: { access_token: string; user: { id: number; name: string; role: 'admin' | 'doctor' | 'patient' } }) => {
-    if (userData.access_token && userData.user) {
-      const userWithToken = { ...userData.user, token: userData.access_token };
-      localStorage.setItem('auth_token', userData.access_token);
-      setUser(userWithToken);
-      
-      switch (userWithToken.role) {
-        case 'admin': setLocation('/admin-dashboard'); break;
-        case 'doctor': setLocation('/doctor-dashboard'); break;
-        case 'patient': setLocation('/patient-dashboard'); break;
-        default: setLocation('/');
-      }
-    }
+  const login = (data: { access_token: string; user: User }) => {
+    localStorage.setItem('auth_token', data.access_token);
+    setUser(data.user);
+    setLocation(data.user ? `/${data.user.role}-dashboard` : '/login');
   };
 
-  const value = { user, login, logout, loading, isAuthenticated: !!user };
+  const value = { user, login, logout, loading };
 
   return (
     <AuthContext.Provider value={value}>
-      {loading ? <div>Loading Application...</div> : children}
+      {loading ? <div>Authenticating...</div> : children}
     </AuthContext.Provider>
   );
 };
 
-export const useAuth = (): AuthContextType => {
+export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
+  if (!context) throw new Error('useAuth must be used within an AuthProvider');
   return context;
 };
