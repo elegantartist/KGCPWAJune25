@@ -10,6 +10,31 @@ export function registerRoutes(app: Express) {
     const router = Router();
 
     // --- AUTHENTICATION ---
+    router.post('/auth/admin-login', async (req, res) => {
+        const { username, password } = req.body;
+        
+        // In a real system, you would hash and compare the password.
+        // For this implementation, we use the specified plain text credentials.
+        if (username !== 'admin' || password !== 'admin123') {
+            return res.status(401).json({ message: 'Invalid admin credentials.' });
+        }
+
+        // Find the admin user in the database
+        const adminUser = await db.query.users.findFirst({
+            where: eq(schema.users.role, 'admin'),
+        });
+
+        if (!adminUser) {
+            return res.status(404).json({ message: 'Admin account not found.' });
+        }
+
+        const accessToken = createAccessToken({ userId: adminUser.id, role: adminUser.role, name: adminUser.name });
+        res.json({ 
+            access_token: accessToken, 
+            user: { id: adminUser.id, name: adminUser.name, role: adminUser.role } 
+        });
+    });
+
     router.post('/auth/verify-sms', async (req, res) => {
         const { email, code } = req.body;
         if (!email || !code) return res.status(400).json({ message: "Email and code are required." });
@@ -56,6 +81,35 @@ export function registerRoutes(app: Express) {
         } catch (error) {
             console.error('Dashboard error:', error);
             res.status(500).json({ message: "An error occurred." });
+        }
+    });
+
+    router.post('/patients/me/scores', authMiddleware(['patient']), async (req: AuthenticatedRequest, res) => {
+        try {
+            const { medicationScore, dietScore, exerciseScore } = req.body;
+            
+            // Get patient record
+            const patient = await db.select().from(schema.patients)
+                .where(eq(schema.patients.userId, req.user!.userId))
+                .limit(1);
+            
+            if (!patient.length) {
+                return res.status(404).json({ message: "Patient record not found." });
+            }
+            
+            // Insert health metrics
+            const newMetric = await db.insert(schema.healthMetrics).values({
+                patientId: patient[0].id,
+                medicationScore,
+                dietScore,
+                exerciseScore,
+                date: new Date()
+            }).returning();
+            
+            res.json({ message: "Scores submitted successfully", metric: newMetric[0] });
+        } catch (error) {
+            console.error('Scores submission error:', error);
+            res.status(500).json({ message: "Failed to submit scores." });
         }
     });
 

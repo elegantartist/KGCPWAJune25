@@ -1,139 +1,82 @@
-import React from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
+// In client/src/pages/profile.tsx
+import React, { useState } from 'react';
+import { useAuth } from '@/context/auth-context';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiRequest } from '@/lib/apiRequest';
 import { Skeleton } from "@/components/ui/skeleton";
-import PatientProfile from "@/components/patient/PatientProfile";
-import HealthProgressChart from "@/components/health/HealthProgressChart";
-import DailyHealthScore from "@/components/health/DailyHealthScore";
-import HealthInspiration from "@/components/health/HealthInspiration";
-import { useIsMobile } from "@/hooks/use-mobile";
-import { ArrowLeft } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useToast } from "@/hooks/use-toast";
 
-const Profile: React.FC = () => {
-  // Fetch current user context (works for all user types)
-  const { data: userContext, isLoading: isLoadingUserContext } = useQuery({
-    queryKey: ["/api/user/current-context"],
-    staleTime: 0,
-  });
+export default function DailyScoresPage() {
+    const { user } = useAuth();
+    const queryClient = useQueryClient();
+    const { toast } = useToast();
+    const [scores, setScores] = useState({ medicationScore: 5, dietScore: 5, exerciseScore: 5 });
 
-  // Determine the user ID to fetch data for
-  const userId = userContext?.userRole === 'patient' ? userContext.patientId : 
-                 userContext?.userRole === 'doctor' ? userContext.doctorId : 
-                 userContext?.userRole === 'admin' ? userContext.userId : null;
+    // This query now fetches all data, including CPDs, from the secure unified endpoint
+    const { data, isLoading, error } = useQuery({
+        queryKey: ['patientDashboardData', user?.id],
+        queryFn: () => apiRequest('/api/patients/me/dashboard'),
+        enabled: !!user,
+    });
 
-  // Fetch user data using the determined ID
-  const { data: user, isLoading: isLoadingUser } = useQuery({
-    queryKey: ["/api/users", userId],
-    queryFn: async () => {
-      if (!userId) throw new Error('No user ID available');
-      const res = await fetch(`/api/users/${userId}`);
-      if (!res.ok) throw new Error('Failed to fetch user data');
-      return res.json();
-    },
-    enabled: !!userId,
-    retry: false,
-  });
-  
-  const { data: healthMetrics, isLoading: isLoadingMetrics } = useQuery({
-    queryKey: [user ? `/api/users/${user.id}/health-metrics` : null],
-    enabled: !!user && !!user.id,
-  });
-  
-  const isMobile = useIsMobile();
-  
-  if (isLoadingUser || isLoadingMetrics) {
+    // This mutation now submits scores to a secure endpoint
+    const submitScoresMutation = useMutation({
+        mutationFn: (newScores: typeof scores) => apiRequest('/api/patients/me/scores', 'POST', newScores),
+        onSuccess: () => {
+            toast({ title: "Scores Submitted Successfully!" });
+            queryClient.invalidateQueries({ queryKey: ['patientDashboardData', user?.id] });
+        },
+        onError: (err: Error) => toast({ title: "Submission Failed", description: err.message, variant: "destructive" }),
+    });
+
+    if (isLoading) return <div><Skeleton className="h-48 w-full" /></div>;
+    if (error) return <Alert variant="destructive"><AlertDescription>Error loading data: {(error as Error).message}</AlertDescription></Alert>;
+
+    const handleScoreChange = (type: string, value: string) => setScores(prev => ({ ...prev, [type]: parseInt(value) }));
+    const handleSubmit = () => submitScoresMutation.mutate(scores);
+
     return (
-      <div className="space-y-6">
-        <Skeleton className="h-[180px] w-full" />
-        <Skeleton className="h-[350px] w-full" />
-        <Skeleton className="h-[200px] w-full" />
-      </div>
-    );
-  }
-  
-  if (!user) {
-    return (
-      <div className="text-center py-10">
-        <h2 className="text-2xl font-bold text-gray-800">User not found</h2>
-        <p className="text-gray-600 mt-2">Please log in to access your profile.</p>
-      </div>
-    );
-  }
-  
-  return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center mb-3">
-        <Button 
-          variant="outline" 
-          className="flex items-center text-gray-600 hover:text-gray-900"
-          onClick={(e) => {
-            e.preventDefault(); // Prevent any default behavior
+        <div className="p-6">
+            <h1 className="text-2xl font-bold mb-4">Daily Self-Scores for {user?.name}</h1>
+            <Card>
+                <CardHeader><CardTitle>Log Today's Scores</CardTitle></CardHeader>
+                <CardContent className="space-y-6">
+                    <div>
+                        <label>Medication Score: {scores.medicationScore}/10</label>
+                        <Input type="range" min="1" max="10" value={scores.medicationScore} onChange={(e) => handleScoreChange('medicationScore', e.target.value)} />
+                    </div>
+                    <div>
+                        <label>Diet Score: {scores.dietScore}/10</label>
+                        <Input type="range" min="1" max="10" value={scores.dietScore} onChange={(e) => handleScoreChange('dietScore', e.target.value)} />
+                    </div>
+                    <div>
+                        <label>Exercise Score: {scores.exerciseScore}/10</label>
+                        <Input type="range" min="1" max="10" value={scores.exerciseScore} onChange={(e) => handleScoreChange('exerciseScore', e.target.value)} />
+                    </div>
+                    <Button onClick={handleSubmit} disabled={submitScoresMutation.isPending}>
+                        {submitScoresMutation.isPending ? 'Saving...' : 'Save Today\'s Scores'}
+                    </Button>
+                </CardContent>
+            </Card>
             
-            // Store the current authenticated user's information
-            if (user) {
-              localStorage.setItem('currentUser', JSON.stringify({
-                id: user.id,
-                name: user.name,
-                role: userContext?.userRole || 'patient',
-                uin: user.uin,
-                email: user.email
-              }));
-            }
-            
-            // Clear any previous data from session storage that might interfere
-            sessionStorage.clear();
-            
-            // Direct URL navigation using multiple approaches to ensure it works
-            try {
-              console.log("Navigating to Admin Dashboard");
-              
-              // Use the most direct method - doesn't rely on React router
-              document.location.href = '/admin-dashboard';
-              
-              // Failsafe approach
-              setTimeout(() => {
-                // If we're still not on the admin dashboard, try a direct reload
-                if (window.location.pathname !== '/admin-dashboard') {
-                  console.log("Failsafe navigation to Admin Dashboard");
-                  window.location.replace('/admin-dashboard');
-                }
-              }, 200);
-            } catch (error) {
-              console.error("Navigation failed:", error);
-              // Final fallback - hardcoded URL
-              window.location.href = '/admin-dashboard';
-            }
-          }}
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Return to Admin
-        </Button>
-      </div>
-      <PatientProfile user={user} />
-      
-      {/* Desktop: Two columns layout */}
-      {!isMobile && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="md:col-span-2">
-            <HealthProgressChart metrics={healthMetrics} />
-          </div>
-          <div>
-            <HealthInspiration />
-          </div>
+            <Card className="mt-6">
+                <CardHeader><CardTitle>Your Care Plan Directives</CardTitle></CardHeader>
+                <CardContent>
+                    {data?.carePlanDirectives?.length > 0 ? (
+                        <ul>
+                            {data.carePlanDirectives.map((cpd: any) => (
+                                <li key={cpd.id}><strong>{cpd.category}:</strong> {cpd.directive}</li>
+                            ))}
+                        </ul>
+                    ) : (
+                        <p>No active Care Plan Directives found.</p>
+                    )}
+                </CardContent>
+            </Card>
         </div>
-      )}
-      
-      {/* Mobile: Stack vertically */}
-      {isMobile && (
-        <>
-          <HealthProgressChart metrics={healthMetrics} />
-          <HealthInspiration />
-        </>
-      )}
-      
-      <DailyHealthScore metric={healthMetrics[0]} />
-    </div>
-  );
-};
-
-export default Profile;
+    );
+}

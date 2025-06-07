@@ -8,6 +8,7 @@ import LoginPage from './pages/login';
 import DoctorDashboard from './pages/doctor-dashboard';
 import Dashboard from './pages/dashboard'; // Patient dashboard
 import AdminDashboard from './pages/admin-dashboard';
+import ProfilePage from './pages/profile';
 
 const ProtectedRoute = ({ component: Component, requiredRole, ...rest }: any) => {
     const { user, loading } = useAuth();
@@ -36,6 +37,7 @@ function AppRoutes() {
             <ProtectedRoute path="/doctor-dashboard" component={DoctorDashboard} requiredRole="doctor" />
             <ProtectedRoute path="/patient-dashboard" component={Dashboard} requiredRole="patient" />
             <ProtectedRoute path="/admin-dashboard" component={AdminDashboard} requiredRole="admin" />
+            <ProtectedRoute path="/profile" component={ProfilePage} requiredRole="patient" />
 
             {/* Default route redirects to login if not authenticated, or to role-specific dashboard if authenticated */}
             <Route>
