@@ -118,7 +118,7 @@ export default function UnifiedLoginPage() {
                     <CardDescription>Sign in to your account</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <Tabs defaultValue="patient" className="w-full">
+                    <Tabs defaultValue="doctor" className="w-full">
                         <TabsList className="grid w-full grid-cols-3">
                             <TabsTrigger value="patient">Patient</TabsTrigger>
                             <TabsTrigger value="doctor">Doctor</TabsTrigger>
