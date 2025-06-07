@@ -15,7 +15,7 @@ import { KeepGoingFeature } from "@/components/keep-going/KeepGoingFeature";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/auth-context";
 import { apiRequest } from "../lib/apiRequest";
-import { User } from "@/../../shared/schema";
+// Removed unused User import
 
 // Define global window types for TypeScript
 declare global {

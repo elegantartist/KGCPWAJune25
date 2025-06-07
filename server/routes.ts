@@ -38,16 +38,18 @@ export function registerRoutes(app: Express) {
     
     router.get('/patients/me/dashboard', authMiddleware(['patient']), async (req: AuthenticatedRequest, res) => {
         try {
+            console.log('Dashboard request for user:', req.user!.userId);
             const patientData = await db.query.patients.findFirst({
                 where: eq(schema.patients.userId, req.user!.userId),
                 with: { 
                     user: { columns: { name: true, email: true, createdAt: true } },
-                    carePlanDirectives: { where: eq(schema.carePlanDirectives.active, true) }
+                    carePlanDirectives: true
                 }
             });
             if (!patientData) return res.status(404).json({ message: "Patient data could not be found." });
             res.json(patientData);
         } catch (error) {
+            console.error('Dashboard error:', error);
             res.status(500).json({ message: "An error occurred." });
         }
     });
