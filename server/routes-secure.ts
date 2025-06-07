@@ -151,11 +151,12 @@ export function registerSecureRoutes(app: Express): Server {
             // Get all doctors with their user information
             const doctors = await db.select({
                 id: schema.doctors.id,
-                fullName: schema.doctors.fullName,
+                name: schema.users.name,
                 userId: schema.doctors.userId,
                 email: schema.users.email,
                 phoneNumber: schema.users.phoneNumber,
-                isActive: schema.users.isActive
+                isActive: schema.users.isActive,
+                createdAt: schema.users.createdAt
             })
             .from(schema.doctors)
             .leftJoin(schema.users, eq(schema.doctors.userId, schema.users.id))
@@ -172,19 +173,23 @@ export function registerSecureRoutes(app: Express): Server {
     router.get('/api/admin/patients', authMiddleware(['admin']), async (req: AuthenticatedRequest, res) => {
         try {
             // Get all patients with their user and doctor information
+            const doctorUsers = alias(schema.users, 'doctor_users');
+            
             const patients = await db.select({
                 id: schema.patients.id,
-                fullName: schema.patients.fullName,
+                name: schema.users.name,
                 userId: schema.patients.userId,
                 doctorId: schema.patients.doctorId,
                 email: schema.users.email,
                 phoneNumber: schema.users.phoneNumber,
                 isActive: schema.users.isActive,
-                doctorName: schema.doctors.fullName
+                createdAt: schema.users.createdAt,
+                doctorName: doctorUsers.name
             })
             .from(schema.patients)
             .leftJoin(schema.users, eq(schema.patients.userId, schema.users.id))
             .leftJoin(schema.doctors, eq(schema.patients.doctorId, schema.doctors.id))
+            .leftJoin(doctorUsers, eq(schema.doctors.userId, doctorUsers.id))
             .where(eq(schema.users.role, 'patient'));
 
             res.json(patients);
