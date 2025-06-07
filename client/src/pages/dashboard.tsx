@@ -14,7 +14,7 @@ import HealthImageCarousel from "@/components/health/HealthImageCarousel";
 import { KeepGoingFeature } from "@/components/keep-going/KeepGoingFeature";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/auth-context";
-import { apiRequest } from "@/lib/apiRequest";
+import { apiRequest } from "../lib/apiRequest";
 import { User } from "@/../../shared/schema";
 
 // Define global window types for TypeScript
@@ -185,58 +185,13 @@ const Dashboard: React.FC = () => {
 
   return (
     <div className={cn("space-y-6", isMobile && "relative min-h-screen")}>
-      {/* Admin Controls - Return to Admin Dashboard or Logout */}
-      {userContext?.userRole === 'admin' && (
-        <div className={cn(
-          "flex justify-between items-center mb-3",
-          isMobile && "fixed top-0 left-0 right-0 z-50 px-4 py-2"
-        )}>
-          {userContext?.impersonatedPatientId ? (
-            <Button
-              variant="outline"
-              className={cn(
-                "flex items-center hover:text-gray-900",
-                isMobile ? "text-white bg-black/30 hover:bg-black/50 border-transparent" : "text-gray-600"
-              )}
-              onClick={handleReturnToAdminDashboard}
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Return to Admin Dashboard
-            </Button>
-          ) : (
-            <Button
-              variant="outline"
-              className={cn(
-                "flex items-center hover:text-gray-900",
-                isMobile ? "text-white bg-black/30 hover:bg-black/50 border-transparent" : "text-gray-600"
-              )}
-              onClick={() => {
-                // Clear admin session and redirect to login
-                fetch('/api/logout', { method: 'POST' })
-                  .then(() => {
-                    setLocation('/login');
-                  })
-                  .catch(() => {
-                    setLocation('/login');
-                  });
-              }}
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Logout
-            </Button>
-          )}
-        </div>
-      )}
-
-      {/* Patient Logout Button - for regular patient users (not admin impersonating) */}
-      {userContext?.userRole === 'patient' && !userContext?.impersonatedPatientId && (
-        <div className={cn(
-          "flex justify-end mb-3",
-          isMobile && "fixed top-4 right-4 z-50"
-        )}>
-          <LogoutButton userRole="patient" variant="outline" size="sm" />
-        </div>
-      )}
+      {/* Logout Button */}
+      <div className={cn(
+        "flex justify-end mb-3",
+        isMobile && "fixed top-4 right-4 z-50"
+      )}>
+        <LogoutButton />
+      </div>
 
       {/* The carousel should go here but we'll move it back into the card */}
 
@@ -272,16 +227,14 @@ const Dashboard: React.FC = () => {
                   onClick={() => {
                     try {
                       triggerVibration('chat');
-                      // Ensure current patient is stored properly for the chatbot page
-                      if (patient) {
+                      // Ensure current user is stored properly for the chatbot page
+                      if (user) {
                         localStorage.setItem('currentUser', JSON.stringify({
-                          id: patient.id,
-                          name: patient.name,
-                          role: 'patient',
-                          email: patient.email,
-                          uin: patient.uin
+                          id: user.id,
+                          name: user.name,
+                          role: user.role
                         }));
-                        console.log('Dashboard: Stored patient data for chatbot:', patient);
+                        console.log('Dashboard: Stored user data for chatbot:', user);
                       }
 
                       // Longer delay before navigation to allow full therapeutic gong sound and animation to complete
@@ -309,9 +262,9 @@ const Dashboard: React.FC = () => {
               </div>
               <div className="w-full">
                 {/* Our new safer Keep Going component */}
-                {patient?.id && (
+                {user?.id && (
                   <KeepGoingFeature
-                    userId={patient.id}
+                    userId={user.id}
                     overlayImage={motivationalImage}
                   />
                 )}

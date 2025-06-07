@@ -1,7 +1,7 @@
 // In client/src/context/auth-context.tsx
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useLocation } from 'wouter';
-import { apiRequest } from '@/lib/apiRequest';
+import { apiRequest } from '../lib/apiRequest';
 
 interface User {
   id: number;
