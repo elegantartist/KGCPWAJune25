@@ -15,6 +15,7 @@ import { KeepGoingFeature } from "@/components/keep-going/KeepGoingFeature";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/auth-context";
 import { apiRequest } from "../lib/apiRequest";
+import Layout from "@/components/layout/Layout";
 // Removed unused User import
 
 // Define global window types for TypeScript
@@ -184,14 +185,15 @@ const Dashboard: React.FC = () => {
   }
 
   return (
-    <div className={cn("space-y-6", isMobile && "relative min-h-screen")}>
-      {/* Logout Button */}
-      <div className={cn(
-        "flex justify-end mb-3",
-        isMobile && "fixed top-4 right-4 z-50"
-      )}>
-        <LogoutButton userRole="patient" />
-      </div>
+    <Layout>
+      <div className={cn("space-y-6", isMobile && "relative min-h-screen")}>
+        {/* Logout Button */}
+        <div className={cn(
+          "flex justify-end mb-3",
+          isMobile && "fixed top-4 right-4 z-50"
+        )}>
+          <LogoutButton userRole="patient" />
+        </div>
 
       {/* The carousel should go here but we'll move it back into the card */}
 
@@ -325,7 +327,8 @@ const Dashboard: React.FC = () => {
           </div>
         </CardContent>
       </Card>
-    </div>
+      </div>
+    </Layout>
   );
 };
 
