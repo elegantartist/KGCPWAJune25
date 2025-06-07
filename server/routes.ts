@@ -393,13 +393,18 @@ export function registerRoutes(app: Express) {
 
     router.get('/doctor/patients', authMiddleware(['doctor']), async (req: AuthenticatedRequest, res) => {
         try {
+            console.log(`Doctor ${req.user!.name} (ID: ${req.user!.userId}) requesting patient list`);
+            
             const doctor = await db.query.doctors.findFirst({
                 where: eq(schema.doctors.userId, req.user!.userId)
             });
 
             if (!doctor) {
+                console.log('Doctor record not found for user:', req.user!.userId);
                 return res.status(404).json({ message: 'Doctor record not found' });
             }
+
+            console.log(`Found doctor record:`, doctor);
 
             const patients = await db.select({
                 id: schema.patients.id,
@@ -416,6 +421,7 @@ export function registerRoutes(app: Express) {
             .leftJoin(schema.users, eq(schema.patients.userId, schema.users.id))
             .where(eq(schema.patients.doctorId, doctor.id));
 
+            console.log(`Found ${patients.length} patients for doctor ${doctor.id}:`, patients);
             res.json(patients);
         } catch (error) {
             console.error('Error fetching doctor patients:', error);
