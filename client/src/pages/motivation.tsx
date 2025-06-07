@@ -13,6 +13,7 @@ import EnhancedImageStore from "@/lib/enhancedImageStore";
 import KeepGoingVideo from "@/components/motivation/KeepGoingVideo";
 import heartImage from "@assets/image_1744127067136.jpeg";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import Layout from "@/components/layout/Layout";
 
 const Motivation: React.FC = () => {
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
@@ -242,7 +243,7 @@ const Motivation: React.FC = () => {
   };
 
   return (
-    <div className="container mx-auto p-4">
+    <Layout>
       {/* Keep Going Video with enhanced image overlay */}
       {showKeepGoingVideo && (
         <KeepGoingVideo 
@@ -252,7 +253,8 @@ const Motivation: React.FC = () => {
         />
       )}
     
-      <h1 className="text-2xl font-bold mb-6">Motivational Image Processor</h1>
+      <div className="container mx-auto p-4">
+        <h1 className="text-2xl font-bold mb-6">Motivational Image Processor</h1>
       
       <div className={`grid ${isMobile ? "grid-cols-1" : "grid-cols-2"} gap-6`}>
         <Card>
@@ -353,7 +355,8 @@ const Motivation: React.FC = () => {
           </CardContent>
         </Card>
       </div>
-    </div>
+      </div>
+    </Layout>
   );
 };
 

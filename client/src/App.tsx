@@ -9,6 +9,17 @@ import DoctorDashboard from './pages/doctor-dashboard';
 import Dashboard from './pages/dashboard'; // Patient dashboard
 import AdminDashboard from './pages/admin-dashboard';
 import ProfilePage from './pages/profile';
+import MotivationPage from './pages/motivation';
+import InspirationDPage from './pages/inspiration-d';
+import DietLogisticsPage from './pages/diet-logistics';
+import InspirationEWPage from './pages/inspiration-ew';
+import EWSupportPage from './pages/ew-support';
+import MBPWizPage from './pages/mbp-wiz';
+import JournalingPage from './pages/journaling';
+import HealthSnapshotsPage from './pages/health-snapshots';
+import ProgressMilestonesPage from './pages/progress-milestones';
+import FoodDatabasePage from './pages/food-database';
+import ChatbotPage from './pages/chatbot';
 
 const ProtectedRoute = ({ component: Component, requiredRole, ...rest }: any) => {
     const { user, loading } = useAuth();
@@ -35,16 +46,35 @@ function AppRoutes() {
             <Route path="/login" component={UnifiedLoginPage} />
             
             <ProtectedRoute path="/doctor-dashboard" component={DoctorDashboard} requiredRole="doctor" />
-            <ProtectedRoute path="/patient-dashboard" component={Dashboard} requiredRole="patient" />
             <ProtectedRoute path="/admin-dashboard" component={AdminDashboard} requiredRole="admin" />
+            
+            {/* Patient feature routes - all use the same Layout template */}
             <ProtectedRoute path="/profile" component={ProfilePage} requiredRole="patient" />
+            <ProtectedRoute path="/motivation" component={MotivationPage} requiredRole="patient" />
+            <ProtectedRoute path="/inspiration-d" component={InspirationDPage} requiredRole="patient" />
+            <ProtectedRoute path="/diet-logistics" component={DietLogisticsPage} requiredRole="patient" />
+            <ProtectedRoute path="/inspiration-ew" component={InspirationEWPage} requiredRole="patient" />
+            <ProtectedRoute path="/ew-support" component={EWSupportPage} requiredRole="patient" />
+            <ProtectedRoute path="/mbp-wiz" component={MBPWizPage} requiredRole="patient" />
+            <ProtectedRoute path="/journaling" component={JournalingPage} requiredRole="patient" />
+            <ProtectedRoute path="/health-snapshots" component={HealthSnapshotsPage} requiredRole="patient" />
+            <ProtectedRoute path="/progress-milestones" component={ProgressMilestonesPage} requiredRole="patient" />
+            <ProtectedRoute path="/food-database" component={FoodDatabasePage} requiredRole="patient" />
+            <ProtectedRoute path="/chatbot" component={ChatbotPage} requiredRole="patient" />
+            <ProtectedRoute path="/" component={Dashboard} requiredRole="patient" />
 
             {/* Default route redirects to login if not authenticated, or to role-specific dashboard if authenticated */}
             <Route>
                 {() => {
                     const { user, loading } = useAuth();
                     if (loading) return null;
-                    return <Redirect to={user ? `/${user.role}-dashboard` : "/login"} />;
+                    if (!user) return <Redirect to="/login" />;
+                    
+                    // Patient role goes to root path (patient dashboard template)
+                    if (user.role === 'patient') return <Redirect to="/" />;
+                    
+                    // Other roles go to their specific dashboards
+                    return <Redirect to={`/${user.role}-dashboard`} />;
                 }}
             </Route>
         </Switch>
