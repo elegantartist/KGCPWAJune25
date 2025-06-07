@@ -365,5 +365,101 @@ export function registerRoutes(app: Express) {
         }
     });
 
+    // --- DOCTOR DASHBOARD ENDPOINTS ---
+    router.get('/doctor/profile', authMiddleware(['doctor']), async (req: AuthenticatedRequest, res) => {
+        try {
+            const doctor = await db.select({
+                id: schema.doctors.id,
+                name: schema.users.name,
+                email: schema.users.email,
+                phoneNumber: schema.users.phoneNumber,
+                userId: schema.doctors.userId
+            })
+            .from(schema.doctors)
+            .leftJoin(schema.users, eq(schema.doctors.userId, schema.users.id))
+            .where(eq(schema.doctors.userId, req.user!.userId))
+            .limit(1);
+
+            if (!doctor.length) {
+                return res.status(404).json({ message: 'Doctor profile not found' });
+            }
+
+            res.json(doctor[0]);
+        } catch (error) {
+            console.error('Error fetching doctor profile:', error);
+            res.status(500).json({ message: 'Internal server error' });
+        }
+    });
+
+    router.get('/doctor/patients', authMiddleware(['doctor']), async (req: AuthenticatedRequest, res) => {
+        try {
+            const doctor = await db.query.doctors.findFirst({
+                where: eq(schema.doctors.userId, req.user!.userId)
+            });
+
+            if (!doctor) {
+                return res.status(404).json({ message: 'Doctor record not found' });
+            }
+
+            const patients = await db.select({
+                id: schema.patients.id,
+                name: schema.users.name,
+                email: schema.users.email,
+                phoneNumber: schema.users.phoneNumber,
+                userId: schema.patients.userId,
+                doctorId: schema.patients.doctorId,
+                isActive: schema.users.isActive,
+                createdAt: schema.users.createdAt,
+                uin: schema.users.uin
+            })
+            .from(schema.patients)
+            .leftJoin(schema.users, eq(schema.patients.userId, schema.users.id))
+            .where(eq(schema.patients.doctorId, doctor.id));
+
+            res.json(patients);
+        } catch (error) {
+            console.error('Error fetching doctor patients:', error);
+            res.status(500).json({ message: 'Internal server error' });
+        }
+    });
+
+    router.get('/doctor/alerts/count', authMiddleware(['doctor']), async (req: AuthenticatedRequest, res) => {
+        try {
+            // For now, return a simple count - can be enhanced later
+            res.json({ count: 0 });
+        } catch (error) {
+            console.error('Error fetching doctor alerts:', error);
+            res.status(500).json({ message: 'Internal server error' });
+        }
+    });
+
+    router.get('/patients/me/health-metrics/history', authMiddleware(['patient']), async (req: AuthenticatedRequest, res) => {
+        try {
+            const patient = await db.query.patients.findFirst({
+                where: eq(schema.patients.userId, req.user!.userId)
+            });
+
+            if (!patient) {
+                return res.status(404).json({ message: 'Patient record not found' });
+            }
+
+            const metrics = await db.select({
+                id: schema.healthMetrics.id,
+                date: schema.healthMetrics.date,
+                medicationScore: schema.healthMetrics.medicationScore,
+                dietScore: schema.healthMetrics.dietScore,
+                exerciseScore: schema.healthMetrics.exerciseScore
+            })
+            .from(schema.healthMetrics)
+            .where(eq(schema.healthMetrics.patientId, patient.id))
+            .orderBy(schema.healthMetrics.date);
+
+            res.json(metrics);
+        } catch (error) {
+            console.error('Error fetching health metrics:', error);
+            res.status(500).json({ message: 'Internal server error' });
+        }
+    });
+
     app.use('/api', router);
 }
