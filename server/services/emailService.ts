@@ -1,86 +1,108 @@
-import { MailService } from '@sendgrid/mail';
+import sgMail from '@sendgrid/mail';
+import { EmailTemplateService } from './emailTemplateService';
 
-const mailService = new MailService();
+sgMail.setApiKey(process.env.SENDGRID_API_KEY || '');
 
-const initializeEmailService = () => {
-  const apiKey = process.env.SENDGRID_API_KEY;
-  if (apiKey) {
-    mailService.setApiKey(apiKey);
-  }
-};
-
-// Initialize on module load
-initializeEmailService();
-
-interface EmailParams {
-  to: string;
-  from: string;
-  subject: string;
-  text?: string;
-  html?: string;
+export interface WelcomeEmailData {
+    email: string;
+    name: string;
+    role: 'doctor' | 'patient';
+    uin: string;
+    dashboardUrl?: string;
 }
 
 export class EmailService {
-  private defaultFromEmail = 'welcome@keepgoingcare.com';
-
-  async sendEmail(params: EmailParams): Promise<{ success: boolean; error?: string }> {
-    try {
-      await mailService.send({
-        to: params.to,
-        from: params.from,
-        subject: params.subject,
-        text: params.text,
-        html: params.html,
-      });
-      
-      console.log(`Email sent successfully to ${params.to}`);
-      return { success: true };
-    } catch (error: any) {
-      console.error('SendGrid email error:', error);
-      return { 
-        success: false, 
-        error: error.response?.body?.errors?.[0]?.message || error.message || 'Unknown email error'
-      };
+    private static instance: EmailService;
+    
+    static getInstance(): EmailService {
+        if (!EmailService.instance) {
+            EmailService.instance = new EmailService();
+        }
+        return EmailService.instance;
     }
-  }
-
-  private convertToHtml(content: string): string {
-    // Convert plain text to HTML with proper formatting and KGC branding
-    const html = content
-      .replace(/\n\n/g, '</p><p>')
-      .replace(/\n/g, '<br>')
-      .replace(/^/, '<p>')
-      .replace(/$/, '</p>')
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*(.*?)\*/g, '<em>$1</em>')
-      .replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" style="color: #2E8BC0; text-decoration: none;">$1</a>');
-
-    return `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Keep Going Care</title>
-        </head>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
-          <div style="background-color: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-            <div style="text-align: center; margin-bottom: 30px;">
-              <img src="https://keepgoingcare.com.au/logo.png" alt="Keep Going Care" style="max-width: 200px; height: auto;">
-            </div>
-            <div style="color: #333; font-size: 16px;">
-              ${html}
-            </div>
-            <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; font-size: 14px; color: #666; text-align: center;">
-              <p>Keep Going Care - Class I Software as Medical Device (SaMD)</p>
-              <p>Anthrocyt AI Pty Ltd | Australia</p>
-              <p style="font-size: 12px;">This email was sent from an automated system. Please do not reply.</p>
-            </div>
-          </div>
-        </body>
-      </html>
-    `;
-  }
+    
+    async sendWelcomeEmail(data: WelcomeEmailData): Promise<boolean> {
+        try {
+            const { email, name, role, uin, dashboardUrl } = data;
+            
+            const template = role === 'doctor' 
+                ? EmailTemplateService.getDoctorWelcomeTemplate(name)
+                : EmailTemplateService.getPatientWelcomeTemplate(name);
+            
+            let content = template.content;
+            content = content.replace('[DOCTOR_DASHBOARD_LINK]', dashboardUrl || 'https://keepgoingcare.com/doctor-dashboard');
+            content = content.replace('[PATIENT_APP_LINK]', dashboardUrl || 'https://keepgoingcare.com/patient-dashboard');
+            
+            const htmlContent = this.convertToHTML(content, uin, template.requiresAgreement, template.videoLinks);
+            
+            const msg = {
+                to: email,
+                from: 'noreply@keepgoingcare.com',
+                subject: template.subject,
+                html: htmlContent
+            };
+            
+            await sgMail.send(msg);
+            console.log(`Welcome email sent to ${email} (${role}) with UIN: ${uin}`);
+            return true;
+        } catch (error) {
+            console.error('Email sending error:', error);
+            return false;
+        }
+    }
+    
+    private convertToHTML(content: string, uin: string, requiresAgreement: boolean, videoLinks?: string[]): string {
+        const videoSection = videoLinks ? 
+            videoLinks.map(link => `<p><a href="${link}" style="color: #2E8BC0;">Watch Video</a></p>`).join('') : '';
+        
+        const agreementSection = requiresAgreement ? `
+            <div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; margin: 20px 0;">
+                <h3>Agreement Required</h3>
+                <p>${EmailTemplateService.getAgreementContent()}</p>
+                <p><strong>I agree to these terms</strong> (confirmed by account activation)</p>
+            </div>` : '';
+        
+        return `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; }
+        .header { background: #2E8BC0; color: white; padding: 20px; text-align: center; }
+        .content { padding: 20px; background: #f9f9f9; }
+        .uin-box { background: #e7f3ff; border: 2px solid #2E8BC0; padding: 15px; margin: 20px 0; text-align: center; }
+        .footer { padding: 20px; text-align: center; font-size: 12px; color: #666; }
+        pre { white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Keep Going Care</h1>
+        <p>Software as a Medical Device (SaMD)</p>
+    </div>
+    
+    <div class="content">
+        <div class="uin-box">
+            <h3>Your Unique Identification Number (UIN)</h3>
+            <h2 style="color: #2E8BC0; margin: 0;">${uin}</h2>
+            <p><em>Keep this UIN secure for all support communications</em></p>
+        </div>
+        
+        <pre>${content}</pre>
+        
+        ${videoSection}
+        ${agreementSection}
+        
+        <p><strong>Security Note:</strong> Your session will automatically logout after 5 minutes of inactivity for enhanced security.</p>
+    </div>
+    
+    <div class="footer">
+        <p>Keep Going Care - Anthrocyt AI Pty Ltd</p>
+        <p>This email contains confidential medical device information.</p>
+    </div>
+</body>
+</html>`;
+    }
 }
 
-export const emailService = new EmailService();
+export const emailService = EmailService.getInstance();
