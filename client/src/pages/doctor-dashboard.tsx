@@ -123,15 +123,19 @@ export default function DoctorDashboard() {
 
   // Doctor information with admin impersonation support
   const { data: doctor, isLoading: isLoadingDoctor } = useQuery({
-    // CRITICAL FIX: Add doctorToDisplayId to queryKey to ensure re-fetch on impersonation switch
-    queryKey: ["/api/doctor/profile", doctorToDisplayId],
+    queryKey: ["/api/doctor/profile"],
     queryFn: async () => {
-      // Ensure the backend receives the correct ID if directly passed, or relies on session
-      const res = await fetch(`/api/doctor/profile?doctorId=${doctorToDisplayId}`);
+      const token = localStorage.getItem('auth_token');
+      const res = await fetch(`/api/doctor/profile`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
       if (!res.ok) throw new Error('Failed to fetch doctor profile');
       return res.json();
     },
-    enabled: !isLoadingContext && !!doctorToDisplayId, // Only enable if we have a doctor ID to display
+    enabled: !isLoadingContext,
     retry: false,
   });
 
@@ -141,14 +145,19 @@ export default function DoctorDashboard() {
     isLoading: isLoadingPatients,
     refetch: refetchPatients
   } = useQuery({
-    // CRITICAL FIX: Add doctorToDisplayId to queryKey to ensure re-fetch on impersonation switch
-    queryKey: ["/api/doctor/patients", doctorToDisplayId],
+    queryKey: ["/api/doctor/patients"],
     queryFn: async () => {
-      const res = await fetch(`/api/doctor/patients?doctorId=${doctorToDisplayId}`);
+      const token = localStorage.getItem('auth_token');
+      const res = await fetch(`/api/doctor/patients`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
       if (!res.ok) throw new Error('Failed to fetch patients');
       return res.json();
     },
-    enabled: !isLoadingContext && !!doctorToDisplayId, // Only enable if we have a doctor ID to display
+    enabled: !isLoadingContext,
     retry: false,
   });
 
