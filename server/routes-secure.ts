@@ -172,9 +172,7 @@ export function registerSecureRoutes(app: Express): Server {
     // Secure endpoint for admin to get all patients
     router.get('/api/admin/patients', authMiddleware(['admin']), async (req: AuthenticatedRequest, res) => {
         try {
-            // Get all patients with their user and doctor information
-            const doctorUsers = alias(schema.users, 'doctor_users');
-            
+            // Get all patients with their user information
             const patients = await db.select({
                 id: schema.patients.id,
                 name: schema.users.name,
@@ -183,13 +181,10 @@ export function registerSecureRoutes(app: Express): Server {
                 email: schema.users.email,
                 phoneNumber: schema.users.phoneNumber,
                 isActive: schema.users.isActive,
-                createdAt: schema.users.createdAt,
-                doctorName: doctorUsers.name
+                createdAt: schema.users.createdAt
             })
             .from(schema.patients)
             .leftJoin(schema.users, eq(schema.patients.userId, schema.users.id))
-            .leftJoin(schema.doctors, eq(schema.patients.doctorId, schema.doctors.id))
-            .leftJoin(doctorUsers, eq(schema.doctors.userId, doctorUsers.id))
             .where(eq(schema.users.role, 'patient'));
 
             res.json(patients);
