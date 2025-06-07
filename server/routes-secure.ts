@@ -28,7 +28,7 @@ export function registerSecureRoutes(app: Express): Server {
                 return res.status(401).json({ message: 'Invalid credentials' });
             }
 
-            const accessToken = createAccessToken({ userId: user.id, role: user.role });
+            const accessToken = createAccessToken({ userId: user.id, role: user.role, name: user.name });
             return res.json({ access_token: accessToken, user: { id: user.id, role: user.role, email: user.email } });
         } catch (error) {
             console.error('Admin login error:', error);
@@ -49,7 +49,7 @@ export function registerSecureRoutes(app: Express): Server {
                 return res.status(404).json({ message: 'User not found' });
             }
             
-            const accessToken = createAccessToken({ userId: user.id, role: user.role });
+            const accessToken = createAccessToken({ userId: user.id, role: user.role, name: user.name });
             return res.json({ access_token: accessToken, user: { id: user.id, role: user.role, email: user.email } });
         } else {
             return res.status(401).json({ message: 'Invalid verification code' });
