@@ -9,11 +9,15 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
+import { ArrowLeft, Home } from "lucide-react";
+import { LogoutButton } from "@/components/ui/LogoutButton";
+import { useLocation } from "wouter";
 
 export default function DailyScoresPage() {
     const { user } = useAuth();
     const queryClient = useQueryClient();
     const { toast } = useToast();
+    const [, setLocation] = useLocation();
     const [scores, setScores] = useState({ medicationScore: 5, dietScore: 5, exerciseScore: 5 });
 
     // This query now fetches all data, including CPDs, from the secure unified endpoint
@@ -41,6 +45,31 @@ export default function DailyScoresPage() {
 
     return (
         <div className="p-6">
+            {/* Navigation Header */}
+            <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-4">
+                    <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => setLocation('/patient-dashboard')}
+                        className="flex items-center gap-2"
+                    >
+                        <ArrowLeft className="h-4 w-4" />
+                        Back to Dashboard
+                    </Button>
+                    <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => setLocation('/patient-dashboard')}
+                        className="flex items-center gap-2"
+                    >
+                        <Home className="h-4 w-4" />
+                        Home
+                    </Button>
+                </div>
+                <LogoutButton userRole="patient" variant="outline" size="sm" />
+            </div>
+            
             <h1 className="text-2xl font-bold mb-4">Daily Self-Scores for {user?.name}</h1>
             <Card>
                 <CardHeader><CardTitle>Log Today's Scores</CardTitle></CardHeader>
