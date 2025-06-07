@@ -1,6 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes.js";
 import { setupVite, serveStatic, log } from "./vite";
+import { sessionTimeoutMiddleware } from "./sessionTimeout";
 
 // Load environment variables
 import { config } from 'dotenv';
@@ -39,6 +40,9 @@ app.use((req, res, next) => {
 
   next();
 });
+
+// Apply session timeout middleware globally
+app.use(sessionTimeoutMiddleware);
 
 (async () => {
   await registerRoutes(app);

@@ -6,6 +6,8 @@ import { db } from './db';
 import * as schema from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import { createAccessToken, authMiddleware, AuthenticatedRequest } from './auth';
+import { userCreationService } from './services/userCreationService';
+import { uinService } from './services/uinService';
 
 export function registerRoutes(app: Express) {
     const router = Router();
@@ -113,6 +115,79 @@ export function registerRoutes(app: Express) {
     });
     
     router.post('/auth/logout', authMiddleware(), (req, res) => res.status(200).json({ message: 'Logout successful' }));
+
+    // --- USER CREATION ENDPOINTS ---
+    router.post('/admin/create-doctor', authMiddleware(['admin']), async (req, res) => {
+        try {
+            const { name, email, phoneNumber } = req.body;
+            
+            if (!name || !email || !phoneNumber) {
+                return res.status(400).json({ message: 'Name, email, and phone number are required.' });
+            }
+            
+            // Check if email already exists
+            if (await userCreationService.emailExists(email)) {
+                return res.status(409).json({ message: 'Email already exists.' });
+            }
+            
+            const result = await userCreationService.createDoctor({
+                name,
+                email,
+                phoneNumber,
+                role: 'doctor'
+            });
+            
+            res.json({ 
+                message: 'Doctor created successfully',
+                doctor: result.doctor,
+                uin: result.uin
+            });
+        } catch (error) {
+            console.error('Doctor creation error:', error);
+            res.status(500).json({ message: 'Failed to create doctor account.' });
+        }
+    });
+    
+    router.post('/doctors/create-patient', authMiddleware(['doctor']), async (req: AuthenticatedRequest, res) => {
+        try {
+            const { name, email, phoneNumber } = req.body;
+            
+            if (!name || !email || !phoneNumber) {
+                return res.status(400).json({ message: 'Name, email, and phone number are required.' });
+            }
+            
+            // Get doctor record
+            const doctor = await db.query.doctors.findFirst({
+                where: eq(schema.doctors.userId, req.user!.userId)
+            });
+            
+            if (!doctor) {
+                return res.status(404).json({ message: 'Doctor record not found.' });
+            }
+            
+            // Check if email already exists
+            if (await userCreationService.emailExists(email)) {
+                return res.status(409).json({ message: 'Email already exists.' });
+            }
+            
+            const result = await userCreationService.createPatient({
+                name,
+                email,
+                phoneNumber,
+                role: 'patient',
+                doctorId: doctor.id
+            });
+            
+            res.json({ 
+                message: 'Patient created successfully',
+                patient: result.patient,
+                uin: result.uin
+            });
+        } catch (error) {
+            console.error('Patient creation error:', error);
+            res.status(500).json({ message: 'Failed to create patient account.' });
+        }
+    });
 
     // --- SECURE DATA ENDPOINTS ---
     router.get('/users/me', authMiddleware(), async (req: AuthenticatedRequest, res) => {

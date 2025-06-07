@@ -1,81 +1,123 @@
+// 5-minute auto-logout middleware for enhanced security
 import { Request, Response, NextFunction } from 'express';
+import { AuthenticatedRequest } from './auth';
 
-// Session timeout durations in milliseconds
-const DOCTOR_TIMEOUT = 5 * 60 * 1000; // 5 minutes
-const PATIENT_TIMEOUT = 30 * 60 * 1000; // 30 minutes
-
-export interface SessionData {
-  userId?: number;
-  doctorId?: number;
-  patientId?: number;
-  userRole?: string;
-  lastActivity?: number;
+interface SessionData {
+    userId: number;
+    lastActivity: number;
+    role: string;
 }
 
-export function sessionTimeoutMiddleware(req: Request, res: Response, next: NextFunction) {
-  const session = req.session as any;
-  
-  // Check if session exists and has any authentication data
-  const hasAuthData = session && (
-    session.doctorId || 
-    session.patientId || 
-    session.userId || 
-    session.userRole ||
-    session.impersonatedDoctorId ||
-    session.impersonatedPatientId
-  );
-  
-  if (!hasAuthData) {
-    // No active session, continue
-    return next();
-  }
+// Store active sessions in memory (use Redis in production)
+const activeSessions = new Map<string, SessionData>();
 
-  const now = Date.now();
-  const lastActivity = session.lastActivity || now;
-  
-  // Determine timeout based on user role - admin gets longer timeout especially during impersonation
-  let timeoutDuration = PATIENT_TIMEOUT; // Default
-  if (session.userRole === 'doctor') {
-    timeoutDuration = DOCTOR_TIMEOUT;
-  } else if (session.userRole === 'admin' || session.adminOriginalUserId) {
-    // Extended timeout for admin, especially during impersonation - much longer to prevent rapid logout
-    timeoutDuration = 4 * 60 * 60 * 1000; // 4 hours for admin or during admin impersonation
-  }
-  
-  // Check if this is an API route - be more lenient with session timeouts for rapid API calls
-  const isApiRoute = req.path.startsWith('/api/');
-  if (isApiRoute && session.adminOriginalUserId) {
-    // During admin impersonation, be very lenient with API routes to prevent rapid logout
-    timeoutDuration = 8 * 60 * 60 * 1000; // 8 hours for API routes during admin impersonation
-  }
-  
-  if (now - lastActivity > timeoutDuration) {
-    // Session expired
-    console.log(`[SESSION TIMEOUT] Session expired for ${session.userRole} ID: ${session.doctorId || session.patientId || session.userId}, impersonating: ${session.impersonatedDoctorId || session.impersonatedPatientId || 'none'}`);
+export class SessionTimeoutMiddleware {
+    private static readonly TIMEOUT_DURATION = 5 * 60 * 1000; // 5 minutes in milliseconds
+    private static readonly CLEANUP_INTERVAL = 60 * 1000; // Clean up expired sessions every minute
     
-    // Clear session
-    req.session.destroy((err: any) => {
-      if (err) {
-        console.error('Error destroying expired session:', err);
-      }
-    });
+    static {
+        // Start cleanup interval
+        setInterval(() => {
+            this.cleanupExpiredSessions();
+        }, this.CLEANUP_INTERVAL);
+    }
     
-    return res.status(401).json({ 
-      message: 'Session expired. Please log in again.',
-      expired: true,
-      userRole: session.userRole
-    });
-  }
-  
-  // Update last activity timestamp
-  session.lastActivity = now;
-  
-  next();
+    /**
+     * Create session timeout middleware
+     */
+    static create() {
+        return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+            // Skip timeout check for login and public routes
+            if (req.path.includes('/auth/') || req.path.includes('/login')) {
+                return next();
+            }
+            
+            // Check if user is authenticated
+            if (!req.user) {
+                return next();
+            }
+            
+            const sessionId = this.getSessionId(req);
+            const session = activeSessions.get(sessionId);
+            const now = Date.now();
+            
+            if (session) {
+                // Check if session has expired
+                if (now - session.lastActivity > this.TIMEOUT_DURATION) {
+                    activeSessions.delete(sessionId);
+                    console.log(`Session expired for user ${req.user.userId} (${req.user.role})`);
+                    return res.status(401).json({ 
+                        message: 'Session expired due to inactivity. Please login again.',
+                        code: 'SESSION_EXPIRED'
+                    });
+                }
+                
+                // Update last activity time
+                session.lastActivity = now;
+            } else {
+                // Create new session
+                activeSessions.set(sessionId, {
+                    userId: req.user.userId,
+                    lastActivity: now,
+                    role: req.user.role
+                });
+            }
+            
+            next();
+        };
+    }
+    
+    /**
+     * Get session ID from request
+     */
+    private static getSessionId(req: AuthenticatedRequest): string {
+        return `${req.user!.userId}-${req.user!.role}`;
+    }
+    
+    /**
+     * Clean up expired sessions
+     */
+    private static cleanupExpiredSessions(): void {
+        const now = Date.now();
+        const expiredSessions: string[] = [];
+        
+        activeSessions.forEach((session, sessionId) => {
+            if (now - session.lastActivity > this.TIMEOUT_DURATION) {
+                expiredSessions.push(sessionId);
+            }
+        });
+        
+        expiredSessions.forEach(sessionId => {
+            activeSessions.delete(sessionId);
+        });
+        
+        if (expiredSessions.length > 0) {
+            console.log(`Cleaned up ${expiredSessions.length} expired sessions`);
+        }
+    }
+    
+    /**
+     * Force logout user
+     */
+    static forceLogout(userId: number, role: string): void {
+        const sessionId = `${userId}-${role}`;
+        activeSessions.delete(sessionId);
+    }
+    
+    /**
+     * Get active sessions count
+     */
+    static getActiveSessionsCount(): number {
+        return activeSessions.size;
+    }
+    
+    /**
+     * Get session info for user
+     */
+    static getSessionInfo(userId: number, role: string): SessionData | null {
+        const sessionId = `${userId}-${role}`;
+        return activeSessions.get(sessionId) || null;
+    }
 }
 
-export function updateSessionActivity(req: Request) {
-  const session = req.session as any;
-  if (session && (session.doctorId || session.patientId)) {
-    session.lastActivity = Date.now();
-  }
-}
+export const sessionTimeoutMiddleware = SessionTimeoutMiddleware.create();
