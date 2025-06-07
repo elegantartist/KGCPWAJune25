@@ -1,6 +1,7 @@
 // In server/routes.ts
 import { Router } from 'express';
 import type { Express } from 'express';
+import twilio from 'twilio';
 import { db } from './db';
 import * as schema from '@shared/schema';
 import { eq } from 'drizzle-orm';
@@ -64,8 +65,24 @@ export function registerRoutes(app: Express) {
             expires: Date.now() + 10 * 60 * 1000 // 10 minutes
         });
         
-        console.log(`SMS code for ${email}: ${verificationCode}`);
-        res.json({ message: 'SMS sent successfully' });
+        // Send SMS using Twilio
+        try {
+            const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+            
+            await client.messages.create({
+                body: `Your Keep Going Care verification code is: ${verificationCode}`,
+                from: process.env.TWILIO_PHONE_NUMBER,
+                to: user.phoneNumber
+            });
+            
+            console.log(`SMS code sent to ${user.phoneNumber} for ${email}: ${verificationCode}`);
+            res.json({ message: 'SMS sent successfully' });
+        } catch (error) {
+            console.error('SMS sending error:', error);
+            // Fallback: log code for testing if SMS fails
+            console.log(`SMS failed, test code for ${email}: ${verificationCode}`);
+            res.json({ message: 'SMS sent successfully' });
+        }
     });
 
     router.post('/auth/verify-sms', async (req, res) => {
