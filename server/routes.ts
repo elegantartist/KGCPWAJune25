@@ -40,6 +40,8 @@ export function registerRoutes(app: Express) {
 
     router.post('/auth/send-sms', async (req, res) => {
         const { email, role } = req.body;
+        console.log(`SMS request for email: ${email}, role: ${role}`);
+        
         if (!email || !role) return res.status(400).json({ message: "Email and role are required." });
         
         const user = await db.query.users.findFirst({ 
@@ -47,7 +49,10 @@ export function registerRoutes(app: Express) {
             columns: { id: true, role: true, phoneNumber: true, name: true }
         });
         
+        console.log(`User found:`, user);
+        
         if (!user || user.role !== role) {
+            console.log(`Auth failed - user exists: ${!!user}, role match: ${user?.role === role}`);
             return res.status(404).json({ message: 'User not found or role mismatch.' });
         }
         
