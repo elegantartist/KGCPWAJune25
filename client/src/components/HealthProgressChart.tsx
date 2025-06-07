@@ -39,9 +39,9 @@ export const HealthProgressChart: React.FC<HealthProgressChartProps> = ({ metric
             <XAxis dataKey="date" />
             <YAxis domain={[1, 10]} />
             <Tooltip />
-            <Line type="monotone" dataKey="Diet" stroke="#4CAF50" />
+            <Line type="monotone" dataKey="Diet" stroke="#E53935" />
             <Line type="monotone" dataKey="Exercise" stroke="#2E8BC0" />
-            <Line type="monotone" dataKey="Medication" stroke="#E53935" />
+            <Line type="monotone" dataKey="Medication" stroke="#4CAF50" />
           </LineChart>
         </ResponsiveContainer>
       </div>
