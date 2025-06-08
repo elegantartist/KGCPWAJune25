@@ -93,30 +93,46 @@ export function registerRoutes(app: Express) {
     });
 
     router.post('/auth/verify-sms', async (req, res) => {
-        const { email, code } = req.body;
-        if (!email || !code) return res.status(400).json({ message: "Email and code are required." });
-        
-        // Check stored verification code
-        const storedCode = (global as any).verificationCodes?.get(email);
-        if (!storedCode || storedCode.expires < Date.now()) {
-            return res.status(401).json({ message: 'Verification code expired or not found.' });
+        try {
+            const { email, code } = req.body;
+            console.log(`SMS verification attempt for ${email} with code: ${code}`);
+            
+            if (!email || !code) {
+                console.log('Missing email or code in verification request');
+                return res.status(400).json({ message: "Email and code are required." });
+            }
+            
+            // Check stored verification code
+            const storedCode = (global as any).verificationCodes?.get(email);
+            console.log(`Stored code for ${email}:`, storedCode);
+            
+            if (!storedCode || storedCode.expires < Date.now()) {
+                console.log('Verification code expired or not found');
+                return res.status(401).json({ message: 'Verification code expired or not found.' });
+            }
+            
+            if (storedCode.code !== code && code !== "123456") { // Allow static code for testing
+                console.log(`Code mismatch: expected ${storedCode.code}, got ${code}`);
+                return res.status(401).json({ message: 'Invalid verification code.' });
+            }
+            
+            const user = await db.query.users.findFirst({ where: eq(schema.users.email, email) });
+            
+            if (!user) {
+                console.log(`User not found for email: ${email}`);
+                return res.status(401).json({ message: 'User not found.' });
+            }
+            
+            // Clear the used code
+            (global as any).verificationCodes?.delete(email);
+            
+            const accessToken = createAccessToken({ userId: user.id, role: user.role, name: user.name });
+            console.log(`SMS verification successful for ${email}, redirecting to ${user.role} dashboard`);
+            res.json({ access_token: accessToken, user: { id: user.id, name: user.name, role: user.role } });
+        } catch (error) {
+            console.error('SMS verification error:', error);
+            res.status(500).json({ message: 'Internal server error during verification' });
         }
-        
-        if (storedCode.code !== code && code !== "123456") { // Allow static code for testing
-            return res.status(401).json({ message: 'Invalid verification code.' });
-        }
-        
-        const user = await db.query.users.findFirst({ where: eq(schema.users.email, email) });
-        
-        if (!user) {
-            return res.status(401).json({ message: 'User not found.' });
-        }
-        
-        // Clear the used code
-        (global as any).verificationCodes?.delete(email);
-        
-        const accessToken = createAccessToken({ userId: user.id, role: user.role, name: user.name });
-        res.json({ access_token: accessToken, user: { id: user.id, name: user.name, role: user.role } });
     });
     
     router.post('/auth/logout', authMiddleware(), (req: AuthenticatedRequest, res) => {
