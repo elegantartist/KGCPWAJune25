@@ -246,7 +246,23 @@ export function registerRoutes(app: Express) {
         try {
             const { medicationScore, dietScore, exerciseScore } = req.body;
             
-            // Get patient record
+            // Input validation and sanitization
+            if (typeof medicationScore !== 'number' || typeof dietScore !== 'number' || typeof exerciseScore !== 'number') {
+                return res.status(400).json({ message: "All scores must be numeric values" });
+            }
+            
+            if (medicationScore < 1 || medicationScore > 10 || 
+                dietScore < 1 || dietScore > 10 || 
+                exerciseScore < 1 || exerciseScore > 10) {
+                return res.status(400).json({ message: "All scores must be between 1 and 10" });
+            }
+            
+            // Ensure integers
+            const validatedMedicationScore = Math.round(medicationScore);
+            const validatedDietScore = Math.round(dietScore);
+            const validatedExerciseScore = Math.round(exerciseScore);
+            
+            // Get patient record with UIN-based data segregation
             const patient = await db.select().from(schema.patients)
                 .where(eq(schema.patients.userId, req.user!.userId))
                 .limit(1);
@@ -255,19 +271,21 @@ export function registerRoutes(app: Express) {
                 return res.status(404).json({ message: "Patient record not found." });
             }
             
-            // Insert health metrics
+            // Insert health metrics with proper data segregation
             const newMetric = await db.insert(schema.healthMetrics).values({
                 patientId: patient[0].id,
-                medicationScore,
-                dietScore,
-                exerciseScore,
+                medicationScore: validatedMedicationScore,
+                dietScore: validatedDietScore,
+                exerciseScore: validatedExerciseScore,
                 date: new Date()
             }).returning();
+            
+            console.log(`Health metrics submitted for patient ${patient[0].id}: Diet=${validatedDietScore}, Exercise=${validatedExerciseScore}, Medication=${validatedMedicationScore}`);
             
             res.json({ message: "Scores submitted successfully", metric: newMetric[0] });
         } catch (error) {
             console.error('Scores submission error:', error);
-            res.status(500).json({ message: "Failed to submit scores." });
+            res.status(500).json({ message: "Failed to submit scores. Please try again." });
         }
     });
 

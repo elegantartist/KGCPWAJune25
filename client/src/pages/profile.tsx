@@ -110,11 +110,28 @@ export default function DailySelfScores() {
   // Load historical health metrics
   useEffect(() => {
     console.log('Loading health metrics...');
-    fetch('/api/patients/me/health-metrics/history')
-      .then(res => res.json())
+    const token = localStorage.getItem('auth_token');
+    
+    if (!token) {
+      console.error('No authentication token found');
+      return;
+    }
+
+    fetch('/api/patients/me/health-metrics/history', {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    })
+      .then(res => {
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+        }
+        return res.json();
+      })
       .then(data => {
         console.log('Raw health metrics data:', data);
-        // Convert database format to chart format
+        // Backend returns camelCase: dietScore, exerciseScore, medicationScore
         const formattedMetrics = data.map((metric: any) => ({
           createdAt: metric.date,
           diet: metric.dietScore,
@@ -125,7 +142,9 @@ export default function DailySelfScores() {
         setMetrics(formattedMetrics);
       })
       .catch(err => {
-        console.error('Error loading metrics:', err);
+        console.error('Error loading health metrics:', err);
+        // Show user-friendly error message
+        console.error('Failed to load historical data. Please check your connection and try again.');
       });
   }, []);
 
@@ -136,33 +155,57 @@ export default function DailySelfScores() {
   const canSubmit = Object.values(scores).every(score => score >= 1 && score <= 10);
 
   const handleSubmit = async () => {
+    const token = localStorage.getItem('auth_token');
+    
+    if (!token) {
+      console.error('No authentication token found for submission');
+      alert('Please log in again to submit your scores.');
+      return;
+    }
+
     try {
-      await fetch('/api/patients/me/scores', {
+      const response = await fetch('/api/patients/me/scores', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({
           medicationScore: scores.medication,
           dietScore: scores.diet,
           exerciseScore: scores.exercise
         }),
       });
+
+      if (!response.ok) {
+        throw new Error(`Failed to submit scores: ${response.status} ${response.statusText}`);
+      }
+
       setSubmitted(true);
       setTimeout(() => setShowDiscuss(true), 800);
       
-      // Refresh metrics after submission
-      fetch('/api/patients/me/health-metrics/history')
-        .then(res => res.json())
-        .then(data => {
-          const formattedMetrics = data.map((metric: any) => ({
-            createdAt: metric.date,
-            diet: metric.dietScore,
-            exercise: metric.exerciseScore,
-            medication: metric.medicationScore
-          }));
-          setMetrics(formattedMetrics);
-        });
+      // Refresh metrics after successful submission
+      const refreshResponse = await fetch('/api/patients/me/health-metrics/history', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (refreshResponse.ok) {
+        const data = await refreshResponse.json();
+        const formattedMetrics = data.map((metric: any) => ({
+          createdAt: metric.date,
+          diet: metric.dietScore,
+          exercise: metric.exerciseScore,
+          medication: metric.medicationScore
+        }));
+        setMetrics(formattedMetrics);
+        console.log('Metrics refreshed after submission:', formattedMetrics);
+      }
     } catch (error) {
       console.error('Failed to submit scores:', error);
+      alert('Failed to submit your scores. Please try again.');
     }
   };
 
