@@ -51,7 +51,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const login = (data: { access_token: string; user: User }) => {
     localStorage.setItem('auth_token', data.access_token);
     setUser(data.user);
-    setLocation(data.user ? `/${data.user.role}-dashboard` : '/login');
+    
+    // Route patients to root dashboard, others to role-specific dashboards
+    if (data.user?.role === 'patient') {
+      setLocation('/');
+    } else if (data.user?.role === 'doctor') {
+      setLocation('/doctor-dashboard');
+    } else if (data.user?.role === 'admin') {
+      setLocation('/admin-dashboard');
+    } else {
+      setLocation('/login');
+    }
   };
 
   const value = { user, login, logout, loading };
