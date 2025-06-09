@@ -112,10 +112,10 @@ export default function DoctorDashboard() {
     }
   };
 
-  // Fetch patient health data (adapted from legacy)
+  // Fetch patient health data (fixed to use doctor-specific endpoint)
   const fetchPatientHealthData = async (patientId: number) => {
     try {
-      const response = await fetch(`/api/patients/me/health-metrics/history`, {
+      const response = await fetch(`/api/doctor/patients/${patientId}/health-metrics`, {
         method: 'GET',
         headers: createAuthHeaders()
       });
@@ -197,6 +197,18 @@ export default function DoctorDashboard() {
     setSelectedPatient(patient);
     fetchPatientHealthData(patient.id);
     fetchDoctorRemarks(patient.id);
+  };
+
+  // New handler function for cleaning up state before going back to the list
+  const handleReturnToList = () => {
+    setHealthData([]); // Clear the previous patient's health data
+    setDoctorRemarks({ // Reset the remarks to their initial state
+      healthy_eating_plan: "",
+      exercise_wellness_routine: "",
+      prescribed_medication: "",
+    });
+    setError(null); // Clear any previous errors
+    setSelectedPatient(null); // Go back to the list view
   };
 
   // Save care plan directives (adapted from legacy)
@@ -336,7 +348,7 @@ export default function DoctorDashboard() {
       <div className="flex justify-between items-center">
         <Button
           variant="ghost"
-          onClick={() => setSelectedPatient(null)}
+          onClick={handleReturnToList}
           className="text-emerald-600 hover:text-emerald-800"
         >
           <ArrowLeft size={20} className="mr-2" />
