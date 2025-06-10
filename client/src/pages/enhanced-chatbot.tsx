@@ -4,6 +4,7 @@ import { useSimpleToast } from "@/hooks/simple-toast";
 import { Brain, Wifi } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import EnhancedSupervisorAgent from "@/components/chatbot/EnhancedSupervisorAgent";
+import Layout from "@/components/layout/Layout";
 // ConnectivityLevel is still needed for the SupervisorAgent interface
 import { ConnectivityLevel } from "@shared/types";
 import { ConnectivityBanner } from "@/components/ui/connectivity-banner";
@@ -137,46 +138,47 @@ const EnhancedChatbot: React.FC = () => {
     return responses[Math.floor(Math.random() * responses.length)];
   };
   
-  // Import our new ConnectivityBanner component at the top of the file
   return (
-    <div className="flex flex-col h-full max-h-[calc(100vh-6rem)]">
-      <div className="flex items-center justify-between p-4 border-b">
-        <div className="flex items-center gap-2">
-          <h2 className="text-xl font-semibold">KGC Health Assistant</h2>
+    <Layout>
+      <div className="flex flex-col h-full max-h-[calc(100vh-6rem)]">
+        <div className="flex items-center justify-between p-4 border-b">
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-semibold">KGC Health Assistant</h2>
+          </div>
+          
+          {recommendedFeature && (
+            <div className="flex items-center">
+              <Button variant="outline" size="sm" className="flex items-center gap-1">
+                <Brain className="h-4 w-4 text-primary" />
+                <span className="text-xs">
+                  {recommendedFeature.split('-')
+                    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                    .join(' ')}
+                </span>
+              </Button>
+            </div>
+          )}
         </div>
         
-        {recommendedFeature && (
-          <div className="flex items-center">
-            <Button variant="outline" size="sm" className="flex items-center gap-1">
-              <Brain className="h-4 w-4 text-primary" />
-              <span className="text-xs">
-                {recommendedFeature.split('-')
-                  .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-                  .join(' ')}
-              </span>
-            </Button>
+        {/* Add connectivity banner at the top of the chat area */}
+        <ConnectivityBanner level={connectivityLevel} />
+        
+        <div className="grid grid-cols-1 gap-4 flex-1">
+          <div className="relative h-full">
+            <EnhancedSupervisorAgent
+              key={chatKey}
+              userId={userId}
+              healthMetrics={healthMetrics}
+              onRecommendationAccepted={handleRecommendationAccepted}
+              onFeedbackSubmitted={handleFeedbackSubmitted}
+              hideHeader={true} // Hide the component's header since we already have one in this page
+              initialMessage={initialMessage} // Use the state variable that has the timeout logic
+              connectivityLevel={connectivityLevel}
+            />
           </div>
-        )}
-      </div>
-      
-      {/* Add connectivity banner at the top of the chat area */}
-      <ConnectivityBanner level={connectivityLevel} />
-      
-      <div className="grid grid-cols-1 gap-4 flex-1">
-        <div className="relative h-full">
-          <EnhancedSupervisorAgent
-            key={chatKey}
-            userId={userId}
-            healthMetrics={healthMetrics}
-            onRecommendationAccepted={handleRecommendationAccepted}
-            onFeedbackSubmitted={handleFeedbackSubmitted}
-            hideHeader={true} // Hide the component's header since we already have one in this page
-            initialMessage={initialMessage} // Use the state variable that has the timeout logic
-            connectivityLevel={connectivityLevel}
-          />
         </div>
       </div>
-    </div>
+    </Layout>
   );
 };
 

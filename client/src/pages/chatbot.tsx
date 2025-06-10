@@ -113,28 +113,7 @@ const Chatbot: React.FC = () => {
             }
           }
           
-          // If we weren't redirected from health metrics page or metrics are invalid,
-          // fetch the latest metrics from the server
-          if (!redirectedFromHealthMetrics) {
-            try {
-              const healthMetrics = await apiRequest('GET', `/api/users/${user.id}/health-metrics/latest`);
-              if (!isMounted) return;
-              
-              console.log('Chatbot: Fetched latest health metrics:', healthMetrics);
-              
-              if (healthMetrics && typeof healthMetrics.dietScore === 'number') {
-                metrics = {
-                  dietScore: healthMetrics.dietScore,
-                  exerciseScore: healthMetrics.exerciseScore,
-                  medicationScore: healthMetrics.medicationScore
-                };
-                
-                setUserHealthData(metrics);
-              }
-            } catch (healthError) {
-              console.error("Error fetching health metrics:", healthError);
-            }
-          }
+          // Removed automatic health metrics fetching - chatbot now waits for user interaction
           
           // If we have valid metrics, generate a personalised message
           if (metrics) {
