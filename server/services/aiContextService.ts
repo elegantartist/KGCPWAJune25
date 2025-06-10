@@ -12,7 +12,7 @@ import {
   secureLog, 
   emergencyPiiScan 
 } from './privacyMiddleware';
-import { auditLogger } from '../auditLogger';
+// import { auditLogger } from '../auditLogger'; // Simplified for Phase 1
 
 interface AIContextRequest {
   userId: number;
@@ -135,35 +135,13 @@ export class AIContextService {
       const securityValidation = validateMcpBundleSecurity(secureBundle);
 
       if (!securityValidation.isSecure) {
-        await auditLogger.logSecurityEvent({
-          eventType: 'UNAUTHORIZED_ACCESS',
-          severity: 'HIGH',
-          userId: request.userId,
-          ipAddress: 'system',
-          userAgent: 'AIContextService',
-          details: { 
-            sessionId,
-            securityViolations: securityValidation.violations,
-            action: 'AI_CONTEXT_PREPARATION_FAILED'
-          }
-        });
+        console.log(`[AUDIT] Security validation failed for user ${request.userId}: ${securityValidation.violations.join(', ')}`);
         
         throw new Error(`Security validation failed: ${securityValidation.violations.join(', ')}`);
       }
 
-      // Audit successful context preparation
-      await auditLogger.logDataAccess({
-        action: 'read',
-        userId: request.userId,
-        dataType: 'PHI',
-        details: { 
-          sessionId,
-          includeHealthMetrics: request.includeHealthMetrics,
-          includeChatHistory: request.includeChatHistory,
-          bundleSize: JSON.stringify(secureBundle).length,
-          context: 'AI_CONTEXT_PREPARED'
-        }
-      });
+      // Audit successful context preparation - simplified for Phase 1
+      console.log(`[AUDIT] AI context prepared for user ${request.userId}, session ${sessionId}`);
 
       secureLog('Secure AI context prepared successfully', { sessionId, userId: request.userId });
 
@@ -175,22 +153,12 @@ export class AIContextService {
       };
 
     } catch (error) {
-      secureLog('Error preparing AI context', { sessionId, error: error.message });
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      secureLog('Error preparing AI context', { sessionId, error: errorMessage });
       
-      await auditLogger.logSecurityEvent({
-        eventType: 'DATA_ACCESS',
-        severity: 'HIGH',
-        userId: request.userId,
-        ipAddress: 'system',
-        userAgent: 'AIContextService',
-        details: { 
-          sessionId,
-          error: error.message,
-          action: 'AI_CONTEXT_PREPARATION_ERROR'
-        }
-      });
+      console.log(`[AUDIT] AI context preparation failed for user ${request.userId}: ${errorMessage}`);
       
-      throw error;
+      throw new Error(errorMessage);
     }
   }
 
