@@ -261,7 +261,7 @@ const Dashboard: React.FC = () => {
                     } catch (error) {
                       console.error('Error navigating to chat:', error);
                       // Fallback navigation without delay
-                      window.location.href = '/chatbot';
+                      window.location.href = '/enhanced-chatbot';
                     }
                   }}
                 >
