@@ -11,6 +11,7 @@ import { uinService } from './services/uinService';
 import { AIContextService } from './services/aiContextService';
 import { secureLog, emergencyPiiScan } from './services/privacyMiddleware';
 import { supervisorAgent } from './services/supervisorAgent';
+import { getMealInspiration, getWellnessInspiration, getWeeklyMealPlan, getWellnessProgram } from './services/inspirationMachines';
 
 export function registerRoutes(app: Express) {
     const router = Router();
@@ -704,31 +705,171 @@ export function registerRoutes(app: Express) {
     router.get('/v2/supervisor/capabilities', authMiddleware(['patient', 'doctor']), async (req: AuthenticatedRequest, res) => {
         try {
             res.json({
-                version: '2.0',
+                version: '3.0',
                 capabilities: [
                     'health-guidance',
                     'meal-inspiration',
                     'wellness-inspiration',
+                    'weekly-meal-planning',
+                    'wellness-program-design',
                     'care-plan-adherence',
                     'motivational-support'
                 ],
+                inspirationMachines: {
+                    mealInspiration: {
+                        description: 'AI-powered meal suggestions aligned with care plans',
+                        triggers: ['meal', 'food', 'eat', 'recipe', 'cook']
+                    },
+                    wellnessInspiration: {
+                        description: 'Personalized wellness activities and stress management',
+                        triggers: ['wellness', 'exercise', 'activity', 'stress', 'feel', 'movement']
+                    },
+                    weeklyMealPlan: {
+                        description: 'Structured weekly meal planning with prep guidance',
+                        triggers: ['week + meal', 'week + plan', 'week + food']
+                    },
+                    wellnessProgram: {
+                        description: 'Comprehensive wellness programs with progressive structure',
+                        triggers: ['program', 'routine', 'week + wellness']
+                    }
+                },
                 supportedModels: ['gpt-4', 'claude-3-sonnet'],
                 features: {
                     multiModelValidation: true,
                     piiProtection: true,
                     carePlanIntegration: true,
                     conversationHistory: true,
-                    toolCalling: true
+                    toolCalling: true,
+                    inspirationMachines: true
                 },
                 safetyFeatures: [
                     'pii-redaction',
                     'multi-model-validation',
                     'medical-boundary-enforcement',
-                    'care-plan-adherence-checking'
+                    'care-plan-adherence-checking',
+                    'inspiration-machine-fallbacks'
                 ]
             });
         } catch (error: any) {
             res.status(500).json({ message: 'Failed to get capabilities' });
+        }
+    });
+
+    // --- INSPIRATION MACHINE ENDPOINTS (Phase 3) ---
+    
+    // Direct meal inspiration endpoint
+    router.post('/v2/inspiration/meal', authMiddleware(['patient', 'doctor']), async (req: AuthenticatedRequest, res) => {
+        try {
+            const targetUserId = req.user!.role === 'patient' ? req.user!.userId : req.user!.userId;
+            
+            const contextData = await AIContextService.prepareSecureContext({
+                userId: targetUserId,
+                includeHealthMetrics: true,
+                includeChatHistory: false
+            });
+
+            const response = await getMealInspiration(contextData.secureBundle);
+            
+            res.json({
+                success: true,
+                inspiration: response,
+                type: 'meal',
+                sessionId: contextData.sessionId,
+                timestamp: new Date().toISOString()
+            });
+        } catch (error: any) {
+            res.status(500).json({ 
+                success: false, 
+                message: 'Meal inspiration unavailable',
+                fallback: 'Focus on balanced meals with lean protein, vegetables, and complex carbohydrates as outlined in your care plan.'
+            });
+        }
+    });
+
+    // Direct wellness inspiration endpoint
+    router.post('/v2/inspiration/wellness', authMiddleware(['patient', 'doctor']), async (req: AuthenticatedRequest, res) => {
+        try {
+            const targetUserId = req.user!.role === 'patient' ? req.user!.userId : req.user!.userId;
+            
+            const contextData = await AIContextService.prepareSecureContext({
+                userId: targetUserId,
+                includeHealthMetrics: true,
+                includeChatHistory: false
+            });
+
+            const response = await getWellnessInspiration(contextData.secureBundle);
+            
+            res.json({
+                success: true,
+                inspiration: response,
+                type: 'wellness',
+                sessionId: contextData.sessionId,
+                timestamp: new Date().toISOString()
+            });
+        } catch (error: any) {
+            res.status(500).json({ 
+                success: false, 
+                message: 'Wellness inspiration unavailable',
+                fallback: 'Try 10-15 minutes of gentle movement or mindfulness as outlined in your wellness plan.'
+            });
+        }
+    });
+
+    // Weekly meal planning endpoint
+    router.post('/v2/inspiration/meal-plan', authMiddleware(['patient', 'doctor']), async (req: AuthenticatedRequest, res) => {
+        try {
+            const targetUserId = req.user!.role === 'patient' ? req.user!.userId : req.user!.userId;
+            
+            const contextData = await AIContextService.prepareSecureContext({
+                userId: targetUserId,
+                includeHealthMetrics: true,
+                includeChatHistory: false
+            });
+
+            const response = await getWeeklyMealPlan(contextData.secureBundle);
+            
+            res.json({
+                success: true,
+                plan: response,
+                type: 'weekly-meal-plan',
+                sessionId: contextData.sessionId,
+                timestamp: new Date().toISOString()
+            });
+        } catch (error: any) {
+            res.status(500).json({ 
+                success: false, 
+                message: 'Weekly meal planning unavailable',
+                fallback: 'Plan 2-3 simple, repeatable meals for the week that align with your care plan directives.'
+            });
+        }
+    });
+
+    // Wellness program endpoint
+    router.post('/v2/inspiration/wellness-program', authMiddleware(['patient', 'doctor']), async (req: AuthenticatedRequest, res) => {
+        try {
+            const targetUserId = req.user!.role === 'patient' ? req.user!.userId : req.user!.userId;
+            
+            const contextData = await AIContextService.prepareSecureContext({
+                userId: targetUserId,
+                includeHealthMetrics: true,
+                includeChatHistory: false
+            });
+
+            const response = await getWellnessProgram(contextData.secureBundle);
+            
+            res.json({
+                success: true,
+                program: response,
+                type: 'wellness-program',
+                sessionId: contextData.sessionId,
+                timestamp: new Date().toISOString()
+            });
+        } catch (error: any) {
+            res.status(500).json({ 
+                success: false, 
+                message: 'Wellness program unavailable',
+                fallback: 'Start with 15 minutes daily movement, 5 minutes mindfulness, and weekly social connection.'
+            });
         }
     });
 

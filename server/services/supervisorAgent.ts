@@ -7,6 +7,7 @@ import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
 import { AIContextService } from './aiContextService';
 import { secureLog, validateMcpBundleSecurity } from './privacyMiddleware';
+import { getMealInspiration, getWellnessInspiration, getWeeklyMealPlan, getWellnessProgram } from './inspirationMachines';
 import { db } from '../db';
 import * as schema from '@shared/schema';
 import { eq } from 'drizzle-orm';
@@ -36,25 +37,74 @@ interface SupervisorResponse {
   processingTime: number;
 }
 
-// Placeholder sub-agent tools (Phase 3 implementation)
-function getMealInspirationTool(mcpBundle: any): string {
-  secureLog('Meal inspiration tool triggered', { bundleId: mcpBundle.user_id_pseudonym });
+// Phase 3: Real Inspiration Machine Tools - Now using specialized sub-agents
+async function getMealInspirationTool(mcpBundle: any): Promise<string> {
+  secureLog('Meal inspiration machine activated', { bundleId: mcpBundle.user_id_pseudonym });
   
-  const dietGuidance = mcpBundle.care_plan_directives.includes('Diet Guidance:') 
-    ? mcpBundle.care_plan_directives.split('Diet Guidance:')[1].split('\n')[0].trim()
-    : 'balanced nutrition';
+  try {
+    return await getMealInspiration(mcpBundle);
+  } catch (error) {
+    secureLog('Meal inspiration fallback activated', { 
+      bundleId: mcpBundle.user_id_pseudonym,
+      error: error instanceof Error ? error.message : 'Unknown error' 
+    });
+    
+    const dietGuidance = mcpBundle.care_plan_directives.includes('Diet Guidance:') 
+      ? mcpBundle.care_plan_directives.split('Diet Guidance:')[1].split('\n')[0].trim()
+      : 'balanced nutrition';
 
-  return `Based on your personalized care plan focusing on ${dietGuidance}, here's a healthy meal suggestion that aligns with your dietary goals. This is educational guidance to support your health journey.`;
+    return `Based on your personalized care plan focusing on ${dietGuidance}, I recommend a balanced meal with lean protein, vegetables, and complex carbohydrates. This supports stable energy and aligns with your dietary goals.`;
+  }
 }
 
-function getWellnessInspirationTool(mcpBundle: any): string {
-  secureLog('Wellness inspiration tool triggered', { bundleId: mcpBundle.user_id_pseudonym });
+async function getWellnessInspirationTool(mcpBundle: any): Promise<string> {
+  secureLog('Wellness inspiration machine activated', { bundleId: mcpBundle.user_id_pseudonym });
   
-  const exerciseRoutine = mcpBundle.care_plan_directives.includes('Exercise & Wellness Routine:')
-    ? mcpBundle.care_plan_directives.split('Exercise & Wellness Routine:')[1].split('\n')[0].trim()
-    : 'gentle movement';
+  try {
+    return await getWellnessInspiration(mcpBundle);
+  } catch (error) {
+    secureLog('Wellness inspiration fallback activated', { 
+      bundleId: mcpBundle.user_id_pseudonym,
+      error: error instanceof Error ? error.message : 'Unknown error' 
+    });
+    
+    const exerciseRoutine = mcpBundle.care_plan_directives.includes('Exercise & Wellness Routine:')
+      ? mcpBundle.care_plan_directives.split('Exercise & Wellness Routine:')[1].split('\n')[0].trim()
+      : 'gentle movement';
 
-  return `Here's a wellness activity suggestion based on your care plan emphasizing ${exerciseRoutine}. Remember, this is educational support to help you stay motivated on your health journey.`;
+    return `Here's a wellness activity suggestion based on your care plan emphasizing ${exerciseRoutine}: Try 10-15 minutes of gentle movement or mindfulness today.`;
+  }
+}
+
+// Phase 3: Advanced Tool Functions
+async function getWeeklyMealPlanTool(mcpBundle: any): Promise<string> {
+  secureLog('Weekly meal planning tool activated', { bundleId: mcpBundle.user_id_pseudonym });
+  
+  try {
+    return await getWeeklyMealPlan(mcpBundle);
+  } catch (error) {
+    secureLog('Weekly meal planning fallback activated', { 
+      bundleId: mcpBundle.user_id_pseudonym,
+      error: error instanceof Error ? error.message : 'Unknown error' 
+    });
+    
+    return `For weekly planning, focus on 2-3 simple, repeatable meals that align with your care plan. Consider batch cooking proteins and vegetables to support consistent healthy eating.`;
+  }
+}
+
+async function getWellnessProgramTool(mcpBundle: any): Promise<string> {
+  secureLog('Wellness program tool activated', { bundleId: mcpBundle.user_id_pseudonym });
+  
+  try {
+    return await getWellnessProgram(mcpBundle);
+  } catch (error) {
+    secureLog('Wellness program fallback activated', { 
+      bundleId: mcpBundle.user_id_pseudonym,
+      error: error instanceof Error ? error.message : 'Unknown error' 
+    });
+    
+    return `Start with a simple daily routine: 15 minutes of movement, 5 minutes of mindfulness, and one social connection per week. Build consistency before increasing intensity.`;
+  }
 }
 
 class SupervisorAgent {
@@ -100,7 +150,7 @@ class SupervisorAgent {
       }
 
       // 3. Determine if tool calling is needed
-      const toolResponse = this.checkForToolCalling(query.userQuery, mcpBundle);
+      const toolResponse = await this.checkForToolCalling(query.userQuery, mcpBundle);
       if (toolResponse) {
         return {
           response: toolResponse.response,
@@ -170,23 +220,43 @@ class SupervisorAgent {
   }
 
   /**
-   * Check if the query requires specific tool calling
+   * Check if the query requires specific tool calling (Phase 3: Enhanced with async tools)
    */
-  private checkForToolCalling(userQuery: string, mcpBundle: any): { response: string; tools: string[] } | null {
+  private async checkForToolCalling(userQuery: string, mcpBundle: any): Promise<{ response: string; tools: string[] } | null> {
     const query = userQuery.toLowerCase();
 
-    // Meal inspiration tool
-    if (query.includes('meal') || query.includes('eat') || query.includes('food') || query.includes('recipe')) {
+    // Weekly meal planning tool
+    if (query.includes('week') && (query.includes('meal') || query.includes('plan') || query.includes('food'))) {
+      const response = await getWeeklyMealPlanTool(mcpBundle);
       return {
-        response: getMealInspirationTool(mcpBundle),
+        response,
+        tools: ['weekly-meal-plan']
+      };
+    }
+
+    // Wellness program tool
+    if (query.includes('program') || query.includes('routine') || (query.includes('week') && query.includes('wellness'))) {
+      const response = await getWellnessProgramTool(mcpBundle);
+      return {
+        response,
+        tools: ['wellness-program']
+      };
+    }
+
+    // Meal inspiration tool
+    if (query.includes('meal') || query.includes('eat') || query.includes('food') || query.includes('recipe') || query.includes('cook')) {
+      const response = await getMealInspirationTool(mcpBundle);
+      return {
+        response,
         tools: ['meal-inspiration']
       };
     }
 
     // Wellness inspiration tool
-    if (query.includes('feel') || query.includes('activity') || query.includes('exercise') || query.includes('movement')) {
+    if (query.includes('feel') || query.includes('activity') || query.includes('exercise') || query.includes('movement') || query.includes('wellness') || query.includes('stress')) {
+      const response = await getWellnessInspirationTool(mcpBundle);
       return {
-        response: getWellnessInspirationTool(mcpBundle),
+        response,
         tools: ['wellness-inspiration']
       };
     }
