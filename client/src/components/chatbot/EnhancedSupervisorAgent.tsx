@@ -185,113 +185,16 @@ export function EnhancedSupervisorAgent({
   
   // Initialize the chatbot with a welcome message
   useEffect(() => {
-    // Get patient name from local storage if available
-    try {
-      const storedUserData = localStorage.getItem('currentUser');
-      if (storedUserData) {
-        const userData = JSON.parse(storedUserData);
-        if (userData.name) {
-          // Extract first name from full name
-          const firstName = userData.name.split(' ')[0];
-          setPatientName(firstName);
-          console.log('EnhancedSupervisorAgent: Retrieved patient name:', firstName);
-        }
+    setMessages([
+      {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: "Welcome to your KGC Health Assistant. How can I help you today?",
+        timestamp: new Date(),
+        offline: isOffline
       }
-    } catch (error) {
-      console.error('Error retrieving patient name from localStorage:', error);
-    }
-    
-    // Prepare welcome message content
-    let welcomeContent = initialMessage || "Hello! 😃\nI'm your personal Keep Going Care (KGC) health assistant. I am a non-diagnostic, Class 1. Software as a Medical Device (SaMD), prescribed by your doctor to help you with your doctor's healthier lifestyle modification care plan. I'm excited to work with you and your doctor to help you reach your health goals. I'm here for you 24/7 to help with any questions about:\n- Your healthy meal care plan 🥗\n- Your exercise and wellness routine care plan 🏋️\n- Your prescribed medications care plan 💊\nAll designed and updated by your doctor!\nRemember to submit your daily self-scores, 1-10\nfor each of these 3 areas to earn your $100\nhealthy experiences voucher and go into the draw to win the $250 healthy experience voucher drawn every month. \nA score of 5-10 means you're doing great! A score of 4-1 shows you might be facing some challenges, and we can work through them together with my many features.\nRemember, if I don't hear from you for over 24 hours, I'll assume a score of 0 and will reach out to your doctor to keep you safe ✨🩺⛑️\nRemember, you own your data and I keep it secure and delete it if you cancel your subscription. Your self-scores and feedback will be shared in a report for your doctor to review at your next appointment to update your care plan that I use to work with you";
-    
-    // Replace placeholder with actual patient name if available
-    // Check for multiple variations of the placeholder
-    if (patientName) {
-      if (welcomeContent.includes("[Patient's First Name]") || 
-          welcomeContent.includes("[User's First Name]") ||
-          welcomeContent.includes("[Patients First Name]") ||
-          welcomeContent.includes("[Users First Name]")) {
-        // Replace all possible variations
-        welcomeContent = welcomeContent
-          .replace(/\[Patient's First Name\]/g, patientName)
-          .replace(/\[User's First Name\]/g, patientName)
-          .replace(/\[Patients First Name\]/g, patientName)
-          .replace(/\[Users First Name\]/g, patientName);
-        console.log('EnhancedSupervisorAgent: Replaced patient name placeholder in welcome message');
-      }
-    }
-    
-    const welcomeMessage: Message = {
-      id: crypto.randomUUID(),
-      role: 'assistant',
-      content: welcomeContent,
-      timestamp: new Date(),
-      offline: isOffline
-    };
-    setMessages([welcomeMessage]);
-    
-    // Check network connectivity
-    checkConnectivity();
-    
-    // Setup connectivity monitoring
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    
-    // Initialize engagement milestone if it doesn't exist
-    const initializeEngagementMilestone = async () => {
-      try {
-        if (!milestoneExists("Chatbot Assistant Use", "Engagement")) {
-          await createOrUpdateMilestone(
-            "Chatbot Assistant Use", 
-            "Interact with your Keep Going Care Personal Health Assistant regularly for personalised guidance",
-            "Engagement",
-            10, // Start with 10% progress for first interaction
-            false,
-            "Award" // Icon type
-          );
-          console.log("Created initial chatbot engagement milestone");
-        } else {
-          console.log("Chatbot engagement milestone already exists");
-        }
-      } catch (error) {
-        console.error("Error initializing engagement milestone:", error);
-      }
-    };
-    
-    initializeEngagementMilestone();
-    
-    // Check if we have health metrics data and need to analyze it
-    const hasHealthMetrics = healthMetrics && 
-      typeof healthMetrics.dietScore === 'number' && 
-      typeof healthMetrics.exerciseScore === 'number' && 
-      typeof healthMetrics.medicationScore === 'number';
-      
-    // Check if the initial message indicates we should analyze health metrics
-    // Either an explicit message about analysis or any recent health metrics submission
-    const shouldAnalyzeMetrics = initialMessage && (
-      // Explicit analysis message
-      (initialMessage.toLowerCase().includes('analyze') && 
-       initialMessage.toLowerCase().includes('health')) ||
-      // Or just submitted health scores message
-      initialMessage.toLowerCase().includes('submitted') ||
-      // Or general health scores analysis message
-      initialMessage.toLowerCase().includes('health scores')
-    );
-      
-    // We no longer auto-analyze metrics, instead we wait for the user's confirmation
-    // The user will be prompted with initialMessage asking if they want to discuss scores
-    if (hasHealthMetrics && shouldAnalyzeMetrics && !isOffline) {
-      console.log('EnhancedSupervisorAgent: Health metrics detected, waiting for user confirmation:', healthMetrics);
-      // No automatic analysis, let the user confirm first
-    }
-    
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-      // Stop any ongoing speech when component unmounts
-      stopSpeaking();
-    };
-  }, [initialMessage, isOffline, healthMetrics]);
+    ]);
+  }, []);
   
   // Function to handle health metrics analysis
   const handleHealthMetricsAnalysis = async () => {

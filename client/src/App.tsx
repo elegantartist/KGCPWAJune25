@@ -22,7 +22,7 @@ import JournalingPage from './pages/journaling';
 import HealthSnapshotsPage from './pages/health-snapshots';
 import ProgressMilestonesPage from './pages/progress-milestones';
 import FoodDatabasePage from './pages/food-database';
-import ChatbotPage from './pages/chatbot';
+import EnhancedChatbotPage from './pages/enhanced-chatbot';
 
 const ProtectedRoute = ({ component: Component, requiredRole, ...rest }: any) => {
     const { user, loading } = useAuth();
@@ -63,7 +63,7 @@ function AppRoutes() {
             <ProtectedRoute path="/health-snapshots" component={HealthSnapshotsPage} requiredRole="patient" />
             <ProtectedRoute path="/progress-milestones" component={ProgressMilestonesPage} requiredRole="patient" />
             <ProtectedRoute path="/food-database" component={FoodDatabasePage} requiredRole="patient" />
-            <ProtectedRoute path="/chatbot" component={ChatbotPage} requiredRole="patient" />
+            <ProtectedRoute path="/enhanced-chatbot" component={EnhancedChatbotPage} requiredRole="patient" />
             <ProtectedRoute path="/" component={Dashboard} requiredRole="patient" />
 
             {/* Default route redirects to login if not authenticated, or to role-specific dashboard if authenticated */}

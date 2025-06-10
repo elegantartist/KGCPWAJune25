@@ -251,11 +251,11 @@ const Dashboard: React.FC = () => {
                         // Use React routing via wouter to maintain React context
                         try {
                           // Use Link programmatic navigation
-                          window.history.pushState({}, '', '/chatbot');
+                          window.history.pushState({}, '', '/enhanced-chatbot');
                           window.dispatchEvent(new Event('popstate'));
                         } catch (e) {
                           // Fallback to traditional navigation
-                          window.location.href = '/chatbot';
+                          window.location.href = '/enhanced-chatbot';
                         }
                       }, 3000);
                     } catch (error) {
