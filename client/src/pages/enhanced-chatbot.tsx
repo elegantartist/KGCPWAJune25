@@ -73,69 +73,18 @@ const EnhancedChatbot: React.FC = () => {
     }
   }, []);
 
-  // Fetch the user ID and health metrics on mount
+  // Initialize chatbot with basic user info only
   useEffect(() => {
     let isMounted = true;
     
     const fetchUserData = async () => {
       try {
-        // Fetch user basic info
+        // Fetch user basic info only - no health metrics analysis
         const user = await apiRequest<{ id: number; name: string; email: string }>('GET', '/api/user');
         if (!isMounted) return;
         
         if (user && typeof user.id === 'number') {
           setUserId(user.id);
-          
-          // Check if there are recently submitted metrics in localStorage
-          const lastHealthMetricsStr = localStorage.getItem('lastHealthMetrics');
-          let redirectedFromHealthMetrics = false;
-          let metrics = null;
-          
-          if (lastHealthMetricsStr) {
-            try {
-              const parsedMetrics = JSON.parse(lastHealthMetricsStr);
-              // Check if these metrics were submitted recently (within the last 5 minutes)
-              const metricDate = new Date(parsedMetrics.date);
-              const now = new Date();
-              const diffMs = now.getTime() - metricDate.getTime();
-              const diffMinutes = diffMs / (1000 * 60);
-              
-              if (diffMinutes < 5) {
-                console.log('Enhanced Chatbot: Using health metrics from localStorage:', parsedMetrics);
-                console.log('Enhanced Chatbot: Time since metrics were submitted:', Math.round(diffMinutes * 60), 'seconds ago');
-                metrics = {
-                  dietScore: parsedMetrics.dietScore,
-                  exerciseScore: parsedMetrics.exerciseScore,
-                  medicationScore: parsedMetrics.medicationScore,
-                  date: metricDate
-                };
-                redirectedFromHealthMetrics = true;
-                setHealthMetrics(metrics);
-                console.log('Enhanced Chatbot: Using recently submitted health metrics for analysis');
-                
-                // Force chatbot remount to ensure it uses the new metrics
-                setChatKey(`chatbot-${Date.now()}-metrics-${metrics.dietScore}-${metrics.exerciseScore}-${metrics.medicationScore}`);
-              }
-            } catch (e) {
-              console.error('Error parsing health metrics from localStorage:', e);
-            }
-          }
-          
-          // If no recent metrics in localStorage, fetch from server
-          if (!redirectedFromHealthMetrics) {
-            try {
-              const serverMetrics = await apiRequest('GET', `/api/users/${user.id}/health-metrics/latest`);
-              if (!isMounted) return;
-              
-              console.log('Enhanced Chatbot: Fetched latest health metrics from server:', serverMetrics);
-              
-              if (serverMetrics && typeof serverMetrics.dietScore === 'number') {
-                setHealthMetrics(serverMetrics);
-              }
-            } catch (healthError) {
-              console.error("Error fetching health metrics:", healthError);
-            }
-          }
         }
       } catch (error) {
         console.error("Error fetching user:", error);
