@@ -571,9 +571,19 @@ YOUR TASK: Provide a caring, motivational, and educational response that:
     try {
       // Define the features of the KGC App that the AI can recommend
       const KGC_APP_FEATURES = [
-        "Your Wellness Plan to track activities",
-        "The Food Database for recipe inspiration", 
-        "The Daily Self-Scoring feature to log your progress"
+        "Home - Main dashboard with easy access buttons for chat, daily self-scores and your Keep Going button",
+        "Daily Self-Scores - Record how you feel about your healthy lifestyle journey, essential for communicating progress with your doctor who modifies your Care Plan Directives. Your daily self-scores earn you money to spend on healthy experiences like gym, pilates, yoga, health spas, and healthy dining!",
+        "Motivational Image Processing (MIP) - Upload and enhance your chosen motivational image, integrated with the Keep Going button",
+        "Inspiration Machine D - Provides meal inspiration ideas aligned with your personal care plan CPDs and preferences",
+        "Diet Logistics - Provides links for grocery and prepared meals delivery options aligned with your personal care plan CPDs and preferences",
+        "Inspiration Machine E&W - Provides exercise and wellness inspiration ideas aligned with your personal care plan CPDs, abilities and preferences",
+        "E&W Support - Assists you to search for local gyms, personal trainers, yoga, and pilates studios to enhance your exercise and wellness experiences",
+        "MBP Wiz - Finds best prices on medications via Chemist Warehouse with pharmacy location information",
+        "Journaling - Record thoughts, track progress, and document health experiences. Useful for you and your doctor to discuss medication compliance and adherence",
+        "Progress Milestones - KGC achievement badges awarded for maintaining consistent health scores over time. Earn $100 and more for your Keep Going Care efforts",
+        "Food Database - Provides nutritional information and food recommendations based on Food Standards Australia including the FoodSwitch label scanning app",
+        "Chatbot - KGC AI assistant for answering questions and providing guidance",
+        "Health Snapshots - Provides visual progress summaries and adherence tracking of your daily self-scores"
       ];
 
       const { activity = 'activity', location = 'area' } = parsedQuery.entities;
