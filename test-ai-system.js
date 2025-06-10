@@ -12,22 +12,23 @@ async function authenticateTestPatient() {
     try {
         console.log('🔐 Authenticating test patient...');
         
-        // Request SMS for test patient
-        const smsResponse = await axios.post(`${BASE_URL}/auth/sms-request`, {
-            phoneNumber: '+61400000001'
+        // Request SMS for test patient using correct endpoint
+        const smsResponse = await axios.post(`${BASE_URL}/auth/send-sms`, {
+            email: 'patient@test.com',
+            role: 'patient'
         });
         
-        // Verify with test code
-        const verifyResponse = await axios.post(`${BASE_URL}/auth/sms-verify`, {
-            phoneNumber: '+61400000001',
+        // Verify with test code using correct endpoint
+        const verifyResponse = await axios.post(`${BASE_URL}/auth/verify-sms`, {
+            email: 'patient@test.com',
             code: '123456'
         });
         
-        if (verifyResponse.data.token) {
+        if (verifyResponse.data.access_token) {
             console.log('✅ Authentication successful');
-            return verifyResponse.data.token;
+            return verifyResponse.data.access_token;
         } else {
-            throw new Error('No token received');
+            throw new Error('No access token received');
         }
     } catch (error) {
         console.error('❌ Authentication failed:', error.response?.data || error.message);
