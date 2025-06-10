@@ -4,6 +4,9 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider, useAuth } from './context/auth-context';
+import { useOnlineStatus } from './hooks/useOnlineStatus';
+import { offlineQueueService } from './services/offlineQueueService';
+import { useEffect } from 'react';
 import UnifiedLoginPage from './pages/Login';
 import DoctorDashboard from './pages/doctor-dashboard';
 import Dashboard from './pages/dashboard'; // Patient dashboard
@@ -82,11 +85,29 @@ function AppRoutes() {
 }
 
 export default function App() {
+    const isOnline = useOnlineStatus();
+    
+    useEffect(() => {
+        // When coming back online, sync offline messages
+        if (isOnline) {
+            offlineQueueService.syncOfflineMessages();
+        }
+    }, [isOnline]);
+    
     return (
         <QueryClientProvider client={queryClient}>
             <AuthProvider>
-                <AppRoutes />
-                <Toaster />
+                <div className="relative">
+                    <AppRoutes />
+                    <Toaster />
+                    
+                    {/* App-wide offline indicator banner */}
+                    {!isOnline && (
+                        <div className="fixed bottom-0 left-0 right-0 bg-gray-800 text-white text-center p-2 text-sm z-50">
+                            You are currently offline. Some features may be limited.
+                        </div>
+                    )}
+                </div>
             </AuthProvider>
         </QueryClientProvider>
     );
