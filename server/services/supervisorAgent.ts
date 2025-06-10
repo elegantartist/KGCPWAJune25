@@ -23,7 +23,10 @@ const anthropic = new Anthropic({
 });
 
 interface SupervisorQuery {
-  userQuery: string;
+  message: {
+    text: string;
+    sentAt: string;
+  };
   userId: number;
   sessionId?: string;
   requiresValidation?: boolean;
@@ -122,24 +125,63 @@ class SupervisorAgent {
 
   /**
    * Main orchestration function for supervisor queries
-   * Implements resilient agent orchestration with decoupled primary/secondary tasks
+   * Implements resilient agent orchestration with time-aware logic and decoupled primary/secondary tasks
    */
   async runSupervisorQuery(query: SupervisorQuery): Promise<SupervisorResponse> {
+    const { message, userId, sessionId } = query;
+    const { text: userQuery, sentAt } = message;
     const startTime = Date.now();
-    const sessionId = query.sessionId || crypto.randomUUID();
+    const finalSessionId = sessionId || crypto.randomUUID();
+
+    const timeSent = new Date(sentAt);
+    const timeProcessed = new Date();
+    
+    // Calculate the time difference in minutes
+    const deltaInMinutes = (timeProcessed.getTime() - timeSent.getTime()) / 60000;
+
+    // --- TIME-AWARE LOGIC GATE ---
+    // If the message is more than 15 minutes old, it's stale. Re-engage instead of answering.
+    if (deltaInMinutes > 15) {
+      secureLog('Stale offline message received. Pivoting to re-engagement.', { 
+        userId, 
+        sessionId: finalSessionId, 
+        deltaInMinutes 
+      });
+      
+      // Instead of processing the old query, return a context-aware re-engagement message.
+      const reEngagementResponse: SupervisorResponse = {
+        response: "Welcome back online! I've just received your message from earlier. I hope you were able to resolve what you needed. How can I help you right now?",
+        sessionId: finalSessionId,
+        modelUsed: 're-engagement',
+        processingTime: Date.now() - startTime
+      };
+      
+      // Run analytics as a non-critical side effect
+      this.logAnalytics(userId, "staleMessageReEngagement", finalSessionId).catch((err: Error | unknown) => {
+        secureLog("Non-critical error in analytics logging for stale message", { 
+          sessionId: finalSessionId, 
+          error: err instanceof Error ? err.message : 'Unknown error' 
+        });
+      });
+
+      return reEngagementResponse;
+    }
+
+    // --- If the message is recent, proceed with the normal resilient workflow ---
     let mainResponse: SupervisorResponse;
 
     // --- STAGE 1: Execute the critical, primary task ---
     try {
       secureLog('Supervisor query initiated', { 
-        userId: query.userId, 
-        sessionId,
-        queryLength: query.userQuery.length 
+        userId, 
+        sessionId: finalSessionId,
+        queryLength: userQuery.length,
+        deltaInMinutes
       });
 
       // 1. Create secure MCP bundle using privacy middleware
       const contextData = await AIContextService.prepareSecureContext({
-        userId: query.userId,
+        userId,
         includeHealthMetrics: true,
         includeChatHistory: true,
         maxHistoryItems: 10
@@ -154,11 +196,11 @@ class SupervisorAgent {
       }
 
       // 3. Determine if tool calling is needed
-      const toolResponse = await this.checkForToolCalling(query.userQuery, mcpBundle);
+      const toolResponse = await this.checkForToolCalling(userQuery, mcpBundle);
       if (toolResponse) {
         mainResponse = {
           response: toolResponse.response,
-          sessionId,
+          sessionId: finalSessionId,
           modelUsed: 'tool-based',
           toolsUsed: toolResponse.tools,
           processingTime: Date.now() - startTime
@@ -166,7 +208,7 @@ class SupervisorAgent {
       } else {
         // 4. Construct primary LLM prompt
         const systemPrompt = this.buildSystemPrompt();
-        const userPrompt = this.buildUserPrompt(query.userQuery, mcpBundle);
+        const userPrompt = this.buildUserPrompt(userQuery, mcpBundle);
 
         // 5. Call primary LLM (OpenAI GPT-4)
         const primaryResponse = await this.callPrimaryLLM(systemPrompt, userPrompt);
@@ -175,8 +217,8 @@ class SupervisorAgent {
         let finalResponse = primaryResponse;
         let validationStatus = 'not-required';
 
-        if (query.requiresValidation || this.requiresValidation(query.userQuery)) {
-          secureLog('Multi-model validation triggered', { sessionId });
+        if (query.requiresValidation || this.requiresValidation(userQuery)) {
+          secureLog('Multi-model validation triggered', { sessionId: finalSessionId });
           const validatedResponse = await this.performMultiModelValidation(
             systemPrompt, 
             userPrompt, 
@@ -187,10 +229,10 @@ class SupervisorAgent {
         }
 
         // 7. Final security check on response
-        const responseValidation = await AIContextService.validateAIResponse(finalResponse, sessionId);
+        const responseValidation = await AIContextService.validateAIResponse(finalResponse, finalSessionId);
         if (!responseValidation.isSecure) {
           secureLog('AI response contained PII, sanitizing', { 
-            sessionId, 
+            sessionId: finalSessionId, 
             violations: responseValidation.violations 
           });
           finalResponse = responseValidation.sanitizedResponse;
@@ -198,7 +240,7 @@ class SupervisorAgent {
 
         mainResponse = {
           response: finalResponse,
-          sessionId,
+          sessionId: finalSessionId,
           modelUsed: 'gpt-4',
           validationStatus,
           processingTime: Date.now() - startTime
@@ -206,18 +248,18 @@ class SupervisorAgent {
       }
 
       secureLog('Supervisor query completed successfully', { 
-        sessionId, 
+        sessionId: finalSessionId, 
         processingTime: Date.now() - startTime 
       });
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      secureLog('CRITICAL ERROR in main agent flow', { sessionId, error: errorMessage });
+      secureLog('CRITICAL ERROR in main agent flow', { sessionId: finalSessionId, error: errorMessage });
 
       // Return a safe, generic error message ONLY if the main flow fails
       return {
         response: "I'm sorry, I'm having trouble processing your request right now. Please try again shortly.",
-        sessionId,
+        sessionId: finalSessionId,
         modelUsed: 'error-handler',
         processingTime: Date.now() - startTime
       };
@@ -225,21 +267,21 @@ class SupervisorAgent {
 
     // --- STAGE 2: Execute non-critical side effects asynchronously ---
     // We do NOT use 'await' here. This is "fire-and-forget".
-    this.updateProgressMilestones(query.userId, "chatbotInteraction", sessionId)
+    this.updateProgressMilestones(userId, "chatbotInteraction", finalSessionId)
       .catch((err: Error | unknown) => {
         // Log the error for developers but DO NOT let it crash the response to the user.
         secureLog("Non-critical error in milestone update", { 
-          sessionId, 
-          userId: query.userId,
+          sessionId: finalSessionId, 
+          userId,
           error: err instanceof Error ? err.message : 'Unknown error'
         });
       });
     
-    this.logAnalytics(query.userId, "queryExecuted", sessionId)
+    this.logAnalytics(userId, "queryExecuted", finalSessionId)
       .catch((err: Error | unknown) => {
         secureLog("Non-critical error in analytics logging", { 
-          sessionId, 
-          userId: query.userId,
+          sessionId: finalSessionId, 
+          userId,
           error: err instanceof Error ? err.message : 'Unknown error'
         });
       });

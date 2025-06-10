@@ -493,7 +493,14 @@ export function EnhancedSupervisorAgent({
     
     if (!input.trim() || agentStatus !== 'idle') return;
     
-    // Create user message
+    // --- START MODIFICATION ---
+    // 1. Create a payload object that includes the message text and a timestamp.
+    const messagePayload = {
+      text: input,
+      sentAt: new Date().toISOString() // e.g., "2025-06-11T23:30:00.000Z"
+    };
+
+    // Create user message for UI
     const userMessage: Message = {
       id: crypto.randomUUID(),
       role: 'user',
@@ -543,32 +550,42 @@ export function EnhancedSupervisorAgent({
       // Log the connectivity level we're sending to the server
       console.log(`Sending request with connectivity level: ${ConnectivityLevel[connectivityLevel]} (${connectivityLevel})`);
       
-      // Send request to the enhanced MCP service with additional error handling
+      // Send request to the Supervisor Agent with timestamped message payload
       let responseData;
       try {
-        const response = await axios.post('/api/mcp/generate', {
-          prompt: userMessage.content,
-          userId,
-          healthMetrics,
-          conversationHistory,
-          connectivityLevel: connectivityLevel // Ensure we're passing the current connectivity level
+        const token = localStorage.getItem('auth_token');
+        const response = await fetch('/api/v2/supervisor/query', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          // 2. Send the entire payload object in the body.
+          body: JSON.stringify({ 
+            message: messagePayload,
+            userId,
+            sessionId: crypto.randomUUID(),
+            requiresValidation: false
+          })
         });
         
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
         // Safety check for valid response
-        responseData = response.data || {};
+        responseData = await response.json();
       } catch (apiError) {
         console.error("API request failed:", apiError);
         throw new Error("Failed to communicate with assistant service");
       }
       
-      // Process the response with fallback values for safety
-      let primaryResponse = responseData.primaryResponse || "I'm sorry, I couldn't process that properly. How else can I help you today?";
-      const provider = responseData.provider || "system";
-      const alternativeResponses = responseData.alternativeResponses || [];
-      const evaluationSummary = responseData.evaluationSummary || "No evaluation available";
-      const allResponsesValid = responseData.allResponsesValid !== false;
-      const memories = responseData.memories || { retrieved: [], created: [] };
-      const offline = responseData.offline || false;
+      // Process the response from Supervisor Agent
+      let primaryResponse = responseData.data?.response || responseData.response || "I'm sorry, I couldn't process that properly. How else can I help you today?";
+      const sessionId = responseData.data?.sessionId || responseData.sessionId;
+      const modelUsed = responseData.data?.modelUsed || responseData.modelUsed || "supervisor-agent";
+      const toolsUsed = responseData.data?.toolsUsed || responseData.toolsUsed || [];
+      const offline = false; // Supervisor agent responses are always online
       
       // Sanitize the response to remove any system prompt directives or markers that might have leaked through
       primaryResponse = sanitizeChatbotResponse(primaryResponse);
@@ -606,12 +623,12 @@ export function EnhancedSupervisorAgent({
       
       setMessages(prev => [...prev, assistantMessage]);
       
-      // If there were alternative responses that were rejected during evaluation,
-      // we can log them or use them in some way
-      if (!allResponsesValid && alternativeResponses && alternativeResponses.length > 0) {
-        console.debug('Alternative responses were rejected:', alternativeResponses);
-        console.debug('Evaluation summary:', evaluationSummary);
-      }
+      // Log supervisor agent response details
+      console.debug('Supervisor agent response details:', {
+        modelUsed,
+        toolsUsed,
+        sessionId
+      });
       
       // Read the response aloud if speech is enabled
       if (isSpeechEnabled) {

@@ -646,15 +646,28 @@ export function registerRoutes(app: Express) {
     // Main Supervisor Agent query endpoint
     router.post('/v2/supervisor/query', authMiddleware(['patient', 'doctor']), async (req: AuthenticatedRequest, res) => {
         try {
-            const { userQuery, requiresValidation, sessionId } = req.body;
+            const { message, userQuery, requiresValidation, sessionId, userId } = req.body;
             
-            if (!userQuery || typeof userQuery !== 'string') {
-                return res.status(400).json({ message: 'userQuery is required and must be a string' });
+            // Handle both new timestamped message format and legacy userQuery format
+            let queryText: string;
+            let sentAt: string;
+            
+            if (message && typeof message === 'object' && message.text && message.sentAt) {
+                // New timestamped message format
+                queryText = message.text;
+                sentAt = message.sentAt;
+            } else if (userQuery && typeof userQuery === 'string') {
+                // Legacy format - create timestamp
+                queryText = userQuery;
+                sentAt = new Date().toISOString();
+            } else {
+                return res.status(400).json({ message: 'message object with text and sentAt is required' });
             }
 
             secureLog('Supervisor query received', { 
                 userId: req.user!.userId,
-                queryLength: userQuery.length,
+                queryLength: queryText.length,
+                sentAt,
                 sessionId 
             });
 
@@ -663,7 +676,7 @@ export function registerRoutes(app: Express) {
             const targetUserId = req.user!.role === 'patient' ? req.user!.userId : req.user!.userId;
 
             const response = await supervisorAgent.runSupervisorQuery({
-                userQuery,
+                message: { text: queryText, sentAt },
                 userId: targetUserId,
                 sessionId,
                 requiresValidation: requiresValidation || false
