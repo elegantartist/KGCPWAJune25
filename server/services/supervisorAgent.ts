@@ -11,6 +11,7 @@ import { getMealInspiration, getWellnessInspiration, getWeeklyMealPlan, getWelln
 import { db } from '../db';
 import * as schema from '@shared/schema';
 import { eq } from 'drizzle-orm';
+import crypto from 'crypto';
 
 // Initialize LLM clients
 const openai = new OpenAI({
@@ -121,11 +122,14 @@ class SupervisorAgent {
 
   /**
    * Main orchestration function for supervisor queries
+   * Implements resilient agent orchestration with decoupled primary/secondary tasks
    */
   async runSupervisorQuery(query: SupervisorQuery): Promise<SupervisorResponse> {
     const startTime = Date.now();
     const sessionId = query.sessionId || crypto.randomUUID();
+    let mainResponse: SupervisorResponse;
 
+    // --- STAGE 1: Execute the critical, primary task ---
     try {
       secureLog('Supervisor query initiated', { 
         userId: query.userId, 
@@ -152,45 +156,53 @@ class SupervisorAgent {
       // 3. Determine if tool calling is needed
       const toolResponse = await this.checkForToolCalling(query.userQuery, mcpBundle);
       if (toolResponse) {
-        return {
+        mainResponse = {
           response: toolResponse.response,
           sessionId,
           modelUsed: 'tool-based',
           toolsUsed: toolResponse.tools,
           processingTime: Date.now() - startTime
         };
-      }
+      } else {
+        // 4. Construct primary LLM prompt
+        const systemPrompt = this.buildSystemPrompt();
+        const userPrompt = this.buildUserPrompt(query.userQuery, mcpBundle);
 
-      // 4. Construct primary LLM prompt
-      const systemPrompt = this.buildSystemPrompt();
-      const userPrompt = this.buildUserPrompt(query.userQuery, mcpBundle);
+        // 5. Call primary LLM (OpenAI GPT-4)
+        const primaryResponse = await this.callPrimaryLLM(systemPrompt, userPrompt);
 
-      // 5. Call primary LLM (OpenAI GPT-4)
-      const primaryResponse = await this.callPrimaryLLM(systemPrompt, userPrompt);
+        // 6. Multi-model validation if required
+        let finalResponse = primaryResponse;
+        let validationStatus = 'not-required';
 
-      // 6. Multi-model validation if required
-      let finalResponse = primaryResponse;
-      let validationStatus = 'not-required';
+        if (query.requiresValidation || this.requiresValidation(query.userQuery)) {
+          secureLog('Multi-model validation triggered', { sessionId });
+          const validatedResponse = await this.performMultiModelValidation(
+            systemPrompt, 
+            userPrompt, 
+            primaryResponse
+          );
+          finalResponse = validatedResponse.response;
+          validationStatus = validatedResponse.status;
+        }
 
-      if (query.requiresValidation || this.requiresValidation(query.userQuery)) {
-        secureLog('Multi-model validation triggered', { sessionId });
-        const validatedResponse = await this.performMultiModelValidation(
-          systemPrompt, 
-          userPrompt, 
-          primaryResponse
-        );
-        finalResponse = validatedResponse.response;
-        validationStatus = validatedResponse.status;
-      }
+        // 7. Final security check on response
+        const responseValidation = await AIContextService.validateAIResponse(finalResponse, sessionId);
+        if (!responseValidation.isSecure) {
+          secureLog('AI response contained PII, sanitizing', { 
+            sessionId, 
+            violations: responseValidation.violations 
+          });
+          finalResponse = responseValidation.sanitizedResponse;
+        }
 
-      // 7. Final security check on response
-      const responseValidation = await AIContextService.validateAIResponse(finalResponse, sessionId);
-      if (!responseValidation.isSecure) {
-        secureLog('AI response contained PII, sanitizing', { 
-          sessionId, 
-          violations: responseValidation.violations 
-        });
-        finalResponse = responseValidation.sanitizedResponse;
+        mainResponse = {
+          response: finalResponse,
+          sessionId,
+          modelUsed: 'gpt-4',
+          validationStatus,
+          processingTime: Date.now() - startTime
+        };
       }
 
       secureLog('Supervisor query completed successfully', { 
@@ -198,25 +210,42 @@ class SupervisorAgent {
         processingTime: Date.now() - startTime 
       });
 
-      return {
-        response: finalResponse,
-        sessionId,
-        modelUsed: 'gpt-4',
-        validationStatus,
-        processingTime: Date.now() - startTime
-      };
-
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      secureLog('Supervisor query failed', { sessionId, error: errorMessage });
+      secureLog('CRITICAL ERROR in main agent flow', { sessionId, error: errorMessage });
 
+      // Return a safe, generic error message ONLY if the main flow fails
       return {
-        response: 'I apologize, but I encountered an issue processing your request. Please try again or contact support if the problem persists.',
+        response: "I'm sorry, I'm having trouble processing your request right now. Please try again shortly.",
         sessionId,
         modelUsed: 'error-handler',
         processingTime: Date.now() - startTime
       };
     }
+
+    // --- STAGE 2: Execute non-critical side effects asynchronously ---
+    // We do NOT use 'await' here. This is "fire-and-forget".
+    this.updateProgressMilestones(query.userId, "chatbotInteraction", sessionId)
+      .catch((err: Error | unknown) => {
+        // Log the error for developers but DO NOT let it crash the response to the user.
+        secureLog("Non-critical error in milestone update", { 
+          sessionId, 
+          userId: query.userId,
+          error: err instanceof Error ? err.message : 'Unknown error'
+        });
+      });
+    
+    this.logAnalytics(query.userId, "queryExecuted", sessionId)
+      .catch((err: Error | unknown) => {
+        secureLog("Non-critical error in analytics logging", { 
+          sessionId, 
+          userId: query.userId,
+          error: err instanceof Error ? err.message : 'Unknown error'
+        });
+      });
+
+    // --- STAGE 3: Return the successful main response to the user immediately ---
+    return mainResponse;
   }
 
   /**
@@ -409,6 +438,53 @@ Provide your assessment: APPROVED, NEEDS_REVISION, or REJECTED with brief reason
     } catch (error) {
       secureLog('Multi-model validation failed', { error: error instanceof Error ? error.message : 'Unknown error' });
       return { response: primaryResponse, status: 'validation-unavailable' };
+    }
+  }
+
+  /**
+   * Update progress milestones (non-critical background task)
+   */
+  private async updateProgressMilestones(userId: number, milestone: string, sessionId: string): Promise<void> {
+    try {
+      // For now, we'll use secure logging for milestone tracking
+      // This can be extended to use a database table when progressMilestones schema is added
+      secureLog('Progress milestone tracked', { 
+        userId, 
+        milestone, 
+        sessionId,
+        timestamp: new Date().toISOString(),
+        event: 'chatbot_interaction'
+      });
+
+      // In a future implementation, this would insert into a progressMilestones table:
+      // await db.insert(schema.progressMilestones).values({ ... });
+      
+    } catch (error) {
+      // Re-throw to be caught by the calling code's error handler
+      throw new Error(`Milestone update failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Log analytics data (non-critical background task)
+   */
+  private async logAnalytics(userId: number, event: string, sessionId: string): Promise<void> {
+    try {
+      // In a production system, this would log to an analytics service
+      // For now, we'll use the secure logging system
+      secureLog('Analytics event', {
+        userId,
+        event,
+        sessionId,
+        timestamp: new Date().toISOString()
+      });
+
+      // Could also log to database analytics table if it exists
+      // await db.insert(schema.analyticsEvents).values({ ... });
+      
+    } catch (error) {
+      // Re-throw to be caught by the calling code's error handler
+      throw new Error(`Analytics logging failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 }
