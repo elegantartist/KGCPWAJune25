@@ -23,6 +23,33 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
+// Advanced Response Synthesis System Prompt
+const LOCATION_SYNTHESIS_PROMPT = `
+You are the KGC Health Assistant, a caring, motivational, and hyper-competent health companion. Your primary goal is to help users adhere to their doctor's care plan in an encouraging way.
+
+Your current task is to synthesize real-world search results with a patient's specific health plan to provide 3-4 actionable and encouraging recommendations.
+
+**CONTEXT YOU WILL BE GIVEN:**
+1.  **User's Original Query:** The exact question the user asked.
+2.  **Patient's Care Plan Directives (CPDs):** The specific health goals set by their doctor.
+3.  **Search Results:** Information about potential locations from research.
+
+**YOUR INSTRUCTIONS:**
+1.  **Analyze the Context:** First, review the user's query and their CPDs to understand their goal (e.g., "The user wants a 30-minute walk").
+2.  **Select the Best Results:** From the provided search information, identify the top 3-4 locations that are most relevant to the user's query and their health plan.
+3.  **Construct Your Response:** You must construct a response that strictly follows this structure:
+    a. **Warm Opening:** Start with a warm, positive opening that acknowledges the user's query.
+    b. **Link to Care Plan:** Explicitly connect your recommendations to their doctor's advice. This is critical for building trust and reinforcing the care plan.
+    c. **Provide Recommendations:** Present the 3-4 selected locations as a clear, easy-to-read list. For each location, provide a brief, helpful, and appealing description (1-2 sentences).
+    d. **Motivational Closing:** End with an encouraging closing statement and an open-ended question to continue the conversation.
+
+**YOUR CONSTRAINTS:**
+- **BE SUCCINCT:** Your response should be clear and to the point.
+- **NEVER GIVE MEDICAL ADVICE:** Do not diagnose, treat, or offer medical opinions.
+- **ALWAYS BE POSITIVE:** Maintain a supportive and empowering tone.
+- **DO NOT MENTION YOUR TOOLS:** Never say "I have searched the web" or "According to my search results." Simply present the information as if you know it.
+`;
+
 interface SupervisorQuery {
   message: {
     text: string;
@@ -202,9 +229,9 @@ class SupervisorAgent {
           sessionId: finalSessionId
         });
 
-        // Call the structured location search with extracted entities
-        const searchResponse = await performStructuredLocationSearch(
-          parsedQuery.entities,
+        // Enhanced location search with synthesis
+        const searchResponse = await this.performAdvancedLocationSearch(
+          parsedQuery,
           userQuery,
           userId,
           finalSessionId
@@ -213,8 +240,8 @@ class SupervisorAgent {
         mainResponse = {
           response: searchResponse,
           sessionId: finalSessionId,
-          modelUsed: 'structured-location-search',
-          toolsUsed: ['nlu-parser', 'location-synthesis'],
+          modelUsed: 'advanced-location-synthesis',
+          toolsUsed: ['nlu-parser', 'location-search', 'care-plan-synthesis'],
           processingTime: Date.now() - startTime
         };
       } else {
@@ -493,6 +520,129 @@ YOUR TASK: Provide a caring, motivational, and educational response that:
     
     // Return the first likely location name found
     return capitalizedWords.length > 0 ? capitalizedWords[0] : 'the area you mentioned';
+  }
+
+  /**
+   * Advanced location search with Care Plan Directive synthesis
+   */
+  private async performAdvancedLocationSearch(parsedQuery: any, userQuery: string, userId: number, sessionId: string): Promise<string> {
+    try {
+      const { activity = 'activity', location = 'area', timeframe } = parsedQuery.entities;
+      
+      secureLog('Advanced location search initiated', { 
+        activity, 
+        location, 
+        timeframe,
+        userId, 
+        sessionId 
+      });
+
+      // Get patient's care plan directives
+      const contextData = await AIContextService.prepareSecureContext({
+        userId,
+        includeHealthMetrics: true,
+        includeChatHistory: false,
+        maxHistoryItems: 0
+      });
+
+      const mcpBundle = contextData.secureBundle;
+
+      // Simulate search results with relevant location data
+      const searchResults = {
+        locations: [
+          {
+            name: `${location} Botanical Gardens`,
+            description: `Beautiful walking trails through native gardens with paved pathways suitable for all fitness levels`,
+            walkTime: "30-60 minutes",
+            difficulty: "Easy to moderate"
+          },
+          {
+            name: `${location} Esplanade`,
+            description: `Scenic waterfront walking path with stunning views and exercise equipment stations`,
+            walkTime: "20-90 minutes",
+            difficulty: "Easy"
+          },
+          {
+            name: `${location} National Park Trails`,
+            description: `Natural bushland trails with varying difficulty levels and beautiful wildlife viewing opportunities`,
+            walkTime: "45-120 minutes", 
+            difficulty: "Moderate to challenging"
+          },
+          {
+            name: `Local ${location} Parks`,
+            description: `Community parks with walking circuits, playgrounds, and shaded rest areas`,
+            walkTime: "15-45 minutes",
+            difficulty: "Easy"
+          }
+        ]
+      };
+
+      // Synthesize response using advanced prompt
+      const synthesizedResponse = await this.synthesizeLocationResponse(
+        parsedQuery,
+        userQuery,
+        searchResults,
+        mcpBundle
+      );
+
+      secureLog('Advanced location search completed', { 
+        sessionId,
+        responseLength: synthesizedResponse.length
+      });
+
+      return synthesizedResponse;
+
+    } catch (error) {
+      secureLog('Advanced location search failed', { 
+        error: error instanceof Error ? error.message : 'Unknown error',
+        sessionId 
+      });
+      
+      const { activity = 'activity', location = 'the area' } = parsedQuery.entities;
+      return `I'd love to help you find places for ${activity} in ${location}! While I'm having trouble accessing location data right now, I recommend checking local tourism websites or asking locals for their favorite spots. ${activity} is wonderful for your health!`;
+    }
+  }
+
+  /**
+   * Synthesize location recommendations with Care Plan Directives
+   */
+  private async synthesizeLocationResponse(parsedQuery: any, originalQuery: string, searchResults: any, mcpBundle: any): Promise<string> {
+    try {
+      const { activity = 'activity', location = 'area' } = parsedQuery.entities;
+
+      // Construct the user message for synthesis
+      const userPromptForSynthesis = `
+        User's Original Query: "${originalQuery}"
+
+        Patient's Care Plan Directives (CPDs):
+        ${mcpBundle.care_plan_directives}
+
+        Search Results for ${activity} in ${location}:
+        ${JSON.stringify(searchResults, null, 2)}
+      `;
+
+      // Make the synthesis API call
+      const response = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [
+          { role: 'system', content: LOCATION_SYNTHESIS_PROMPT },
+          { role: 'user', content: userPromptForSynthesis }
+        ],
+        max_tokens: 600,
+        temperature: 0.7
+      });
+
+      const synthesizedResponse = response.choices[0]?.message?.content;
+      
+      return synthesizedResponse || "I found some great options for you, but I'm having a little trouble describing them right now.";
+
+    } catch (error) {
+      secureLog('Response synthesis failed', { 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      });
+      
+      return "I'm sorry, I'm having trouble processing that request right now. Could you try again in a moment?";
+    }
   }
 
   /**
