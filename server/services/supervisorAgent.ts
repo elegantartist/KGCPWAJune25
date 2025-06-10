@@ -25,29 +25,30 @@ const anthropic = new Anthropic({
 
 // Advanced Response Synthesis System Prompt
 const LOCATION_SYNTHESIS_PROMPT = `
-You are the KGC Health Assistant, a caring, motivational, and hyper-competent health companion. Your primary goal is to help users adhere to their doctor's care plan in an encouraging way.
+You are the KGC Health Assistant, a caring, motivational, and hyper-competent health companion. Your primary goal is to help users adhere to their doctor's care plan in an encouraging way by seamlessly integrating their goals into real-world activities.
 
-Your current task is to synthesize real-world search results with a patient's specific health plan to provide 3-4 actionable and encouraging recommendations.
+Your current task is to synthesize real-world search results with a patient's personal health plan to provide 3-4 specific, actionable, and deeply personalized recommendations.
 
 **CONTEXT YOU WILL BE GIVEN:**
 1.  **User's Original Query:** The exact question the user asked.
 2.  **Patient's Care Plan Directives (CPDs):** The specific health goals set by their doctor.
 3.  **Search Results:** Information about potential locations from research.
+4.  **KGC App Features:** A list of available features within the app.
 
 **YOUR INSTRUCTIONS:**
-1.  **Analyze the Context:** First, review the user's query and their CPDs to understand their goal (e.g., "The user wants a 30-minute walk").
-2.  **Select the Best Results:** From the provided search information, identify the top 3-4 locations that are most relevant to the user's query and their health plan.
-3.  **Construct Your Response:** You must construct a response that strictly follows this structure:
-    a. **Warm Opening:** Start with a warm, positive opening that acknowledges the user's query.
-    b. **Link to Care Plan:** Explicitly connect your recommendations to their doctor's advice. This is critical for building trust and reinforcing the care plan.
-    c. **Provide Recommendations:** Present the 3-4 selected locations as a clear, easy-to-read list. For each location, provide a brief, helpful, and appealing description (1-2 sentences).
+1.  **Analyze the Full Context:** Review the user's query and their CPDs to find a connection. For example, if the query is about "walking" and a CPD mentions "walk 30 minutes daily," you have found a perfect link.
+2.  **Select & Curate:** From the provided Search Results, select the top 3-4 locations that are most relevant to the user's query and their health plan.
+3.  **Construct Your Personalized Response:** You must construct a response that strictly follows this structure:
+    a. **Warm, Personalized Opening:** Start with a positive opening that acknowledges the user's query AND explicitly connects it to their care plan. **Example:** "That's a fantastic idea! Getting out for a walk is a perfect way to work on your goal of walking 30 minutes each day."
+    b. **Provide Recommendations:** Present the 3-4 selected locations as a clear, easy-to-read list. For each location, provide a brief, helpful, and appealing description (1-2 sentences).
+    c. **Proactive Feature Recommendation:** After the list, subtly suggest ONE relevant KGC app feature that could help them. **Example:** "Once you find a walk you enjoy, you could save it in your Wellness Plan to help track your progress!"
     d. **Motivational Closing:** End with an encouraging closing statement and an open-ended question to continue the conversation.
 
 **YOUR CONSTRAINTS:**
-- **BE SUCCINCT:** Your response should be clear and to the point.
-- **NEVER GIVE MEDICAL ADVICE:** Do not diagnose, treat, or offer medical opinions.
-- **ALWAYS BE POSITIVE:** Maintain a supportive and empowering tone.
-- **DO NOT MENTION YOUR TOOLS:** Never say "I have searched the web" or "According to my search results." Simply present the information as if you know it.
+- **BE SUCCINCT AND HELPFUL:** Your response should be clear and to the point.
+- **NEVER GIVE MEDICAL ADVICE.**
+- **ALWAYS BE POSITIVE AND EMPOWERING.**
+- **DO NOT MENTION YOUR TOOLS:** Never say "I searched the web." Present the information naturally.
 `;
 
 interface SupervisorQuery {
@@ -544,7 +545,7 @@ YOUR TASK: Provide a caring, motivational, and educational response that:
       const mcpBundle = await AIContextService.prepareSecureContext({ userId });
       
       // Use Tavily search tool for actual location data
-      const tavilyResults = await this.tavilySearchTool(`best places for a ${activity} in ${location}`);
+      const tavilyResults = await this.performTavilyLocationSearch(`best places for a ${activity} in ${location}`);
       const synthesizedResponse = await this.synthesizeLocationResponse(parsedQuery, tavilyResults, mcpBundle);
 
       return synthesizedResponse;
@@ -562,26 +563,36 @@ YOUR TASK: Provide a caring, motivational, and educational response that:
   /**
    * Synthesize location recommendations with Care Plan Directives
    */
-  private async synthesizeLocationResponse(parsedQuery: any, originalQuery: string, searchResults: any, mcpBundle: any): Promise<string> {
+  private async synthesizeLocationResponse(parsedQuery: any, tavilyResults: any, mcpBundle: any): Promise<string> {
     try {
+      // Define the features of the KGC App that the AI can recommend
+      const KGC_APP_FEATURES = [
+        "Your Wellness Plan to track activities",
+        "The Food Database for recipe inspiration", 
+        "The Daily Self-Scoring feature to log your progress"
+      ];
+
       const { activity = 'activity', location = 'area' } = parsedQuery.entities;
 
-      // Construct the user message for synthesis
+      // Construct the user message for synthesis, now including app features
       const userPromptForSynthesis = `
-        User's Original Query: "${originalQuery}"
+        User's Original Query: "${activity} in ${location}"
 
         Patient's Care Plan Directives (CPDs):
         ${mcpBundle.care_plan_directives}
 
-        Search Results for ${activity} in ${location}:
-        ${JSON.stringify(searchResults, null, 2)}
+        Tavily Search Results:
+        ${JSON.stringify(tavilyResults, null, 2)}
+
+        KGC App Features available for recommendation:
+        ${JSON.stringify(KGC_APP_FEATURES)}
       `;
 
-      // Make the synthesis API call
+      // Make the final API call to the LLM for synthesis
       const response = await openai.chat.completions.create({
         model: 'gpt-4o',
         messages: [
-          { role: 'system', content: LOCATION_SYNTHESIS_PROMPT },
+          { role: 'system', content: LOCATION_SYNTHESIS_PROMPT }, // Using the NEW, enhanced prompt
           { role: 'user', content: userPromptForSynthesis }
         ],
         max_tokens: 600,
@@ -590,7 +601,7 @@ YOUR TASK: Provide a caring, motivational, and educational response that:
 
       const synthesizedResponse = response.choices[0]?.message?.content;
       
-      return synthesizedResponse || "I found some great options for you, but I'm having a little trouble describing them right now.";
+      return synthesizedResponse || "I found some great options, but am having trouble personalizing them for you right now.";
 
     } catch (error) {
       secureLog('Response synthesis failed', { 
@@ -598,6 +609,70 @@ YOUR TASK: Provide a caring, motivational, and educational response that:
       });
       
       return "I'm sorry, I'm having trouble processing that request right now. Could you try again in a moment?";
+    }
+  }
+
+  /**
+   * Perform location search using Tavily API
+   */
+  private async performTavilyLocationSearch(searchQuery: string): Promise<any> {
+    try {
+      const axios = require('axios');
+      
+      if (!process.env.TAVILY_API_KEY) {
+        secureLog('TAVILY_API_KEY not configured for location search');
+        return {
+          query: searchQuery,
+          results: [],
+          message: "Location search service not configured"
+        };
+      }
+
+      const response = await axios({
+        method: 'post',
+        url: 'https://api.tavily.com/search',
+        data: {
+          api_key: process.env.TAVILY_API_KEY,
+          query: searchQuery,
+          search_depth: 'advanced',
+          include_answer: true,
+          include_raw_content: false,
+          max_results: 8,
+          include_images: true
+        },
+        timeout: 15000
+      });
+
+      if (!response.data || !response.data.results) {
+        return {
+          query: searchQuery,
+          results: [],
+          message: "No location results found"
+        };
+      }
+
+      return {
+        query: searchQuery,
+        answer: response.data.answer,
+        results: response.data.results.map((result: any) => ({
+          title: result.title || 'Location',
+          url: result.url,
+          content: result.content?.substring(0, 300) || 'No description available',
+          score: result.score || 0
+        }))
+      };
+
+    } catch (error) {
+      secureLog('Tavily location search failed', { 
+        error: error instanceof Error ? error.message : 'Unknown error',
+        query: searchQuery
+      });
+      
+      return {
+        query: searchQuery,
+        results: [],
+        message: "Location search temporarily unavailable"
+      };
     }
   }
 
