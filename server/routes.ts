@@ -536,6 +536,47 @@ export function registerRoutes(app: Express) {
         res.json({ status: 'success', message: 'Phase 1: Care plan saving will be implemented in Phase 2' });
     });
 
+    // Get latest health metrics for patient
+    router.get('/users/:userId/health-metrics/latest', authMiddleware(['patient', 'doctor', 'admin']), async (req: AuthenticatedRequest, res) => {
+        try {
+            const userId = parseInt(req.params.userId);
+            
+            // Security check: patients can only access their own data
+            if (req.user!.role === 'patient' && req.user!.userId !== userId) {
+                return res.status(403).json({ message: 'Access denied' });
+            }
+
+            const patient = await db.query.patients.findFirst({
+                where: eq(schema.patients.userId, userId)
+            });
+
+            if (!patient) {
+                return res.status(404).json({ message: 'Patient record not found' });
+            }
+
+            const latestMetric = await db.select({
+                id: schema.healthMetrics.id,
+                date: schema.healthMetrics.date,
+                medicationScore: schema.healthMetrics.medicationScore,
+                dietScore: schema.healthMetrics.dietScore,
+                exerciseScore: schema.healthMetrics.exerciseScore
+            })
+            .from(schema.healthMetrics)
+            .where(eq(schema.healthMetrics.patientId, patient.id))
+            .orderBy(desc(schema.healthMetrics.date))
+            .limit(1);
+
+            if (latestMetric.length === 0) {
+                return res.json(null); // No metrics found
+            }
+
+            res.json(latestMetric[0]);
+        } catch (error) {
+            console.error('Error fetching latest health metrics:', error);
+            res.status(500).json({ message: 'Internal server error' });
+        }
+    });
+
     router.get('/patients/me/health-metrics/history', authMiddleware(['patient']), async (req: AuthenticatedRequest, res) => {
         try {
             const patient = await db.query.patients.findFirst({
