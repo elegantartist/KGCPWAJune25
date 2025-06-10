@@ -703,7 +703,10 @@ export function registerRoutes(app: Express) {
         try {
             // Test basic functionality
             const testResponse = await supervisorAgent.runSupervisorQuery({
-                userQuery: 'Health check test',
+                message: {
+                    text: 'Health check test',
+                    sentAt: new Date().toISOString()
+                },
                 userId: req.user!.userId,
                 requiresValidation: false
             });
@@ -1068,6 +1071,50 @@ export function registerRoutes(app: Express) {
     });
 
     // Analytics dashboard summary endpoint
+    // Offline message synchronization endpoint
+    router.post('/api/sync-offline-messages', authMiddleware(), async (req: AuthenticatedRequest, res) => {
+        try {
+            const { messages } = req.body;
+            
+            if (!messages || !Array.isArray(messages)) {
+                return res.status(400).json({ error: 'Invalid messages format' });
+            }
+
+            const processedResponses = [];
+            const syncedMessageIds = [];
+
+            for (const message of messages) {
+                try {
+                    // Process each offline message through the supervisor agent
+                    const response = await supervisorAgent.runSupervisorQuery({
+                        message: {
+                            text: message.text,
+                            sentAt: message.sentAt
+                        },
+                        userId: req.user!.userId,
+                        sessionId: message.sessionId
+                    });
+
+                    processedResponses.push(response);
+                    syncedMessageIds.push(message.id);
+                } catch (error) {
+                    console.error('Failed to process offline message:', error);
+                    // Continue processing other messages even if one fails
+                }
+            }
+
+            res.json({
+                success: true,
+                messagesProcessed: processedResponses.length,
+                syncedMessageIds,
+                responses: processedResponses
+            });
+        } catch (error) {
+            console.error('Sync offline messages error:', error);
+            res.status(500).json({ error: 'Failed to sync offline messages' });
+        }
+    });
+
     router.get('/v4/analytics/dashboard', authMiddleware(['patient', 'doctor']), async (req: AuthenticatedRequest, res) => {
         try {
             const targetUserId = req.user!.role === 'patient' ? req.user!.userId : req.user!.userId;

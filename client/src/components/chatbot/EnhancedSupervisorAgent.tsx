@@ -29,7 +29,9 @@ import axios from 'axios';
 import { useSimpleToast } from '@/hooks/simple-toast';
 import { ConnectivityLevel } from '@/../../shared/types';
 import { useProgressMilestones } from '@/hooks/useProgressMilestones';
-import { useConnectivity } from '@/hooks/useConnectivity';
+import { useOnlineStatus } from '@/hooks/useOnlineStatus';
+import { offlineQueueService } from '@/services/offlineQueueService';
+import { useNotificationStore } from '@/stores/notificationStore';
 import { speakText, stopSpeaking } from '@/lib/speechUtils';
 // We'll implement a simplified connectivity check directly rather than removing it entirely
 
@@ -52,14 +54,14 @@ type SpeechRecognitionErrorEventType = Event & { error: string };
 function sanitizeChatbotResponse(text: string): string {
   // First, check if response contains system prompt directives (markers)
   const systemDirectivePatterns = [
-    /# CARE PLAN DIRECTIVES.*?(?=\n\n|$)/gs,
-    /# IMPORTANT PATIENT MEMORY CONTEXT.*?(?=\n\n|$)/gs,
-    /# FOOD PREFERENCES AND DIETARY CONTEXT.*?(?=\n\n|$)/gs,
-    /# FOOD DATABASE PREFERENCES.*?(?=\n\n|$)/gs,
-    /CRITICAL COMPLIANCE REQUIREMENT:.*?(?=\n\n|$)/gs,
-    /# SYSTEM INSTRUCTIONS.*?(?=\n\n|$)/gs,
-    /\[SYSTEM:.*?\]/gs,
-    /\[INSTRUCTIONS:.*?\]/gs
+    /# CARE PLAN DIRECTIVES[\s\S]*?(?=\n\n|$)/,
+    /# IMPORTANT PATIENT MEMORY CONTEXT[\s\S]*?(?=\n\n|$)/,
+    /# FOOD PREFERENCES AND DIETARY CONTEXT[\s\S]*?(?=\n\n|$)/,
+    /# FOOD DATABASE PREFERENCES[\s\S]*?(?=\n\n|$)/,
+    /CRITICAL COMPLIANCE REQUIREMENT:[\s\S]*?(?=\n\n|$)/,
+    /# SYSTEM INSTRUCTIONS[\s\S]*?(?=\n\n|$)/,
+    /\[SYSTEM:[\s\S]*?\]/,
+    /\[INSTRUCTIONS:[\s\S]*?\]/
   ];
   
   // Remove any system directives from the text
@@ -127,18 +129,15 @@ export function EnhancedSupervisorAgent({
     milestones: userMilestones
   } = useProgressMilestones(userId);
   
+  // Visual connectivity system hooks
+  const isOnline = useOnlineStatus();
+  const { setPendingMessageCount } = useNotificationStore();
+  
   // State for storing patient name
   const [patientName, setPatientName] = useState<string>('');
   
-  // Use the connectivity hook
-  const { 
-    connectivityLevel: detectedConnectivityLevel, 
-    setConnectivity,
-    isOffline: detectedIsOffline,
-    isMinimal: detectedIsMinimal,
-    isFunctional: detectedIsFunctional,
-    isFull: detectedIsFull 
-  } = useConnectivity();
+  // Simplified connectivity state - using the visual connectivity system
+  const connectivityLevel = isOnline ? ConnectivityLevel.FULL : ConnectivityLevel.OFFLINE;
   
   // Always force connectivity to FULL to avoid error messages
   // This ensures compatibility with mobile devices that may have intermittent connectivity

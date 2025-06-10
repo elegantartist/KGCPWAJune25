@@ -8,6 +8,8 @@ import { MessageCircle, BarChart, ArrowRight, ArrowLeft } from 'lucide-react';
 import { LogoutButton } from "@/components/ui/LogoutButton";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
+import { useNotificationStore } from '../stores/notificationStore';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { createHapticFeedback } from "@/lib/hapticFeedback";
 import EnhancedImageStore from "@/lib/enhancedImageStore";
 import HealthImageCarousel from "@/components/health/HealthImageCarousel";
@@ -33,13 +35,15 @@ const Dashboard: React.FC = () => {
   const [keepGoingVibrating, setKeepGoingVibrating] = useState(false);
   const [scoresVibrating, setScoresVibrating] = useState(false);
   const [motivationalImage, setMotivationalImage] = useState<string | null>(null);
-  // Connectivity level state removed - app now requires internet connection
-  // const [connectivityLevel, setConnectivityLevel] = useState(ConnectivityLevel.FULL);
-
+  
   // Get responsive layout information
   const isMobile = useIsMobile();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  
+  // Visual connectivity system hooks
+  const isOnline = useOnlineStatus();
+  const { hasNewChatMessages, pendingMessageCount, clearNotifications } = useNotificationStore();
 
   // Connectivity change listener removed - app now requires internet connection
 
@@ -229,6 +233,9 @@ const Dashboard: React.FC = () => {
                   onClick={() => {
                     try {
                       triggerVibration('chat');
+                      // Clear notifications when navigating to chatbot
+                      clearNotifications();
+                      
                       // Ensure current user is stored properly for the chatbot page
                       if (user) {
                         localStorage.setItem('currentUser', JSON.stringify({
@@ -258,8 +265,21 @@ const Dashboard: React.FC = () => {
                     }
                   }}
                 >
-                  <MessageCircle className="h-6 w-6 mr-2 flex-shrink-0" />
-                  <span>Chat</span>
+                  <div className="relative">
+                    <MessageCircle className="h-6 w-6 mr-2 flex-shrink-0" />
+                    <span>Chat</span>
+                    {/* Notification badges */}
+                    {(hasNewChatMessages || pendingMessageCount > 0) && (
+                      <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                        {pendingMessageCount > 0 ? pendingMessageCount : '!'}
+                      </div>
+                    )}
+                    {!isOnline && pendingMessageCount > 0 && (
+                      <div className="absolute -bottom-1 -right-1 bg-orange-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
+                        <span className="text-[10px]">⏱</span>
+                      </div>
+                    )}
+                  </div>
                 </Button>
               </div>
               <div className="w-full">
