@@ -1072,16 +1072,16 @@ export function registerRoutes(app: Express) {
                         predictive: alerts.length,
                         active: activeAlerts.length,
                         critical: [...alerts, ...activeAlerts].filter(a => a.severity === 'critical').length,
-                        actionRequired: [...alerts, ...activeAlerts].filter(a => a.actionable || a.severity === 'high' || a.severity === 'critical').length
+                        actionRequired: [...alerts, ...activeAlerts].filter(a => a.severity === 'high' || a.severity === 'critical').length
                     },
                     insights: {
                         total: insights.length,
                         highPriority: insights.filter(i => i.priority === 'high').length,
                         actionable: insights.filter(i => i.actionable).length
                     },
-                    overallHealthScore: this.calculateOverallHealthScore(trends),
-                    riskLevel: this.calculateRiskLevel(alerts, activeAlerts),
-                    recommendedActions: this.getTopRecommendations(insights, activeAlerts)
+                    overallHealthScore: calculateOverallHealthScore(trends),
+                    riskLevel: calculateRiskLevel(alerts, activeAlerts),
+                    recommendedActions: getTopRecommendations(insights, activeAlerts)
                 },
                 generatedAt: new Date().toISOString()
             });
