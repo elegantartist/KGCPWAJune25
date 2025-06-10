@@ -137,16 +137,11 @@ export function EnhancedSupervisorAgent({
   const [patientName, setPatientName] = useState<string>('');
   
   // Simplified connectivity state - using the visual connectivity system
-  const connectivityLevel = isOnline ? ConnectivityLevel.FULL : ConnectivityLevel.OFFLINE;
-  
-  // Always force connectivity to FULL to avoid error messages
-  // This ensures compatibility with mobile devices that may have intermittent connectivity
-  const connectivityLevel = ConnectivityLevel.FULL;
-  const isOffline = false; // Force to always appear online
-  // These connectivity levels no longer exist in the enum, keeping variables for backward compatibility
+  const currentConnectivityLevel = isOnline ? ConnectivityLevel.FULL : ConnectivityLevel.OFFLINE;
+  const isOffline = !isOnline;
   const isMinimal = false;
-  const isFunctional = false;
-  const isFull = true; // Always show as fully connected
+  const isFunctional = isOnline;
+  const isFull = isOnline;
 
   // Setup service worker message handler for notifications from the service worker
   useEffect(() => {
@@ -354,7 +349,7 @@ export function EnhancedSupervisorAgent({
           userId,
           healthMetrics,
           conversationHistory,
-          connectivityLevel // Ensure we're passing the current connectivity level
+          currentConnectivityLevel // Ensure we're passing the current connectivity level
         });
         
         // Safety check for valid response
@@ -447,34 +442,22 @@ export function EnhancedSupervisorAgent({
     }
   }, [isSpeechEnabled]);
 
-  // Simplified connectivity check - just try to ping the server
+  // Simplified connectivity check - using visual connectivity system
   const checkConnectivity = async () => {
-    try {
-      const response = await fetch('/api/connectivity/test');
-      // Always set connectivity to FULL regardless of response
-      // This prevents error messages on mobile devices with intermittent connectivity
-      setConnectivity(ConnectivityLevel.FULL);
-    } catch (error) {
-      // Even if we can't reach the server, keep showing as online
-      // to avoid disrupting the user experience
-      console.log('Connectivity check failed, but keeping status as online');
-      setConnectivity(ConnectivityLevel.FULL);
-    }
+    // Visual connectivity system handles this automatically
+    console.log('Connectivity status:', isOnline ? 'online' : 'offline');
   };
 
   // Handle online status change
   const handleOnline = () => {
-    setConnectivity(ConnectivityLevel.FULL);
-    // Try to sync any pending data
-    fetch('/api/sync', { method: 'POST' }).catch(() => {}); // Ignore errors
+    // Visual connectivity system handles sync automatically
+    console.log('Browser came back online');
   };
 
-  // Handle offline status change - but keep showing as online
+  // Handle offline status change
   const handleOffline = () => {
-    // Log the offline event but keep the UI showing as online
-    console.log('Browser reported offline status, but keeping UI as online');
-    // Don't change connectivity status to avoid disrupting user experience
-    setConnectivity(ConnectivityLevel.FULL);
+    // Visual connectivity system handles offline state
+    console.log('Browser went offline');
   };
 
   // Get the conversation history for context
@@ -521,6 +504,38 @@ export function EnhancedSupervisorAgent({
     setInput('');
     setAgentStatus('thinking');
     
+    // If offline, queue the message for later processing
+    if (!isOnline) {
+      // Remove pending message
+      setMessages(prev => prev.filter(msg => msg.id !== pendingMessage.id));
+      
+      // Add to offline queue
+      offlineQueueService.addToQueue({
+        id: crypto.randomUUID(),
+        text: input,
+        sentAt: new Date().toISOString(),
+        userId,
+        sessionId: crypto.randomUUID()
+      });
+      
+      // Add offline response message
+      const offlineMessage: Message = {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: 'Your message has been saved. I\'ll respond when you\'re back online.',
+        timestamp: new Date(),
+        offline: true
+      };
+      
+      setMessages(prev => [...prev, offlineMessage]);
+      setAgentStatus('idle');
+      
+      // Update pending count in notification store
+      setPendingMessageCount(offlineQueueService.getPendingCount());
+      
+      return;
+    }
+
     // Check if the user is responding positively to reviewing their health scores
     const positiveResponses = ['yes', 'yeah', 'sure', 'ok', 'okay', 'please', 'i would', 'let\'s do it', 'let\'s discuss', 'discuss', 'analyze', 'review'];
     const userInputLower = userMessage.content.toLowerCase().trim();
@@ -547,7 +562,7 @@ export function EnhancedSupervisorAgent({
       const conversationHistory = getConversationHistory();
       
       // Log the connectivity level we're sending to the server
-      console.log(`Sending request with connectivity level: ${ConnectivityLevel[connectivityLevel]} (${connectivityLevel})`);
+      console.log(`Sending request - online status: ${isOnline}`);
       
       // Send request to the Supervisor Agent with timestamped message payload
       let responseData;
