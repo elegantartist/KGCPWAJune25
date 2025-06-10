@@ -10,6 +10,7 @@ import { userCreationService } from './services/userCreationService';
 import { uinService } from './services/uinService';
 import { AIContextService } from './services/aiContextService';
 import { secureLog, emergencyPiiScan } from './services/privacyMiddleware';
+import { supervisorAgent } from './services/supervisorAgent';
 
 export function registerRoutes(app: Express) {
     const router = Router();
@@ -625,6 +626,109 @@ export function registerRoutes(app: Express) {
             res.json(summary);
         } catch (error: any) {
             res.status(500).json({ message: 'Failed to get context summary' });
+        }
+    });
+
+    // --- SUPERVISOR AGENT ENDPOINTS (Phase 2) ---
+    
+    // Main Supervisor Agent query endpoint
+    router.post('/v2/supervisor/query', authMiddleware(['patient', 'doctor']), async (req: AuthenticatedRequest, res) => {
+        try {
+            const { userQuery, requiresValidation, sessionId } = req.body;
+            
+            if (!userQuery || typeof userQuery !== 'string') {
+                return res.status(400).json({ message: 'userQuery is required and must be a string' });
+            }
+
+            secureLog('Supervisor query received', { 
+                userId: req.user!.userId,
+                queryLength: userQuery.length,
+                sessionId 
+            });
+
+            // For doctors, they might be querying on behalf of patients
+            // For patients, they query for themselves
+            const targetUserId = req.user!.role === 'patient' ? req.user!.userId : req.user!.userId;
+
+            const response = await supervisorAgent.runSupervisorQuery({
+                userQuery,
+                userId: targetUserId,
+                sessionId,
+                requiresValidation: requiresValidation || false
+            });
+
+            res.json({
+                success: true,
+                data: response,
+                timestamp: new Date().toISOString()
+            });
+
+        } catch (error: any) {
+            secureLog('Supervisor query endpoint error', { error: error.message });
+            res.status(500).json({ 
+                success: false,
+                message: 'Supervisor agent unavailable',
+                error: process.env.NODE_ENV === 'development' ? error.message : undefined
+            });
+        }
+    });
+
+    // Health check for Supervisor Agent
+    router.get('/v2/supervisor/health', authMiddleware(['admin', 'doctor']), async (req: AuthenticatedRequest, res) => {
+        try {
+            // Test basic functionality
+            const testResponse = await supervisorAgent.runSupervisorQuery({
+                userQuery: 'Health check test',
+                userId: req.user!.userId,
+                requiresValidation: false
+            });
+
+            res.json({
+                status: 'healthy',
+                supervisorAgent: 'operational',
+                lastResponse: testResponse.response ? 'generated' : 'failed',
+                processingTime: testResponse.processingTime,
+                timestamp: new Date().toISOString()
+            });
+        } catch (error: any) {
+            res.status(503).json({
+                status: 'unhealthy',
+                supervisorAgent: 'error',
+                error: error.message,
+                timestamp: new Date().toISOString()
+            });
+        }
+    });
+
+    // Get Supervisor Agent capabilities (for frontend integration)
+    router.get('/v2/supervisor/capabilities', authMiddleware(['patient', 'doctor']), async (req: AuthenticatedRequest, res) => {
+        try {
+            res.json({
+                version: '2.0',
+                capabilities: [
+                    'health-guidance',
+                    'meal-inspiration',
+                    'wellness-inspiration',
+                    'care-plan-adherence',
+                    'motivational-support'
+                ],
+                supportedModels: ['gpt-4', 'claude-3-sonnet'],
+                features: {
+                    multiModelValidation: true,
+                    piiProtection: true,
+                    carePlanIntegration: true,
+                    conversationHistory: true,
+                    toolCalling: true
+                },
+                safetyFeatures: [
+                    'pii-redaction',
+                    'multi-model-validation',
+                    'medical-boundary-enforcement',
+                    'care-plan-adherence-checking'
+                ]
+            });
+        } catch (error: any) {
+            res.status(500).json({ message: 'Failed to get capabilities' });
         }
     });
 
