@@ -8,6 +8,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { AIContextService } from './aiContextService';
 import { secureLog, validateMcpBundleSecurity } from './privacyMiddleware';
 import { getMealInspiration, getWellnessInspiration, getWeeklyMealPlan, getWellnessProgram } from './inspirationMachines';
+import { parseUserQuery, performStructuredLocationSearch } from './queryParser';
 import { db } from '../db';
 import * as schema from '@shared/schema';
 import { eq } from 'drizzle-orm';
@@ -179,25 +180,41 @@ class SupervisorAgent {
         deltaInMinutes
       });
 
-      // --- PART 2 ENHANCEMENT: Early Intent Classification ---
-      // Classify user intent FIRST to handle location queries intelligently
-      const isLocationIntent = this.classifyLocationIntent(userQuery);
+      // --- NEW STEP 1: Parse the query to understand intent and entities ---
+      const parsedQuery = await parseUserQuery(userQuery);
       
-      if (isLocationIntent) {
-        secureLog('Location intent detected, bypassing PII validation for location terms', { 
-          sessionId: finalSessionId,
-          query: userQuery.substring(0, 50) + '...'
+      secureLog('Query parsed successfully', {
+        sessionId: finalSessionId,
+        intent: parsedQuery.intent,
+        entityCount: Object.keys(parsedQuery.entities).length,
+        isSafeForTooling: parsedQuery.isSafeForTooling,
+        confidence: parsedQuery.confidence
+      });
+
+      // --- NEW STEP 2: Intelligent Tool-Use based on Intent ---
+      if (parsedQuery.intent === 'find_location_for_activity' && 
+          parsedQuery.entities.location && 
+          parsedQuery.isSafeForTooling &&
+          parsedQuery.confidence > 0.7) {
+        
+        secureLog('Location intent detected. Using structured location search.', { 
+          entities: parsedQuery.entities,
+          sessionId: finalSessionId
         });
-        
-        // For location queries, immediately use search tool with extracted location
-        const locationEntity = this.extractLocationEntity(userQuery);
-        const searchResponse = await this.performLocationSearch(locationEntity, userQuery, userId, finalSessionId);
-        
+
+        // Call the structured location search with extracted entities
+        const searchResponse = await performStructuredLocationSearch(
+          parsedQuery.entities,
+          userQuery,
+          userId,
+          finalSessionId
+        );
+
         mainResponse = {
           response: searchResponse,
           sessionId: finalSessionId,
-          modelUsed: 'location-search',
-          toolsUsed: ['tavily-search'],
+          modelUsed: 'structured-location-search',
+          toolsUsed: ['nlu-parser', 'location-synthesis'],
           processingTime: Date.now() - startTime
         };
       } else {
@@ -219,17 +236,17 @@ class SupervisorAgent {
           throw new Error(`Security validation failed: ${securityValidation.violations.join(', ')}`);
         }
 
-        // 3. Determine if tool calling is needed
+        // 3. Enhanced tool calling with parsed intent context
         const toolResponse = await this.checkForToolCalling(userQuery, mcpBundle);
         if (toolResponse) {
-        mainResponse = {
-          response: toolResponse.response,
-          sessionId: finalSessionId,
-          modelUsed: 'tool-based',
-          toolsUsed: toolResponse.tools,
-          processingTime: Date.now() - startTime
-        };
-      } else {
+          mainResponse = {
+            response: toolResponse.response,
+            sessionId: finalSessionId,
+            modelUsed: 'tool-based',
+            toolsUsed: toolResponse.tools,
+            processingTime: Date.now() - startTime
+          };
+        } else {
         // 4. Construct primary LLM prompt
         const systemPrompt = this.buildSystemPrompt();
         const userPrompt = this.buildUserPrompt(userQuery, mcpBundle);
@@ -318,8 +335,9 @@ class SupervisorAgent {
 
   /**
    * Check if the query requires specific tool calling (Phase 3: Enhanced with async tools)
+   * Enhanced with parsed query context for better intent understanding
    */
-  private async checkForToolCalling(userQuery: string, mcpBundle: any): Promise<{ response: string; tools: string[] } | null> {
+  private async checkForToolCalling(userQuery: string, mcpBundle: any, parsedQuery?: any): Promise<{ response: string; tools: string[] } | null> {
     const query = userQuery.toLowerCase();
 
     // Weekly meal planning tool
