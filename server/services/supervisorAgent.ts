@@ -530,9 +530,10 @@ YOUR TASK: Provide a caring, motivational, and educational response that:
     // --- START OF MODIFICATIONS ---
 
     // Part 1: Proactive Prerequisite Check
-    const MAPPING_SERVICE_API_KEY = process.env.MAPPING_SERVICE_API_KEY;
-    if (!MAPPING_SERVICE_API_KEY) {
-      secureLog('CRITICAL_ERROR: MAPPING_SERVICE_API_KEY is not configured.', { sessionId, userId });
+    const TAVILY_API_KEY = process.env.TAVILY_API_KEY;
+    if (!TAVILY_API_KEY) {
+      // Also update the log message to be accurate.
+      secureLog('CRITICAL_ERROR: TAVILY_API_KEY is not configured for location searches.', { sessionId, userId });
       return "I'm sorry, my location search feature is not configured correctly at the moment. I can still help with other questions you might have.";
     }
 
