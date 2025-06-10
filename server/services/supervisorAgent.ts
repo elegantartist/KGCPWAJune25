@@ -526,81 +526,37 @@ YOUR TASK: Provide a caring, motivational, and educational response that:
    * Advanced location search with Care Plan Directive synthesis
    */
   private async performAdvancedLocationSearch(parsedQuery: any, userQuery: string, userId: number, sessionId: string): Promise<string> {
+    // --- START OF MODIFICATIONS ---
+
+    // Part 1: Proactive Prerequisite Check
+    const MAPPING_SERVICE_API_KEY = process.env.MAPPING_SERVICE_API_KEY;
+    if (!MAPPING_SERVICE_API_KEY) {
+      secureLog('CRITICAL_ERROR: MAPPING_SERVICE_API_KEY is not configured.', { sessionId, userId });
+      return "I'm sorry, my location search feature is not configured correctly at the moment. I can still help with other questions you might have.";
+    }
+
+    // Part 2: Comprehensive try...catch Error Insulation
     try {
-      const { activity = 'activity', location = 'area', timeframe } = parsedQuery.entities;
-      
-      secureLog('Advanced location search initiated', { 
-        activity, 
-        location, 
-        timeframe,
-        userId, 
-        sessionId 
-      });
+      const { activity = 'activity', location = 'area' } = parsedQuery.entities;
+      secureLog('Advanced location search initiated', { activity, location, userId, sessionId });
 
       // Get patient's care plan directives
-      const contextData = await AIContextService.prepareSecureContext({
-        userId,
-        includeHealthMetrics: true,
-        includeChatHistory: false,
-        maxHistoryItems: 0
-      });
-
-      const mcpBundle = contextData.secureBundle;
-
-      // Simulate search results with relevant location data
-      const searchResults = {
-        locations: [
-          {
-            name: `${location} Botanical Gardens`,
-            description: `Beautiful walking trails through native gardens with paved pathways suitable for all fitness levels`,
-            walkTime: "30-60 minutes",
-            difficulty: "Easy to moderate"
-          },
-          {
-            name: `${location} Esplanade`,
-            description: `Scenic waterfront walking path with stunning views and exercise equipment stations`,
-            walkTime: "20-90 minutes",
-            difficulty: "Easy"
-          },
-          {
-            name: `${location} National Park Trails`,
-            description: `Natural bushland trails with varying difficulty levels and beautiful wildlife viewing opportunities`,
-            walkTime: "45-120 minutes", 
-            difficulty: "Moderate to challenging"
-          },
-          {
-            name: `Local ${location} Parks`,
-            description: `Community parks with walking circuits, playgrounds, and shaded rest areas`,
-            walkTime: "15-45 minutes",
-            difficulty: "Easy"
-          }
-        ]
-      };
-
-      // Synthesize response using advanced prompt
-      const synthesizedResponse = await this.synthesizeLocationResponse(
-        parsedQuery,
-        userQuery,
-        searchResults,
-        mcpBundle
-      );
-
-      secureLog('Advanced location search completed', { 
-        sessionId,
-        responseLength: synthesizedResponse.length
-      });
+      const mcpBundle = await AIContextService.prepareSecureContext({ userId });
+      
+      // Use Tavily search tool for actual location data
+      const tavilyResults = await this.tavilySearchTool(`best places for a ${activity} in ${location}`);
+      const synthesizedResponse = await this.synthesizeLocationResponse(parsedQuery, tavilyResults, mcpBundle);
 
       return synthesizedResponse;
 
     } catch (error) {
-      secureLog('Advanced location search failed', { 
-        error: error instanceof Error ? error.message : 'Unknown error',
-        sessionId 
-      });
-      
-      const { activity = 'activity', location = 'the area' } = parsedQuery.entities;
-      return `I'd love to help you find places for ${activity} in ${location}! While I'm having trouble accessing location data right now, I recommend checking local tourism websites or asking locals for their favorite spots. ${activity} is wonderful for your health!`;
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      secureLog('ERROR during performAdvancedLocationSearch', { sessionId, userId, error: errorMessage });
+
+      // Return a graceful, user-facing fallback message.
+      return "I'm having a little trouble accessing specific location details right now, but I can still help with other questions or provide general wellness tips!";
     }
+    // --- END OF MODIFICATIONS ---
   }
 
   /**
