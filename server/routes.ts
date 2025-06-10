@@ -12,6 +12,8 @@ import { AIContextService } from './services/aiContextService';
 import { secureLog, emergencyPiiScan } from './services/privacyMiddleware';
 import { supervisorAgent } from './services/supervisorAgent';
 import { getMealInspiration, getWellnessInspiration, getWeeklyMealPlan, getWellnessProgram } from './services/inspirationMachines';
+import { analyzeHealthTrends, generatePredictiveAlerts, generateAnalyticsInsights } from './services/analyticsEngine';
+import { proactiveMonitoring } from './services/proactiveMonitoring';
 
 export function registerRoutes(app: Express) {
     const router = Router();
@@ -873,5 +875,269 @@ export function registerRoutes(app: Express) {
         }
     });
 
+    // --- PHASE 4: ANALYTICS ENGINE & PROACTIVE MONITORING ---
+
+    // Health trends analysis endpoint
+    router.get('/v4/analytics/trends/:timeframe?', authMiddleware(['patient', 'doctor']), async (req: AuthenticatedRequest, res) => {
+        try {
+            const targetUserId = req.user!.role === 'patient' ? req.user!.userId : req.user!.userId;
+            const timeframe = parseInt(req.params.timeframe || '30');
+
+            const trends = await analyzeHealthTrends(targetUserId, timeframe);
+
+            res.json({
+                success: true,
+                trends,
+                timeframe: `${timeframe} days`,
+                generatedAt: new Date().toISOString(),
+                userId: targetUserId
+            });
+        } catch (error: any) {
+            res.status(500).json({
+                success: false,
+                message: 'Health trends analysis unavailable',
+                error: error.message
+            });
+        }
+    });
+
+    // Predictive alerts endpoint
+    router.get('/v4/analytics/alerts', authMiddleware(['patient', 'doctor']), async (req: AuthenticatedRequest, res) => {
+        try {
+            const targetUserId = req.user!.role === 'patient' ? req.user!.userId : req.user!.userId;
+
+            const alerts = await generatePredictiveAlerts(targetUserId);
+
+            res.json({
+                success: true,
+                alerts,
+                alertCount: alerts.length,
+                criticalAlerts: alerts.filter(a => a.severity === 'critical').length,
+                generatedAt: new Date().toISOString()
+            });
+        } catch (error: any) {
+            res.status(500).json({
+                success: false,
+                message: 'Predictive alerts unavailable',
+                error: error.message
+            });
+        }
+    });
+
+    // Comprehensive analytics insights endpoint
+    router.get('/v4/analytics/insights', authMiddleware(['patient', 'doctor']), async (req: AuthenticatedRequest, res) => {
+        try {
+            const targetUserId = req.user!.role === 'patient' ? req.user!.userId : req.user!.userId;
+
+            const insights = await generateAnalyticsInsights(targetUserId);
+
+            res.json({
+                success: true,
+                insights,
+                insightCount: insights.length,
+                highPriorityInsights: insights.filter(i => i.priority === 'high').length,
+                actionableInsights: insights.filter(i => i.actionable).length,
+                generatedAt: new Date().toISOString()
+            });
+        } catch (error: any) {
+            res.status(500).json({
+                success: false,
+                message: 'Analytics insights unavailable',
+                error: error.message
+            });
+        }
+    });
+
+    // Start proactive monitoring session
+    router.post('/v4/monitoring/start', authMiddleware(['patient', 'doctor']), async (req: AuthenticatedRequest, res) => {
+        try {
+            const targetUserId = req.user!.role === 'patient' ? req.user!.userId : req.user!.userId;
+
+            const session = await proactiveMonitoring.startMonitoringSession(targetUserId);
+
+            res.json({
+                success: true,
+                session: {
+                    userId: session.userId,
+                    startTime: session.startTime,
+                    status: session.status,
+                    alertsGenerated: session.alertsGenerated,
+                    trendsAnalyzed: session.trendsAnalyzed,
+                    interventionsTriggered: session.interventionsTriggered
+                },
+                message: 'Proactive monitoring session initiated'
+            });
+        } catch (error: any) {
+            res.status(500).json({
+                success: false,
+                message: 'Failed to start monitoring session',
+                error: error.message
+            });
+        }
+    });
+
+    // Get monitoring status
+    router.get('/v4/monitoring/status', authMiddleware(['patient', 'doctor']), async (req: AuthenticatedRequest, res) => {
+        try {
+            const targetUserId = req.user!.role === 'patient' ? req.user!.userId : req.user!.userId;
+
+            const status = proactiveMonitoring.getMonitoringStatus(targetUserId);
+
+            if (!status) {
+                return res.json({
+                    success: true,
+                    monitoring: false,
+                    message: 'No active monitoring session'
+                });
+            }
+
+            res.json({
+                success: true,
+                monitoring: true,
+                session: {
+                    userId: status.userId,
+                    startTime: status.startTime,
+                    endTime: status.endTime,
+                    status: status.status,
+                    alertsGenerated: status.alertsGenerated,
+                    trendsAnalyzed: status.trendsAnalyzed,
+                    interventionsTriggered: status.interventionsTriggered
+                }
+            });
+        } catch (error: any) {
+            res.status(500).json({
+                success: false,
+                message: 'Failed to get monitoring status',
+                error: error.message
+            });
+        }
+    });
+
+    // Get active health alerts
+    router.get('/v4/monitoring/alerts', authMiddleware(['patient', 'doctor']), async (req: AuthenticatedRequest, res) => {
+        try {
+            const targetUserId = req.user!.role === 'patient' ? req.user!.userId : req.user!.userId;
+
+            const alerts = await proactiveMonitoring.getActiveAlerts(targetUserId);
+
+            res.json({
+                success: true,
+                alerts: alerts.map(alert => ({
+                    id: alert.id,
+                    type: alert.type,
+                    severity: alert.severity,
+                    title: alert.title,
+                    message: alert.message,
+                    triggeredAt: alert.triggeredAt,
+                    actionItems: alert.actionItems,
+                    confidence: alert.confidence
+                })),
+                alertCount: alerts.length,
+                criticalAlerts: alerts.filter(a => a.severity === 'critical').length,
+                highAlerts: alerts.filter(a => a.severity === 'high').length
+            });
+        } catch (error: any) {
+            res.status(500).json({
+                success: false,
+                message: 'Failed to get active alerts',
+                error: error.message
+            });
+        }
+    });
+
+    // Analytics dashboard summary endpoint
+    router.get('/v4/analytics/dashboard', authMiddleware(['patient', 'doctor']), async (req: AuthenticatedRequest, res) => {
+        try {
+            const targetUserId = req.user!.role === 'patient' ? req.user!.userId : req.user!.userId;
+
+            // Run comprehensive analytics
+            const [trends, alerts, insights] = await Promise.all([
+                analyzeHealthTrends(targetUserId, 30),
+                generatePredictiveAlerts(targetUserId),
+                generateAnalyticsInsights(targetUserId)
+            ]);
+
+            const activeAlerts = await proactiveMonitoring.getActiveAlerts(targetUserId);
+
+            res.json({
+                success: true,
+                dashboard: {
+                    trends: {
+                        total: trends.length,
+                        improving: trends.filter(t => t.trend === 'improving').length,
+                        declining: trends.filter(t => t.trend === 'declining' || t.trend === 'concerning').length,
+                        stable: trends.filter(t => t.trend === 'stable').length
+                    },
+                    alerts: {
+                        predictive: alerts.length,
+                        active: activeAlerts.length,
+                        critical: [...alerts, ...activeAlerts].filter(a => a.severity === 'critical').length,
+                        actionRequired: [...alerts, ...activeAlerts].filter(a => a.actionable || a.severity === 'high' || a.severity === 'critical').length
+                    },
+                    insights: {
+                        total: insights.length,
+                        highPriority: insights.filter(i => i.priority === 'high').length,
+                        actionable: insights.filter(i => i.actionable).length
+                    },
+                    overallHealthScore: this.calculateOverallHealthScore(trends),
+                    riskLevel: this.calculateRiskLevel(alerts, activeAlerts),
+                    recommendedActions: this.getTopRecommendations(insights, activeAlerts)
+                },
+                generatedAt: new Date().toISOString()
+            });
+        } catch (error: any) {
+            res.status(500).json({
+                success: false,
+                message: 'Analytics dashboard unavailable',
+                error: error.message
+            });
+        }
+    });
+
     app.use('/api', router);
+}
+
+// Helper functions for analytics dashboard
+function calculateOverallHealthScore(trends: any[]): number {
+    if (trends.length === 0) return 75; // Default baseline
+    
+    const improvingCount = trends.filter(t => t.trend === 'improving').length;
+    const decliningCount = trends.filter(t => t.trend === 'declining' || t.trend === 'concerning').length;
+    const stableCount = trends.filter(t => t.trend === 'stable').length;
+    
+    // Calculate weighted score (improving=100, stable=75, declining=25, concerning=10)
+    const totalScore = (improvingCount * 100) + (stableCount * 75) + 
+                      (trends.filter(t => t.trend === 'declining').length * 25) +
+                      (trends.filter(t => t.trend === 'concerning').length * 10);
+    
+    return Math.round(totalScore / trends.length);
+}
+
+function calculateRiskLevel(predictiveAlerts: any[], activeAlerts: any[]): string {
+    const allAlerts = [...predictiveAlerts, ...activeAlerts];
+    const criticalCount = allAlerts.filter(a => a.severity === 'critical').length;
+    const highCount = allAlerts.filter(a => a.severity === 'high').length;
+    
+    if (criticalCount > 0) return 'critical';
+    if (highCount > 2) return 'high';
+    if (highCount > 0 || allAlerts.length > 3) return 'medium';
+    return 'low';
+}
+
+function getTopRecommendations(insights: any[], activeAlerts: any[]): string[] {
+    const recommendations = new Set<string>();
+    
+    // Add high-priority insight recommendations
+    insights
+        .filter(i => i.priority === 'high' && i.actionable)
+        .slice(0, 3)
+        .forEach(i => i.recommendations.forEach((r: string) => recommendations.add(r)));
+    
+    // Add critical alert action items
+    activeAlerts
+        .filter(a => a.severity === 'critical' || a.severity === 'high')
+        .slice(0, 2)
+        .forEach(a => a.actionItems?.forEach((item: string) => recommendations.add(item)));
+    
+    return Array.from(recommendations).slice(0, 5);
 }
