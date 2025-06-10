@@ -687,15 +687,8 @@ export function EnhancedSupervisorAgent({
         updateEngagementMilestone();
       }
       
-      // Log memories for debugging - with safe access checks
-      if (memories && memories.retrieved && memories.created) {
-        try {
-          console.debug('Retrieved memories:', memories.retrieved);
-          console.debug('Created memories:', memories.created);
-        } catch (memoryError) {
-          console.error('Error accessing memory data:', memoryError);
-        }
-      }
+      // Log debugging information for supervisor agent interaction
+      console.debug('Time-aware supervisor agent interaction completed successfully');
       
     } catch (error) {
       console.error('Error getting MCP response:', error);
