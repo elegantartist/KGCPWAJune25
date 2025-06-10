@@ -40,3 +40,14 @@ export const healthMetrics = pgTable('health_metrics', {
   dietScore: integer("diet_score").notNull(),
   exerciseScore: integer("exercise_score").notNull(),
 });
+
+export const auditLog = pgTable('audit_log', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id').references(() => users.id),
+  action: text('action').notNull(),
+  dataType: text('data_type'),
+  ipAddress: varchar('ip_address', { length: 45 }),
+  userAgent: text('user_agent'),
+  details: text('details'),
+  timestamp: timestamp('timestamp').defaultNow().notNull(),
+});

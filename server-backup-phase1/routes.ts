@@ -8,8 +8,6 @@ import { eq, sql, and, desc } from 'drizzle-orm';
 import { createAccessToken, authMiddleware, AuthenticatedRequest } from './auth';
 import { userCreationService } from './services/userCreationService';
 import { uinService } from './services/uinService';
-import { AIContextService } from './services/aiContextService';
-import { secureLog, emergencyPiiScan } from './services/privacyMiddleware';
 
 export function registerRoutes(app: Express) {
     const router = Router();
@@ -637,83 +635,6 @@ export function registerRoutes(app: Express) {
         } catch (error) {
             console.error('Error fetching health metrics:', error);
             res.status(500).json({ message: 'Internal server error' });
-        }
-    });
-
-    // --- PRIVACY MIDDLEWARE & AI CONTEXT ENDPOINTS ---
-    
-    // Prepare secure AI context (doctor/admin access)
-    router.post('/ai/prepare-context', authMiddleware(['doctor', 'admin']), async (req: AuthenticatedRequest, res) => {
-        try {
-            const { userId, includeHealthMetrics = true, includeChatHistory = false } = req.body;
-            
-            secureLog('AI context preparation requested', { 
-                requestedBy: req.user!.userId, 
-                targetUser: userId 
-            });
-
-            const context = await AIContextService.prepareSecureContext({
-                userId: parseInt(userId),
-                doctorId: req.user!.userId,
-                includeHealthMetrics,
-                includeChatHistory
-            });
-
-            res.json({
-                sessionId: context.sessionId,
-                secureBundle: context.secureBundle,
-                securityValidation: context.securityValidation,
-                timestamp: context.timestamp
-            });
-        } catch (error: any) {
-            secureLog('Error preparing AI context', { error: error.message });
-            res.status(500).json({ message: 'Failed to prepare AI context' });
-        }
-    });
-
-    // Validate AI response (system endpoint)
-    router.post('/ai/validate-response', authMiddleware(['doctor', 'admin']), async (req: AuthenticatedRequest, res) => {
-        try {
-            const { response, sessionId } = req.body;
-            
-            const validation = await AIContextService.validateAIResponse(response, sessionId);
-            
-            res.json(validation);
-        } catch (error: any) {
-            secureLog('Error validating AI response', { error: error.message });
-            res.status(500).json({ message: 'Failed to validate AI response' });
-        }
-    });
-
-    // Emergency PII scan endpoint (admin only)
-    router.post('/privacy/emergency-scan', authMiddleware(['admin']), async (req: AuthenticatedRequest, res) => {
-        try {
-            const { data } = req.body;
-            
-            const scanResult = emergencyPiiScan(data);
-            
-            secureLog('Emergency PII scan performed', { 
-                adminUser: req.user!.userId,
-                hasPii: scanResult.hasPii,
-                piiTypes: scanResult.piiTypes 
-            });
-
-            res.json(scanResult);
-        } catch (error: any) {
-            res.status(500).json({ message: 'Emergency scan failed' });
-        }
-    });
-
-    // Get AI context summary (admin debugging)
-    router.get('/ai/context-summary/:userId', authMiddleware(['admin']), async (req: AuthenticatedRequest, res) => {
-        try {
-            const { userId } = req.params;
-            
-            const summary = await AIContextService.getContextSummary(parseInt(userId));
-            
-            res.json(summary);
-        } catch (error: any) {
-            res.status(500).json({ message: 'Failed to get context summary' });
         }
     });
 
