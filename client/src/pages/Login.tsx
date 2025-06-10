@@ -31,15 +31,37 @@ const SmsLogin: React.FC<{ role: 'doctor' | 'patient' }> = ({ role }) => {
         }
     };
 
-    const handleVerifyCode = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setIsLoading(true);
-        setError('');
+    const handleVerifyCode = async (event: React.FormEvent) => {
+        event.preventDefault();
+        setIsLoading(true); // Optional: for UI feedback
+        setError('');   // Optional: clear previous errors
+
         try {
-            const data = await apiRequest('/api/auth/verify-sms', 'POST', { email, code });
-            login(data);
-        } catch (err: any) {
-            setError(err.message);
+            const response = await fetch('/api/auth/verify-sms', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: email, code: code }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                // Handle cases where the code is wrong or expired
+                throw new Error(data.message || 'Verification failed. Please try again.');
+            }
+
+            // --- THIS IS THE CRITICAL HANDOFF ---
+            // 1. On success, call the login function from our AuthContext
+            //    This function should handle storing the token and setting the user state.
+            login({ accessToken: data.accessToken, user: data.user });
+
+            // 2. Navigate the user to the correct dashboard based on their role.
+            // Note: Navigation is handled in the AuthContext login function
+            // ------------------------------------
+
+        } catch (error: any) {
+            setError(error.message);
+            console.error("Authentication verification failed:", error);
         } finally {
             setIsLoading(false);
         }

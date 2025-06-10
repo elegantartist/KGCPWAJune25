@@ -11,7 +11,7 @@ interface User {
 
 interface AuthContextType {
   user: User | null;
-  login: (data: { access_token: string; user: User }) => void;
+  login: (data: { accessToken: string; user: User } | { access_token: string; user: User }) => void;
   logout: () => void;
   loading: boolean;
 }
@@ -48,8 +48,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     validateSession();
   }, [logout]);
 
-  const login = (data: { access_token: string; user: User }) => {
-    localStorage.setItem('auth_token', data.access_token);
+  const login = (data: { accessToken: string; user: User } | { access_token: string; user: User }) => {
+    const token = 'accessToken' in data ? data.accessToken : data.access_token;
+    localStorage.setItem('auth_token', token);
     setUser(data.user);
     
     // Route patients to root dashboard, others to role-specific dashboards

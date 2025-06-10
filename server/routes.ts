@@ -134,7 +134,16 @@ export function registerRoutes(app: Express) {
             
             const accessToken = createAccessToken({ userId: user.id, role: user.role, name: user.name });
             console.log(`SMS verification successful for ${email}, redirecting to ${user.role} dashboard`);
-            res.json({ access_token: accessToken, user: { id: user.id, name: user.name, role: user.role } });
+            res.json({ 
+                success: true,
+                accessToken: accessToken, 
+                user: { 
+                    id: user.id, 
+                    name: user.name, 
+                    email: user.email,
+                    role: user.role 
+                } 
+            });
         } catch (error) {
             console.error('SMS verification error:', error);
             res.status(500).json({ message: 'Internal server error during verification' });
