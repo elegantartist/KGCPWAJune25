@@ -81,7 +81,7 @@ const EnhancedChatbot: React.FC = () => {
     const fetchUserData = async () => {
       try {
         // Fetch user basic info only - no health metrics analysis
-        const user = await apiRequest<{ id: number; name: string; email: string }>('GET', '/api/user');
+        const user = await apiRequest<{ id: number; name: string; email: string }>('GET', '/api/users/me');
         if (!isMounted) return;
         
         if (user && typeof user.id === 'number') {
