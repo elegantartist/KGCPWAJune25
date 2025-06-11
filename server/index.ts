@@ -45,7 +45,7 @@ app.use((req, res, next) => {
 app.use(sessionTimeoutMiddleware);
 
 // Critical fix: Add API route bypass middleware BEFORE any other middleware
-app.use((req, res, next) => {
+app.use((req: any, res, next) => {
   // Mark API requests for bypass
   if (req.path.startsWith('/api/') || req.path.startsWith('/auth/') || 
       req.path.startsWith('/admin/') || req.path.startsWith('/doctors/') || 

@@ -1540,7 +1540,11 @@ export function registerRoutes(app: Express) {
         }
     });
 
+    // Mount API routes with explicit precedence over Vite middleware
     app.use('/api', router);
+    
+    // Also mount routes directly without /api prefix for fallback
+    app.use(router);
 }
 
 // Helper functions for analytics dashboard
