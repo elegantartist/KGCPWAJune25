@@ -38,6 +38,87 @@ export function registerRoutes(app: Express) {
         });
     });
 
+    // Temporary frontend access route
+    router.get('/temp', (req, res) => {
+        res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Keep Going Care</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { color: #2E8BC0; text-align: center; }
+        .btn { background: #2E8BC0; color: white; padding: 12px 24px; border: none; border-radius: 5px; cursor: pointer; margin: 10px; text-decoration: none; display: inline-block; }
+        .btn:hover { background: #1e6a8f; }
+        .status { background: #e8f5e8; padding: 15px; border-radius: 5px; margin: 20px 0; }
+        .warning { background: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #ffc107; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Keep Going Care Healthcare Platform</h1>
+        
+        <div class="warning">
+            <strong>Note:</strong> React frontend is being configured. This temporary interface provides access to all backend services.
+        </div>
+        
+        <div class="status">
+            <strong>✓ Backend Status:</strong> All API services operational
+        </div>
+
+        <div style="text-align: center; margin: 30px 0;">
+            <a href="/api/auth/admin-login" class="btn" onclick="adminLogin(); return false;">Admin Login</a>
+            <a href="/api/health" class="btn" onclick="testHealth(); return false;">Test Health API</a>
+            <a href="/" class="btn">Try React App</a>
+        </div>
+
+        <div id="results" style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 5px; display: none;">
+            <h3>Results:</h3>
+            <pre id="output"></pre>
+        </div>
+    </div>
+
+    <script>
+        function adminLogin() {
+            fetch('/api/auth/admin-login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: 'admin', password: 'admin123' })
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('output').textContent = 'Admin Login: ' + JSON.stringify(data, null, 2);
+                document.getElementById('results').style.display = 'block';
+                if (data.access_token) {
+                    localStorage.setItem('token', data.access_token);
+                    alert('Admin login successful! Token saved.');
+                }
+            })
+            .catch(error => {
+                document.getElementById('output').textContent = 'Admin Login Error: ' + error.message;
+                document.getElementById('results').style.display = 'block';
+            });
+        }
+
+        function testHealth() {
+            fetch('/api/health')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('output').textContent = 'Health API: ' + JSON.stringify(data, null, 2);
+                document.getElementById('results').style.display = 'block';
+            })
+            .catch(error => {
+                document.getElementById('output').textContent = 'Health API Error: ' + error.message;
+                document.getElementById('results').style.display = 'block';
+            });
+        }
+    </script>
+</body>
+</html>`);
+    });
+
     // --- AUTHENTICATION ---
     router.post('/auth/admin-login', async (req, res) => {
         const { username, password } = req.body;

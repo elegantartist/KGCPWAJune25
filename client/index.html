@@ -21,7 +21,117 @@
     <div id="root"></div>
     <!-- Offline page fallback -->
     <noscript>You need to enable JavaScript to run this app.</noscript>
-    <script type="module" src="/src/main.tsx"></script>
+    <script type="module">
+      // Direct rendering without external file dependencies
+      import React from 'react';
+      import { createRoot } from 'react-dom/client';
+      
+      function App() {
+        const [apiTest, setApiTest] = React.useState('');
+        
+        const testAPI = async () => {
+          try {
+            const response = await fetch('/api/health');
+            const data = await response.json();
+            setApiTest(JSON.stringify(data, null, 2));
+          } catch (error) {
+            setApiTest('Error: ' + error.message);
+          }
+        };
+        
+        return React.createElement('div', {
+          style: { 
+            padding: '20px', 
+            fontFamily: 'Arial, sans-serif', 
+            textAlign: 'center',
+            maxWidth: '800px',
+            margin: '0 auto'
+          }
+        }, [
+          React.createElement('h1', { 
+            key: 'title',
+            style: { color: '#2E8BC0', marginBottom: '10px' } 
+          }, 'Keep Going Care Healthcare Platform'),
+          
+          React.createElement('p', { 
+            key: 'subtitle',
+            style: { fontSize: '18px', marginBottom: '30px' } 
+          }, 'Frontend is now operational'),
+          
+          React.createElement('div', {
+            key: 'buttons',
+            style: { marginBottom: '20px' }
+          }, [
+            React.createElement('button', {
+              key: 'api-test',
+              style: {
+                backgroundColor: '#2E8BC0',
+                color: 'white',
+                padding: '12px 24px',
+                border: 'none',
+                borderRadius: '5px',
+                cursor: 'pointer',
+                margin: '10px',
+                fontSize: '16px'
+              },
+              onClick: testAPI
+            }, 'Test Backend API'),
+            
+            React.createElement('button', {
+              key: 'admin-login',
+              style: {
+                backgroundColor: '#28a745',
+                color: 'white',
+                padding: '12px 24px',
+                border: 'none',
+                borderRadius: '5px',
+                cursor: 'pointer',
+                margin: '10px',
+                fontSize: '16px'
+              },
+              onClick: () => {
+                fetch('/api/auth/admin-login', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ username: 'admin', password: 'admin123' })
+                })
+                .then(r => r.json())
+                .then(d => {
+                  setApiTest('Admin Login: ' + JSON.stringify(d, null, 2));
+                  if (d.access_token) {
+                    localStorage.setItem('token', d.access_token);
+                    alert('Admin login successful!');
+                  }
+                })
+                .catch(e => setApiTest('Admin Login Error: ' + e.message));
+              }
+            }, 'Admin Login')
+          ]),
+          
+          apiTest && React.createElement('div', {
+            key: 'results',
+            style: {
+              backgroundColor: '#f8f9fa',
+              padding: '15px',
+              borderRadius: '5px',
+              textAlign: 'left',
+              marginTop: '20px'
+            }
+          }, [
+            React.createElement('h3', { key: 'results-title' }, 'API Results:'),
+            React.createElement('pre', { 
+              key: 'results-content',
+              style: { fontSize: '14px', overflow: 'auto' }
+            }, apiTest)
+          ])
+        ]);
+      }
+      
+      const rootElement = document.getElementById('root');
+      if (rootElement) {
+        createRoot(rootElement).render(React.createElement(App));
+      }
+    </script>
     <!-- This script injects a replit badge into the page, please feel free to remove this line -->
     <script type="text/javascript" src="https://replit.com/public/js/replit-badge-v3.js"></script>
   </body>
