@@ -1047,6 +1047,46 @@ export function registerRoutes(app: Express) {
         }
     });
 
+    // AI-assisted YouTube video search for recipes (Inspiration Machine D)
+    router.post('/api/recipes/videos', authMiddleware(['patient', 'doctor']), async (req: AuthenticatedRequest, res) => {
+        try {
+            const { searchCookingVideos } = await import('./ai/tavilyClient');
+            
+            // Extract search filters from request
+            const filters = req.body;
+            
+            // Perform YouTube search using Tavily API
+            const searchResult = await searchCookingVideos(filters);
+            
+            if (!searchResult.videos || searchResult.videos.length === 0) {
+                return res.json({
+                    videos: [],
+                    query: searchResult.query,
+                    message: searchResult.message || "No cooking videos found for your search criteria"
+                });
+            }
+            
+            // Return exactly 10 YouTube video results as programmed
+            const limitedVideos = searchResult.videos.slice(0, 10);
+            
+            res.json({
+                videos: limitedVideos,
+                query: searchResult.query,
+                answer: searchResult.answer,
+                totalFound: searchResult.videos.length,
+                returned: limitedVideos.length
+            });
+            
+        } catch (error: any) {
+            console.error('Recipe video search error:', error);
+            res.status(500).json({
+                videos: [],
+                query: 'cooking videos',
+                message: 'Video search temporarily unavailable'
+            });
+        }
+    });
+
     // Weekly meal planning endpoint
     router.post('/v2/inspiration/meal-plan', authMiddleware(['patient', 'doctor']), async (req: AuthenticatedRequest, res) => {
         try {
