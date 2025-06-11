@@ -44,16 +44,22 @@ app.use((req, res, next) => {
 // Apply session timeout middleware globally
 app.use(sessionTimeoutMiddleware);
 
+// Critical fix: Add API route bypass middleware BEFORE any other middleware
+app.use((req, res, next) => {
+  // Mark API requests for bypass
+  if (req.path.startsWith('/api/') || req.path.startsWith('/auth/') || 
+      req.path.startsWith('/admin/') || req.path.startsWith('/doctors/') || 
+      req.path.startsWith('/patients/') || req.path.startsWith('/users/') ||
+      req.path.startsWith('/v2/') || req.path.startsWith('/v4/') || 
+      req.path.startsWith('/privacy/')) {
+    req.isApiRoute = true;
+  }
+  next();
+});
+
 (async () => {
+  // Register API routes first to prevent Vite interference
   await registerRoutes(app);
-
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-
-    res.status(status).json({ message });
-    throw err;
-  });
 
   // ALWAYS serve the app on port 5000
   // this serves both the API and the client.
@@ -71,4 +77,12 @@ app.use(sessionTimeoutMiddleware);
   } else {
     serveStatic(app);
   }
+
+  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+    const status = err.status || err.statusCode || 500;
+    const message = err.message || "Internal Server Error";
+
+    res.status(status).json({ message });
+    throw err;
+  });
 })();

@@ -19,6 +19,16 @@ import { performEnhancedSearch } from './services/enhancedSearchService';
 export function registerRoutes(app: Express) {
     const router = Router();
 
+    // --- API HEALTH CHECK ---
+    router.get('/health', (req, res) => {
+        res.json({ 
+            status: 'healthy', 
+            timestamp: new Date().toISOString(),
+            version: '2.0',
+            api: 'active'
+        });
+    });
+
     // --- AUTHENTICATION ---
     router.post('/auth/admin-login', async (req, res) => {
         const { username, password } = req.body;
