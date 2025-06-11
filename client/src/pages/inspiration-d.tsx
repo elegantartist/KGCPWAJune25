@@ -192,9 +192,9 @@ const InspirationD: React.FC = () => {
           source_name: 'YouTube',
           cuisine_type: filters.cuisineType,
           meal_type: filters.mealType,
-          relevanceScore: video.relevanceScore || 5,
+          relevanceScore: (video as any).relevanceScore || 5,
           nutritionalAnalysis: video.nutritionalAnalysis || {},
-          enhancedMetadata: video.enhancedMetadata || {},
+          enhancedMetadata: (video as any).enhancedMetadata || {},
           healthScore: video.nutritionalAnalysis?.healthScore || 5
         }));
 
