@@ -265,7 +265,7 @@ const InspirationD: React.FC = () => {
   return (
     <Layout>
       <div className="container mx-auto p-4">
-        <h1 className="text-2xl font-bold mb-6">Recipes that Match My CPDs</h1>
+        <h1 className="text-2xl font-bold mb-6 text-[#4b68b8]">INSPIRATION MACHINE D</h1>
       
       <Card className="mb-6">
         <CardHeader>
