@@ -73,28 +73,28 @@ const InspirationEW: React.FC = () => {
   const [savedVideos, setSavedVideos] = useState<string[]>([]);
   const [videos, setVideos] = useState<VideoResult[]>([]);
   const [carePlanDirective, setCarePlanDirective] = useState<string>('');
-  const [loadingCPD, setLoadingCPD] = useState<boolean>(true);
 
   const { toast } = useToast();
   const isMobile = useIsMobile();
 
   // Default user ID (should be replaced with actual user ID from context/auth)
-  // Get current authenticated user
+  // Get current authenticated user using the same pattern as Inspiration Machine D
   const { data: currentUser } = useQuery({
-    queryKey: ['/api/user/current-context'],
+    queryKey: ['/api/users/me'],
     retry: false
   });
 
   const userId = currentUser?.id;
 
-  // Setup mutation for searching videos
+  // Setup mutation for searching videos using authenticated API request
   const videoSearchMutation = useMutation<VideoSearchResponse, Error, any>({
     mutationFn: async (searchData) => {
-      const response = await axios.post<VideoSearchResponse>(
+      const response = await apiRequest<VideoSearchResponse>(
+        'POST',
         '/api/exercise-wellness/videos',
         searchData
       );
-      return response.data;
+      return response;
     },
     onSuccess: (data) => {
       setVideos(data.videos);
@@ -159,47 +159,41 @@ const InspirationEW: React.FC = () => {
     return video.image || imageAssets[index % imageAssets.length];
   };
 
-  // Fetch care plan directives on component mount
+  // Use React Query for CPD fetching like Inspiration Machine D
+  const { data: carePlanDirectives, isLoading: loadingCPD, error: cpdError } = useQuery({
+    queryKey: ['/api/users', userId, 'care-plan-directives/active'],
+    enabled: !!userId,
+    retry: false
+  });
+
+
+
+  // Process CPD data when it loads
   useEffect(() => {
-    const fetchCarePlanDirectives = async () => {
-      try {
-        setLoadingCPD(true);
-        const response = await fetch(`/api/users/${userId}/care-plan-directives/active`);
+    if (carePlanDirectives) {
+      // Find the exercise or wellness directive
+      const ewDirective = carePlanDirectives.find((directive: any) => 
+        directive.category.toLowerCase() === 'exercise' || 
+        directive.category.toLowerCase() === 'wellness' ||
+        directive.category.toLowerCase() === 'physical activity'
+      );
 
-        if (!response.ok) {
-          throw new Error('Failed to fetch care plan directives');
-        }
-
-        const data = await response.json();
-
-        // Find the exercise or wellness directive
-        const ewDirective = data.find((directive: any) => 
-          directive.category.toLowerCase() === 'exercise' || 
-          directive.category.toLowerCase() === 'wellness' ||
-          directive.category.toLowerCase() === 'physical activity'
-        );
-
-        if (ewDirective) {
-          // Always display the doctor's exact Exercise & Wellness CPD text in the UI
-          setCarePlanDirective(ewDirective.directive);
-        } else {
-          setCarePlanDirective('Your doctor has not yet provided any Exercise & Wellness care plan directives. Please check back later.');
-        }
-      } catch (error) {
-        console.error('Error fetching care plan directives:', error);
-        toast({
-          title: "Error",
-          description: "Failed to load care plan directives",
-          variant: "destructive"
-        });
-        setCarePlanDirective('Could not load Exercise & Wellness care plan directives. Please try again later.');
-      } finally {
-        setLoadingCPD(false);
+      if (ewDirective) {
+        // Always display the doctor's exact Exercise & Wellness CPD text in the UI
+        setCarePlanDirective(ewDirective.directive);
+      } else {
+        setCarePlanDirective('Your doctor has not yet provided any Exercise & Wellness care plan directives. Please check back later.');
       }
-    };
-
-    fetchCarePlanDirectives();
-  }, [userId, toast]);
+    } else if (cpdError) {
+      console.error('Error fetching care plan directives:', cpdError);
+      toast({
+        title: "Error",
+        description: "Failed to load care plan directives",
+        variant: "destructive"
+      });
+      setCarePlanDirective('Could not load Exercise & Wellness care plan directives. Please try again later.');
+    }
+  }, [carePlanDirectives, cpdError, toast]);
 
   return (
     <Layout>
