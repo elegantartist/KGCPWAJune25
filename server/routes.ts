@@ -14,6 +14,7 @@ import { supervisorAgent } from './services/supervisorAgent';
 import { getMealInspiration, getWellnessInspiration, getWeeklyMealPlan, getWellnessProgram } from './services/inspirationMachines';
 import { analyzeHealthTrends, generatePredictiveAlerts, generateAnalyticsInsights } from './services/analyticsEngine';
 import { proactiveMonitoring } from './services/proactiveMonitoring';
+import { performEnhancedSearch } from './services/enhancedSearchService';
 
 export function registerRoutes(app: Express) {
     const router = Router();
@@ -1137,6 +1138,58 @@ export function registerRoutes(app: Express) {
                 videos: [],
                 query: 'exercise wellness videos',
                 message: 'Video search temporarily unavailable'
+            });
+        }
+    });
+
+    // Enhanced location-based search for recipe providers (Inspiration Machine D)
+    router.post('/api/recipes/providers', authMiddleware(['patient', 'doctor']), async (req: AuthenticatedRequest, res) => {
+        try {
+            const { ingredients, cuisineType, location } = req.body;
+            const queryType = `${cuisineType || ''} ${ingredients || ''} cooking classes restaurants`;
+            const searchLocation = location || 'Australia';
+            
+            // Use the enhanced search to find local providers
+            const results = await performEnhancedSearch(searchLocation, queryType);
+            
+            res.json({ 
+                providers: results,
+                location: searchLocation,
+                searchType: queryType,
+                totalFound: results.length
+            });
+        } catch (error: any) {
+            console.error('Recipe provider search error:', error);
+            res.status(500).json({ 
+                providers: [],
+                error: 'Failed to search for recipe providers.',
+                message: 'Provider search temporarily unavailable'
+            });
+        }
+    });
+
+    // Enhanced location-based search for exercise & wellness providers (Inspiration Machine E&W)
+    router.post('/api/exercise-wellness/providers', authMiddleware(['patient', 'doctor']), async (req: AuthenticatedRequest, res) => {
+        try {
+            const { activity, location } = req.body;
+            const searchLocation = location || 'Australia';
+            const searchType = `${activity || 'fitness wellness'} gyms trainers classes`;
+            
+            // Use the enhanced search to find local providers
+            const results = await performEnhancedSearch(searchLocation, searchType);
+            
+            res.json({ 
+                providers: results,
+                location: searchLocation,
+                searchType: searchType,
+                totalFound: results.length
+            });
+        } catch (error: any) {
+            console.error('Exercise & Wellness provider search error:', error);
+            res.status(500).json({ 
+                providers: [],
+                error: 'Failed to search for E&W support.',
+                message: 'Provider search temporarily unavailable'
             });
         }
     });
