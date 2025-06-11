@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "../components/ui/card";
+import React, { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Checkbox } from "../components/ui/checkbox";
 import { Label } from "../components/ui/label";
@@ -8,8 +8,7 @@ import { Badge } from "../components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "../components/ui/accordion";
 import { useToast } from "../hooks/use-toast";
-import { useIsMobile } from "../hooks/use-mobile";
-import { Search, ExternalLink, Trash, Loader2, BookmarkCheck, Library, Clock, Youtube, ArrowLeft, Heart, Award, ChefHat } from "lucide-react";
+import { Search, ExternalLink, Loader2, Library, Clock, Heart, Award, ChefHat } from "lucide-react";
 import { 
   searchCookingVideos,
   saveFavoriteVideo,
@@ -75,6 +74,7 @@ const InspirationD: React.FC = () => {
     shellfish: false,
     soy: false
   });
+  const [activeTab, setActiveTab] = useState<string>("recipes");
   const [analyzedRecipes, setAnalyzedRecipes] = useState<EnhancedRecipe[]>([]);
   const [isLoadingRecipes, setIsLoadingRecipes] = useState<boolean>(false);
   const [searchPerformed, setSearchPerformed] = useState<boolean>(false);
@@ -306,19 +306,14 @@ const InspirationD: React.FC = () => {
     };
   };
 
-  // Search for recipes from our backend API
+  // Search for recipes that match CPDs
   const handleSearchRecipes = async () => {
-    if (activeTab === "recipes") {
-      setIsLoadingRecipes(true);
-    } else {
-      setIsLoadingVideos(true);
-    }
+    setIsLoadingRecipes(true);
     
     const filters = createSearchFilters();
     
     try {
-      if (activeTab === "recipes") {
-        // Search for text-based recipes
+        // Search for recipes that match CPDs
         const recipeResults = await searchRecipes(filters);
         
         if (recipeResults.length === 0) {
@@ -479,21 +474,21 @@ const InspirationD: React.FC = () => {
               </Card>
             )}
             
-            <Tabs defaultValue="recipes" value={activeTab} onValueChange={handleTabChange}>
+            <Tabs defaultValue="preferences" value={activeTab} onValueChange={(value) => setActiveTab(value)}>
               <TabsList className="mb-4">
-                <TabsTrigger value="recipes">Recipe Search</TabsTrigger>
-                <TabsTrigger value="videos">Video Tutorials</TabsTrigger>
+                <TabsTrigger value="preferences">Your Preferences</TabsTrigger>
+                <TabsTrigger value="cpds">Doctor's Plan</TabsTrigger>
               </TabsList>
               
-              <TabsContent value="recipes" className="space-y-4">
+              <TabsContent value="preferences" className="space-y-4">
                 <p className="text-sm text-muted-foreground">
-                  Find healthy recipes with nutritional analysis and health scores.
+                  Set your meal preferences to find recipes that match your taste.
                 </p>
               </TabsContent>
               
-              <TabsContent value="videos" className="space-y-4">
+              <TabsContent value="cpds" className="space-y-4">
                 <p className="text-sm text-muted-foreground">
-                  Discover cooking tutorial videos to help you prepare healthy meals.
+                  View your doctor's dietary recommendations and search for matching recipes.
                 </p>
               </TabsContent>
             </Tabs>
@@ -574,14 +569,14 @@ const InspirationD: React.FC = () => {
             <Button 
               onClick={handleSearchRecipes}
               className="bg-primary text-white hover:bg-primary/90 w-full md:w-auto"
-              disabled={isLoadingRecipes || isLoadingVideos}
+              disabled={isLoadingRecipes}
             >
-              {(isLoadingRecipes || isLoadingVideos) ? (
+              {isLoadingRecipes ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               ) : (
                 <Search className="h-4 w-4 mr-2" />
               )}
-              Inspiration Search
+              Recipes that Match My CPDs
             </Button>
           </div>
         </CardContent>
@@ -740,73 +735,7 @@ const InspirationD: React.FC = () => {
         </>
       )}
       
-      {/* Video Tab Content */}
-      {activeTab === "videos" && (
-        <>
-          {isLoadingVideos ? (
-            <div className="flex justify-center items-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <span className="ml-3 text-lg">Searching for cooking videos...</span>
-            </div>
-          ) : videos.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {videos.map((video, index) => (
-                <Card key={video.id} className="overflow-hidden">
-                  <div className="relative">
-                    <img 
-                      src={getThumbnail(video, index)} 
-                      alt={video.title}
-                      className="w-full h-48 object-cover"
-                    />
-                  </div>
-                  <CardContent className="p-4">
-                    <h3 className="font-semibold text-lg mb-1 line-clamp-1">{video.title}</h3>
-                    <div className="flex justify-between items-center mb-3">
-                      <p className="text-gray-500 text-sm">{video.source_name || 'YouTube'}</p>
-                      <div className="flex gap-1">
-                        {video.tags && video.tags.slice(0, 2).map((tag, i) => (
-                          <Badge key={i} variant="secondary" className="text-xs">
-                            {tag}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="flex justify-between">
-                      <Button variant="outline" size="sm" onClick={() => window.open(video.url, '_blank')}>
-                        <ExternalLink className="h-4 w-4 mr-1" />
-                        Watch
-                      </Button>
-                      <Button 
-                        variant={isRecipeSaved(video.url) ? "default" : "secondary"} 
-                        size="sm"
-                        onClick={() => handleSaveRecipe(video)}
-                        disabled={saveMutation.isPending || isRecipeSaved(video.url)}
-                      >
-                        {saveMutation.isPending ? (
-                          <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                        ) : (
-                          <Heart className="h-4 w-4 mr-1" fill={isRecipeSaved(video.url) ? "currentColor" : "none"} />
-                        )}
-                        {isRecipeSaved(video.url) ? "Saved" : "Save"}
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : searchPerformed ? (
-            <div className="text-center py-8">
-              <p className="text-lg">No videos found matching your criteria.</p>
-              <p>Try adjusting your search terms or dietary preferences.</p>
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <p className="text-lg">Use the search options above to find cooking videos.</p>
-              <p>Select a meal type and your dietary preferences to get started.</p>
-            </div>
-          )}
-        </>
-      )}
+
       </div>
     </Layout>
   );
