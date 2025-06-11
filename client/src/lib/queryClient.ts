@@ -32,10 +32,42 @@ export async function apiRequest<T = any>(
       ...options
     });
 
+    // Handle unauthorized responses gracefully
+    if (res.status === 401) {
+      console.warn(`Unauthorized request to ${url}, clearing auth token`);
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('currentUser');
+      throw new Error('Authentication expired. Please log in again.');
+    }
+
     await throwIfResNotOk(res);
     return await res.json() as T;
   } catch (error) {
     console.error(`API request failed for ${method} ${url}:`, error);
+    throw error;
+  }
+}
+
+// Centralized video search API function
+export async function searchVideos(type: 'recipes' | 'exercise-wellness', query: string): Promise<any[]> {
+  try {
+    const endpoint = type === 'recipes' ? '/api/recipes/videos' : '/api/exercise-wellness/videos';
+    const response = await apiRequest('POST', endpoint, { query });
+    return response.videos || [];
+  } catch (error) {
+    console.error(`Video search failed for ${type}:`, error);
+    throw error;
+  }
+}
+
+// Centralized provider search API function
+export async function searchProviders(type: 'recipes' | 'exercise-wellness', location: string): Promise<any[]> {
+  try {
+    const endpoint = type === 'recipes' ? '/api/recipes/providers' : '/api/exercise-wellness/providers';
+    const response = await apiRequest('POST', endpoint, { location });
+    return response.providers || [];
+  } catch (error) {
+    console.error(`Provider search failed for ${type}:`, error);
     throw error;
   }
 }
