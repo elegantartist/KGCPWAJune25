@@ -374,7 +374,7 @@ const InspirationD: React.FC = () => {
               ) : (
                 <Search className="h-4 w-4 mr-2" />
               )}
-              Recipes that Match My CPDs
+              Inspiration Search
             </Button>
           </div>
         </CardContent>
