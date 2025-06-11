@@ -17,7 +17,7 @@ import {
   deleteFavoriteVideo,
   type RecipeSearchFilters
 } from "../services/recipeService";
-import { queryClient } from "../lib/queryClient";
+import { queryClient, apiRequest } from "../lib/queryClient";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import Layout from "@/components/layout/Layout";
 
@@ -88,12 +88,14 @@ const InspirationD: React.FC = () => {
   const { toast } = useToast();
   const isMobile = useIsMobile();
   
-  // Get current authenticated user
+  // This ensures we are using our standard, authenticated fetcher.
   const { data: currentUser } = useQuery({
     queryKey: ['/api/users/me'],
-    retry: false
+    queryFn: () => apiRequest<{ id: number; name: string }>('GET', '/api/users/me'),
+    retry: false,
   });
 
+  // This safely handles the case where currentUser is still loading.
   const userId = (currentUser as any)?.id;
 
   // Functions to interact with the API
@@ -120,11 +122,18 @@ const InspirationD: React.FC = () => {
     queryFn: () => getSavedRecipes(userId)
   });
   
-  // Fetch user's care plan directives using React Query with default authenticated fetcher
+  // The correct, robust implementation for CPD fetching
   const { data: carePlanDirectives = [], isLoading: isLoadingCPDs } = useQuery({
+    // 1. The queryKey MUST be a string template for dynamic URLs.
     queryKey: [`/api/users/${userId}/care-plan-directives/active`],
-    enabled: !!userId
-  }) as { data: CarePlanDirective[], isLoading: boolean };
+    
+    // 2. The queryFn MUST use our standard authenticated apiRequest.
+    queryFn: () => apiRequest<CarePlanDirective[]>('GET', `/api/users/${userId}/care-plan-directives/active`),
+    
+    // 3. The 'enabled' flag correctly prevents the query from running with an undefined userId.
+    enabled: !!userId,
+    retry: false
+  });
   
   // Update care plan directive state when React Query data changes
   useEffect(() => {

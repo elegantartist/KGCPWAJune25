@@ -78,13 +78,15 @@ const InspirationEW: React.FC = () => {
   const isMobile = useIsMobile();
 
   // Default user ID (should be replaced with actual user ID from context/auth)
-  // Get current authenticated user using the same pattern as Inspiration Machine D
+  // This ensures we are using our standard, authenticated fetcher.
   const { data: currentUser } = useQuery({
     queryKey: ['/api/users/me'],
-    retry: false
+    queryFn: () => apiRequest<{ id: number; name: string }>('GET', '/api/users/me'),
+    retry: false,
   });
 
-  const userId = currentUser?.id;
+  // This safely handles the case where currentUser is still loading.
+  const userId = (currentUser as any)?.id;
 
   // Setup mutation for searching videos using authenticated API request
   const videoSearchMutation = useMutation<VideoSearchResponse, Error, any>({
@@ -159,9 +161,15 @@ const InspirationEW: React.FC = () => {
     return video.image || imageAssets[index % imageAssets.length];
   };
 
-  // Use React Query for CPD fetching like Inspiration Machine D
+  // The correct, robust implementation for CPD fetching
   const { data: carePlanDirectives, isLoading: loadingCPD, error: cpdError } = useQuery({
-    queryKey: ['/api/users', userId, 'care-plan-directives/active'],
+    // 1. The queryKey MUST be a string template for dynamic URLs.
+    queryKey: [`/api/users/${userId}/care-plan-directives/active`],
+    
+    // 2. The queryFn MUST use our standard authenticated apiRequest.
+    queryFn: () => apiRequest<any[]>('GET', `/api/users/${userId}/care-plan-directives/active`),
+    
+    // 3. The 'enabled' flag correctly prevents the query from running with an undefined userId.
     enabled: !!userId,
     retry: false
   });
