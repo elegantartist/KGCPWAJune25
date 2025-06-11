@@ -362,7 +362,7 @@ export async function searchCookingVideos(filters: RecipeSearchFilters): Promise
         title: enhanced.title,
         description: enhanced.content,
         url: enhanced.url,
-        thumbnail_url: enhanced.image,
+        thumbnail_url: enhanced.image || undefined,
         videoId: enhanced.videoId,
         source_name: 'YouTube',
         cuisine_type: filters.cuisineType || undefined,
@@ -375,7 +375,7 @@ export async function searchCookingVideos(filters: RecipeSearchFilters): Promise
       return {
         query: searchQuery,
         answer: response.data.answer,
-        videos: finalVideoResults.sort((a, b) => (b.relevanceScore || 0) - (a.relevanceScore || 0))
+        videos: finalVideoResults.sort((a, b) => (b.relevanceScore || 0) - (a.relevanceScore || 0)) as RecipeSearchResult[]
       };
     } catch (enhancementError) {
       console.warn('OpenAI enhancement failed, returning original results:', enhancementError);
