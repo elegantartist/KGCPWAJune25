@@ -287,11 +287,7 @@ const KeepGoingWithMIP: React.FC<KeepGoingWithMIPProps> = ({ onClose }) => {
             <span className="font-medium">Edit Image</span>
           </button>
           
-          <KeepGoingVideo
-            videoId="bKYqK1R19hM"
-            onClose={handleVideoClose}
-            enhancedImageOverlay={true}
-          />
+          {/* Keep Going video functionality moved to main Keep Going feature */}
         </div>
       )}
       

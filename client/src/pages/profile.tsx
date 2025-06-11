@@ -16,16 +16,18 @@ import React, { useState, useEffect } from 'react';
 import { useLocation } from "wouter";
 import Layout from "@/components/layout/Layout";
 import HealthProgressChart from "@/components/health/HealthProgressChart";
+import { healthMetrics } from "@shared/schema";
 
-// Types
-type Scores = { diet: number; exercise: number; medication: number; };
-
-interface HealthMetric {
+// Type for health metrics based on schema
+type HealthMetric = typeof healthMetrics.$inferSelect & {
   createdAt: string;
   diet: number;
   exercise: number;
   medication: number;
-}
+};
+
+// Types
+type Scores = { diet: number; exercise: number; medication: number; };
 
 
 

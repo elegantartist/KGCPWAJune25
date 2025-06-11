@@ -20,7 +20,7 @@ const Motivation: React.FC = () => {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [enhancedUrl, setEnhancedUrl] = useState<string | null>(null);
   const [processingImage, setProcessingImage] = useState(false);
-  const [showKeepGoingVideo, setShowKeepGoingVideo] = useState(false);
+
   const [_, setLocation] = useLocation();
   const { toast } = useToast();
   const isMobile = useIsMobile();
@@ -224,7 +224,7 @@ const Motivation: React.FC = () => {
       
       // Show a preview of the Keep Going video with the image
       setTimeout(() => {
-        setShowKeepGoingVideo(true);
+        // Keep Going functionality now handled by main Keep Going feature
       }, 1500);
     } catch (error) {
       console.error("Error saving image to database:", error);
@@ -244,14 +244,7 @@ const Motivation: React.FC = () => {
 
   return (
     <Layout>
-      {/* Keep Going Video with enhanced image overlay */}
-      {showKeepGoingVideo && (
-        <KeepGoingVideo 
-          videoId="bKYqK1R19hM" 
-          onClose={() => setShowKeepGoingVideo(false)}
-          enhancedImageOverlay={true}
-        />
-      )}
+
     
       <div className="container mx-auto p-4">
         <h1 className="text-2xl font-bold mb-6">Motivational Image Processor</h1>
