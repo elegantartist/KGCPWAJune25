@@ -2,21 +2,14 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes.js";
 import { setupVite, serveStatic, log } from "./vite";
 import { sessionTimeoutMiddleware } from "./sessionTimeout";
-import { securityHeaders, corsConfig, limitRequestSize } from "./middleware/security";
 
 // Load environment variables
 import { config } from 'dotenv';
 config();
 
 const app = express();
-
-// Apply security middleware first
-app.use(securityHeaders);
-app.use(corsConfig);
-app.use(limitRequestSize);
-
-app.use(express.json({ limit: '50kb' }));
-app.use(express.urlencoded({ extended: false, limit: '50kb' }));
+app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
 
 app.use((req, res, next) => {
   const start = Date.now();
