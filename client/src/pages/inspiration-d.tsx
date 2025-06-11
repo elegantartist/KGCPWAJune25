@@ -14,14 +14,12 @@ import {
   saveFavoriteVideo,
   getFavoriteVideos,
   deleteFavoriteVideo,
-  type RecipeSearchFilters
+  type RecipeSearchFilters,
+  type RecipeSearchResult
 } from "../services/recipeService";
 import { queryClient, apiRequest } from "../lib/queryClient";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import Layout from "@/components/layout/Layout";
-
-// Import recipe service types we need
-import type { RecipeSearchResult } from "../services/recipeService";
 
 // Interface for Care Plan Directives
 interface CarePlanDirective {
@@ -35,31 +33,39 @@ interface CarePlanDirective {
   updatedAt: string;
 }
 
-// Import fallback food images (used if a video has no thumbnail)
-import foodImage1 from "@assets/image_1744127067136.jpeg";
-import foodImage2 from "@assets/image_1744127100239.jpeg";
-import foodImage3 from "@assets/image_1744127300035.jpeg";
-
-// Use these images as fallback thumbnails
-const fallbackImages = [foodImage1, foodImage2, foodImage3];
-
 // Interface for enhanced recipe data
-interface EnhancedRecipe extends RecipeSearchResult {
-  healthScore?: number;
+interface EnhancedRecipe {
+  title: string;
+  description: string;
+  url: string;
+  thumbnail_url?: string;
+  videoId?: string;
+  source_name: string;
+  cuisine_type?: string;
+  meal_type?: string;
+  relevanceScore?: number;
+  nutritionalAnalysis?: {
+    calories?: number;
+    difficulty?: string;
+    healthScore?: number;
+    allergens?: string[];
+    dietCompatibility?: Record<string, boolean>;
+  };
+  enhancedMetadata?: {
+    tags?: string[];
+    recommendedFor?: string[];
+    equipmentNeeded?: string[];
+    skillLevel?: string;
+  };
   analysis?: {
-    difficultyLevel: string;
-    caloriesEstimate: string;
     nutritionalValue: string;
     healthBenefits: string[];
+    caloriesEstimate: string;
+    difficultyLevel: string;
     alternatives: { ingredient: string; alternatives: string[] }[];
     tips: string[];
   };
-}
-
-// Interface for video data
-interface VideoResult extends RecipeSearchResult {
-  id: number;
-  tags?: string[];
+  healthScore?: number;
 }
 
 const InspirationD: React.FC = () => {
@@ -74,68 +80,42 @@ const InspirationD: React.FC = () => {
     shellfish: false,
     soy: false
   });
-  const [activeTab, setActiveTab] = useState<string>("recipes");
+  const [activeTab, setActiveTab] = useState<string>("preferences");
   const [analyzedRecipes, setAnalyzedRecipes] = useState<EnhancedRecipe[]>([]);
   const [isLoadingRecipes, setIsLoadingRecipes] = useState<boolean>(false);
   const [searchPerformed, setSearchPerformed] = useState<boolean>(false);
-  const [usedHeartHealthFallback, setUsedHeartHealthFallback] = useState<boolean>(false);
   const [carePlanDirective, setCarePlanDirective] = useState<string>('');
   const [loadingCPD, setLoadingCPD] = useState<boolean>(true);
   
   const { toast } = useToast();
-  const isMobile = useIsMobile();
   
-  // This ensures we are using our standard, authenticated fetcher.
+  // Get current user
   const { data: currentUser } = useQuery({
     queryKey: ['/api/users/me'],
     queryFn: () => apiRequest<{ id: number; name: string }>('GET', '/api/users/me'),
     retry: false,
   });
 
-  // This safely handles the case where currentUser is still loading.
   const userId = (currentUser as any)?.id;
 
-  // Functions to interact with the API
-  // These are stub implementations for type checking purposes
-  const getSavedRecipes = async (userId: number) => {
-    return [] as EnhancedRecipe[];
-  };
-  
-  const saveRecipe = async (userId: number, recipe: EnhancedRecipe) => {
-    return recipe;
-  };
-  
-  const searchRecipes = async (filters: RecipeSearchFilters) => {
-    return [] as EnhancedRecipe[];
-  };
-  
-  const analyzeRecipe = async (recipe: any, userId: number) => {
-    return recipe as EnhancedRecipe;
-  };
-  
-  // Get all saved recipes for the user
+  // Get saved recipes for the user
   const { data: savedRecipes = [] } = useQuery({
     queryKey: ['/api/users', userId, 'saved-recipes'],
-    queryFn: () => getSavedRecipes(userId)
+    queryFn: () => getFavoriteVideos(userId),
+    enabled: !!userId
   });
   
-  // The correct, robust implementation for CPD fetching
+  // Get care plan directives
   const { data: carePlanDirectives = [], isLoading: isLoadingCPDs } = useQuery({
-    // 1. The queryKey MUST be a string template for dynamic URLs.
     queryKey: [`/api/users/${userId}/care-plan-directives/active`],
-    
-    // 2. The queryFn MUST use our standard authenticated apiRequest.
     queryFn: () => apiRequest<CarePlanDirective[]>('GET', `/api/users/${userId}/care-plan-directives/active`),
-    
-    // 3. The 'enabled' flag correctly prevents the query from running with an undefined userId.
     enabled: !!userId,
     retry: false
   });
   
-  // Update care plan directive state when React Query data changes
+  // Update care plan directive state when data changes
   useEffect(() => {
     if (Array.isArray(carePlanDirectives) && carePlanDirectives.length > 0) {
-      // Find the diet directive
       const dietDirective = carePlanDirectives.find((directive: CarePlanDirective) => 
         directive.category.toLowerCase() === 'diet' || 
         directive.category.toLowerCase() === 'nutrition' ||
@@ -158,235 +138,79 @@ const InspirationD: React.FC = () => {
     }
   }, [carePlanDirectives, isLoadingCPDs, userId]);
 
-  // Mutation for saving a recipe
-  const saveMutation = useMutation({
-    mutationFn: (recipe: EnhancedRecipe) => saveRecipe(userId, recipe),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/users', userId, 'saved-recipes'] });
-      toast({
-        title: "Recipe saved",
-        description: "Recipe has been added to your favorites",
-      });
-    },
-    onError: (error) => {
-      console.error("Error saving recipe:", error);
-      toast({
-        title: "Error saving recipe",
-        description: "Please try again later",
-        variant: "destructive"
-      });
-    }
-  });
-
-  // Check if a recipe is already saved
-  const isRecipeSaved = useCallback((url: string) => {
-    return savedRecipes.some(recipe => recipe.url === url);
-  }, [savedRecipes]);
-
-  // Function to get the latest diet CPD without any interpretation
-  const getLatestDietCPD = (): CarePlanDirective | null => {
-    if (!Array.isArray(carePlanDirectives) || carePlanDirectives.length === 0) {
-      return null;
-    }
-    
-    // Get diet-related CPDs
-    const dietCPDs = carePlanDirectives.filter((cpd: CarePlanDirective) => 
-      cpd.category.toLowerCase() === 'diet'
-    );
-    
-    if (dietCPDs.length === 0) {
-      return null;
-    }
-    
-    // Sort by updatedAt date and get the most recent one
-    return [...dietCPDs].sort((a, b) => 
-      new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-    )[0];
-  };
-  
-  // Terms used for heart healthy recipes - ONLY used internally for search, never displayed
-  // Per SaMD Class 1 requirements, these are never shown to patients
-  const getHeartHealthTerms = (): string[] => {
-    return [
-      'low-sodium',
-      'low-salt',
-      'low-fat',
-      'whole-grain',
-      'vegetable-rich',
-      'fruit-rich',
-      'high-fiber',
-      'legumes',
-      'nuts'
-    ];
-  };
-  
-  // Extract search terms from CPDs
-  // NOTE: This function only impacts search criteria, not what's displayed to users
-  const extractDietaryTermsFromCPDs = (): string[] => {
-    const dietTerms: string[] = [];
-    const latestDietCPD = getLatestDietCPD();
-    
-    // Always add heart healthy terms for the search (but never display them)
-    dietTerms.push(...getHeartHealthTerms());
-    
-    // If there's a diet CPD, extract terms for search
-    if (latestDietCPD) {
-      const directive = latestDietCPD.directive.toLowerCase();
-      
-      // Extract specific terms for search only
-      if (directive.includes('low carb') || directive.includes('reduce carb')) {
-        dietTerms.push('low-carb');
-      }
-      if (directive.includes('low fat') || directive.includes('reduce fat')) {
-        dietTerms.push('low-fat');
-      }
-      if (directive.includes('low sodium') || directive.includes('reduce salt') || directive.includes('reduce sodium')) {
-        dietTerms.push('low-sodium');
-      }
-      if (directive.includes('high protein') || directive.includes('increase protein')) {
-        dietTerms.push('high-protein');
-      }
-      if (directive.includes('high fiber') || directive.includes('increase fiber')) {
-        dietTerms.push('high-fiber');
-      }
-      if (directive.includes('mediterranean')) {
-        dietTerms.push('mediterranean');
-      }
-      if (directive.includes('vegetarian')) {
-        dietTerms.push('vegetarian');
-      }
-      if (directive.includes('vegan')) {
-        dietTerms.push('vegan');
-      }
-      if (directive.includes('keto') || directive.includes('ketogenic')) {
-        dietTerms.push('keto');
-      }
-      if (directive.includes('paleo')) {
-        dietTerms.push('paleo');
-      }
-      if (directive.includes('whole grain')) {
-        dietTerms.push('whole-grain');
-      }
-      if (directive.includes('reduce sugar') || directive.includes('less sugar')) {
-        dietTerms.push('low-sugar');
-      }
-    }
-    
-    // Remove duplicates and return
-    const uniqueTermsSet = new Set(dietTerms);
-    return Array.from(uniqueTermsSet);
-  };
-
-  // Create search filters based on selected options and CPDs
+  // Create search filters
   const createSearchFilters = (): RecipeSearchFilters => {
-    // Get allergy-based dietary restrictions
-    const dietaryPreferences = Object.entries(allergies)
-      .filter(([_, isChecked]) => isChecked)
-      .map(([allergy]) => `no-${allergy}`);
-    
-    // Add user-selected diet if specified
-    if (selectedDiet && selectedDiet !== "omnivore") {
-      dietaryPreferences.push(selectedDiet);
-    }
-    
-    // Add CPD-derived dietary terms
-    const cpdDietaryTerms = extractDietaryTermsFromCPDs();
-    dietaryPreferences.push(...cpdDietaryTerms);
-    
-    return {
-      ingredients: selectedIngredients,
-      cuisineType: selectedCuisine,
-      mealType: selectedMealType,
-      dietaryPreferences: Array.from(new Set(dietaryPreferences)), // Remove duplicates
-      userId,
-      useCPDs: true, // Flag to indicate CPDs should be considered in the search
-      additionalContext: {
-        doctorCPD: carePlanDirective // Include doctor's exact CPD text
-      }
+    const filters: RecipeSearchFilters = {
+      mealType: selectedMealType || undefined,
+      cuisineType: selectedCuisine || undefined,
+      ingredients: selectedIngredients.length > 0 ? selectedIngredients : undefined,
+      dietaryPreferences: []
     };
+
+    // Add dietary preferences
+    if (selectedDiet) {
+      filters.dietaryPreferences?.push(selectedDiet);
+    }
+
+    // Add allergy restrictions
+    Object.entries(allergies).forEach(([allergy, isChecked]) => {
+      if (isChecked) {
+        filters.dietaryPreferences?.push(`no-${allergy}`);
+      }
+    });
+
+    return filters;
   };
 
   // Search for recipes that match CPDs
   const handleSearchRecipes = async () => {
+    if (!userId) {
+      toast({
+        title: "Authentication Error",
+        description: "User not authenticated. Please login and try again.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setIsLoadingRecipes(true);
     
-    const filters = createSearchFilters();
-    
     try {
-        // Search for recipes that match CPDs
-        const recipeResults = await searchRecipes(filters);
+      const filters = createSearchFilters();
+      
+      // Search for cooking videos that match CPDs
+      const videos = await searchCookingVideos(filters);
+      
+      if (videos && videos.length > 0) {
+        // Convert video results to recipe format
+        const formattedRecipes = videos.map((video: any) => ({
+          title: video.title,
+          description: video.description || 'No description available',
+          url: video.url,
+          thumbnail_url: video.thumbnail_url,
+          videoId: video.videoId,
+          source_name: 'YouTube',
+          cuisine_type: filters.cuisineType,
+          meal_type: filters.mealType,
+          relevanceScore: video.relevanceScore || 5,
+          nutritionalAnalysis: video.nutritionalAnalysis || {},
+          enhancedMetadata: video.enhancedMetadata || {},
+          healthScore: video.nutritionalAnalysis?.healthScore || 5
+        }));
+
+        setAnalyzedRecipes(formattedRecipes);
         
-        if (recipeResults.length === 0) {
-          toast({
-            title: "No recipes found",
-            description: "Try adjusting your search criteria and try again",
-            variant: "destructive"
-          });
-          setAnalyzedRecipes([]);
-        } else {
-          // Analyze the first 3 recipes to avoid too many API calls
-          const recipesToAnalyze = recipeResults.slice(0, 3);
-          const analyzedResults = await Promise.all(
-            recipesToAnalyze.map(recipe => analyzeRecipe(recipe, userId))
-          );
-          
-          setAnalyzedRecipes(analyzedResults);
-          
-          toast({
-            title: "Recipes found",
-            description: `Found ${recipeResults.length} recipes matching your preferences`,
-          });
-        }
+        toast({
+          title: "Recipes Found",
+          description: `Found ${formattedRecipes.length} recipes matching your care plan`,
+        });
       } else {
-        // Search for YouTube cooking videos that match meal preparation criteria
-        const videoResults = await searchCookingVideos(filters);
-        
-        if (videoResults.length === 0) {
-          toast({
-            title: "No videos found",
-            description: "Try adjusting your search criteria and try again",
-            variant: "destructive"
-          });
-          setVideos([]);
-        } else {
-          // Convert results to video format with IDs and enhanced tags
-          const formattedVideos = videoResults.map((result, index) => {
-            // Create comprehensive tags from all available sources
-            const baseTags = [
-              selectedMealType || "meal", 
-              selectedDiet || "recipe",
-              selectedCuisine || "food"
-            ].filter(Boolean);
-            
-            // Add any CPD-related tags that came from the server
-            const allTags = [...baseTags];
-            
-            // If the server returned tags that match CPDs, add those
-            if (result.tags && result.tags.length > 0) {
-              allTags.push(...result.tags);
-            }
-            
-            // If this is for an individual meal (better matches our requirement)
-            if (result.title.toLowerCase().includes("how to make") || 
-                result.title.toLowerCase().includes("how to cook") ||
-                result.title.toLowerCase().includes("recipe")) {
-              allTags.push("individual-meal");
-            }
-            
-            return {
-              ...result,
-              id: index + 1,
-              tags: Array.from(new Set(allTags)) // Remove duplicates
-            };
-          });
-          
-          setVideos(formattedVideos);
-          
-          toast({
-            title: "Meal Videos Found",
-            description: `Found ${formattedVideos.length} cooking videos matching your doctor's plan`,
-          });
-        }
+        setAnalyzedRecipes([]);
+        toast({
+          title: "No recipes found",
+          description: "Try adjusting your search criteria and try again",
+          variant: "destructive"
+        });
       }
       
       setSearchPerformed(true);
@@ -402,7 +226,29 @@ const InspirationD: React.FC = () => {
     }
   };
 
-  // Removed tab functionality - single search type only
+  // Mutation for saving a recipe
+  const saveMutation = useMutation({
+    mutationFn: (recipe: EnhancedRecipe) => saveFavoriteVideo(userId, recipe),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/users', userId, 'saved-recipes'] });
+      toast({
+        title: "Recipe saved",
+        description: "Recipe added to your favorites",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error saving recipe",
+        description: "Could not save recipe. Please try again.",
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Check if recipe is saved
+  const isRecipeSaved = (url: string): boolean => {
+    return savedRecipes.some((recipe: any) => recipe.url === url);
+  };
 
   // Save a recipe
   const handleSaveRecipe = (recipe: EnhancedRecipe) => {
@@ -416,36 +262,16 @@ const InspirationD: React.FC = () => {
     }
   };
 
-  // Get thumbnail - use the provided one or fall back to our images
-  const getThumbnail = (item: RecipeSearchResult | EnhancedRecipe, index: number): string => {
-    // First try to use the thumbnail from the API
-    if (item.thumbnail_url && item.thumbnail_url.startsWith('http')) {
-      return item.thumbnail_url;
-    }
-    
-    // If no thumbnail or invalid URL, generate a placeholder based on title
-    if (!item.thumbnail_url && activeTab === 'videos') {
-      // Red background for YouTube videos
-      return `https://placehold.co/320x180/ff0000/ffffff?text=${encodeURIComponent(item.title.substring(0, 20))}`;
-    } else if (!item.thumbnail_url) {
-      // Blue/green background for recipes
-      return `https://placehold.co/600x400/e6f7ff/1e6091?text=${encodeURIComponent(item.title.substring(0, 20))}`;
-    }
-    
-    // Final fallback - use our predefined images
-    return fallbackImages[index % fallbackImages.length];
-  };
-
   return (
     <Layout>
       <div className="container mx-auto p-4">
-        <h1 className="text-2xl font-bold mb-6">Inspiration Machine D</h1>
+        <h1 className="text-2xl font-bold mb-6">Recipes that Match My CPDs</h1>
       
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle>Meal Ideas for Your Doctor's Plan</CardTitle>
+          <CardTitle>Find Recipes for Your Doctor's Plan</CardTitle>
           <CardDescription>
-            Find exciting and delicious meals that match your doctor's recommendations
+            Search for recipes that align with your doctor's dietary recommendations
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -474,97 +300,69 @@ const InspirationD: React.FC = () => {
               </Card>
             )}
             
-            <Tabs defaultValue="preferences" value={activeTab} onValueChange={(value) => setActiveTab(value)}>
+            {/* Preferences Tabs */}
+            <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value)}>
               <TabsList className="mb-4">
                 <TabsTrigger value="preferences">Your Preferences</TabsTrigger>
                 <TabsTrigger value="cpds">Doctor's Plan</TabsTrigger>
               </TabsList>
               
               <TabsContent value="preferences" className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  Set your meal preferences to find recipes that match your taste.
-                </p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <Label htmlFor="mealType">Meal Type</Label>
+                    <Select value={selectedMealType} onValueChange={setSelectedMealType}>
+                      <SelectTrigger id="mealType">
+                        <SelectValue placeholder="Select meal type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="breakfast">Breakfast</SelectItem>
+                        <SelectItem value="lunch">Lunch</SelectItem>
+                        <SelectItem value="dinner">Dinner</SelectItem>
+                        <SelectItem value="snack">Snack</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="cuisine">Cuisine Type</Label>
+                    <Select value={selectedCuisine} onValueChange={setSelectedCuisine}>
+                      <SelectTrigger id="cuisine">
+                        <SelectValue placeholder="Select cuisine" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="mediterranean">Mediterranean</SelectItem>
+                        <SelectItem value="asian">Asian</SelectItem>
+                        <SelectItem value="american">American</SelectItem>
+                        <SelectItem value="italian">Italian</SelectItem>
+                        <SelectItem value="mexican">Mexican</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="diet">Diet Type</Label>
+                    <Select value={selectedDiet} onValueChange={setSelectedDiet}>
+                      <SelectTrigger id="diet">
+                        <SelectValue placeholder="Select diet" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="vegetarian">Vegetarian</SelectItem>
+                        <SelectItem value="vegan">Vegan</SelectItem>
+                        <SelectItem value="keto">Keto</SelectItem>
+                        <SelectItem value="low-carb">Low Carb</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
               </TabsContent>
               
               <TabsContent value="cpds" className="space-y-4">
                 <p className="text-sm text-muted-foreground">
-                  View your doctor's dietary recommendations and search for matching recipes.
+                  Your search will automatically incorporate your doctor's dietary recommendations shown above.
                 </p>
               </TabsContent>
             </Tabs>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <Label htmlFor="mealType">Meal Type</Label>
-                <Select value={selectedMealType} onValueChange={setSelectedMealType}>
-                  <SelectTrigger id="mealType">
-                    <SelectValue placeholder="Select meal type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="breakfast">Breakfast</SelectItem>
-                    <SelectItem value="lunch">Lunch</SelectItem>
-                    <SelectItem value="dinner">Dinner</SelectItem>
-                    <SelectItem value="snack">Snack</SelectItem>
-                    <SelectItem value="dessert">Dessert</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div>
-                <Label htmlFor="cuisine">Cuisine Type</Label>
-                <Select value={selectedCuisine} onValueChange={setSelectedCuisine}>
-                  <SelectTrigger id="cuisine">
-                    <SelectValue placeholder="Select cuisine" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="mediterranean">Mediterranean</SelectItem>
-                    <SelectItem value="asian">Asian</SelectItem>
-                    <SelectItem value="mexican">Mexican</SelectItem>
-                    <SelectItem value="indian">Indian</SelectItem>
-                    <SelectItem value="italian">Italian</SelectItem>
-                    <SelectItem value="australian">Australian</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div>
-                <Label htmlFor="diet">Dietary Preference</Label>
-                <Select value={selectedDiet} onValueChange={setSelectedDiet}>
-                  <SelectTrigger id="diet">
-                    <SelectValue placeholder="Select diet" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="omnivore">Omnivore</SelectItem>
-                    <SelectItem value="vegetarian">Vegetarian</SelectItem>
-                    <SelectItem value="vegan">Vegan</SelectItem>
-                    <SelectItem value="pescatarian">Pescatarian</SelectItem>
-                    <SelectItem value="keto">Keto</SelectItem>
-                    <SelectItem value="low-sodium">Low-Sodium</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            
-            <div>
-              <Label className="mb-2 block">Allergies & Restrictions</Label>
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                {Object.entries(allergies).map(([key, value]) => (
-                  <div key={key} className="flex items-center space-x-2">
-                    <Checkbox 
-                      id={`allergy-${key}`} 
-                      checked={value}
-                      onCheckedChange={(checked) => {
-                        setAllergies({
-                          ...allergies,
-                          [key]: checked === true
-                        });
-                      }}
-                    />
-                    <Label htmlFor={`allergy-${key}`} className="capitalize">{key}</Label>
-                  </div>
-                ))}
-              </div>
-            </div>
             
             <Button 
               onClick={handleSearchRecipes}
@@ -582,160 +380,111 @@ const InspirationD: React.FC = () => {
         </CardContent>
       </Card>
       
-      {/* Recipe Tab Content */}
-      {activeTab === "recipes" && (
-        <>
-          {isLoadingRecipes ? (
-            <div className="flex justify-center items-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <span className="ml-3 text-lg">Searching for healthy recipes and analyzing nutritional value...</span>
-            </div>
-          ) : analyzedRecipes.length > 0 ? (
-            <div className="space-y-6">
-              {analyzedRecipes.map((recipe, index) => (
-                <Card key={index} className="overflow-hidden">
-                  <div className="md:flex">
-                    <div className="md:w-1/3">
-                      <img 
-                        src={getThumbnail(recipe, index)} 
-                        alt={recipe.title}
-                        className="w-full h-48 md:h-full object-cover"
-                      />
-                    </div>
-                    <div className="md:w-2/3 p-4">
-                      <h3 className="font-semibold text-xl mb-2">{recipe.title}</h3>
-                      <p className="text-sm text-gray-600 mb-2 line-clamp-2">{recipe.description}</p>
-                      
-                      <div className="flex flex-wrap gap-2 mb-3">
-                        {recipe.meal_type && (
-                          <Badge variant="outline" className="bg-blue-50">
-                            {recipe.meal_type}
-                          </Badge>
-                        )}
-                        {recipe.cuisine_type && (
-                          <Badge variant="outline" className="bg-green-50">
-                            {recipe.cuisine_type}
-                          </Badge>
-                        )}
-                        {recipe.source_name && (
-                          <Badge variant="outline" className="bg-purple-50">
-                            {recipe.source_name}
-                          </Badge>
-                        )}
-                      </div>
-                      
-                      {recipe.analysis && (
-                        <div className="mb-3">
-                          <div className="flex items-center gap-4 flex-wrap">
-                            <div className="flex items-center">
-                              <Award className="h-4 w-4 text-amber-500 mr-1" />
-                              <span className="text-sm font-medium">
-                                Health Score: {recipe.healthScore}/100
-                              </span>
-                            </div>
-                            
-                            <div className="flex items-center">
-                              <ChefHat className="h-4 w-4 text-blue-500 mr-1" />
-                              <span className="text-sm">
-                                Difficulty: {recipe.analysis.difficultyLevel}
-                              </span>
-                            </div>
-                            
-                            <div className="flex items-center">
-                              <Clock className="h-4 w-4 text-red-400 mr-1" />
-                              <span className="text-sm">
-                                ~{recipe.analysis.caloriesEstimate}
-                              </span>
-                            </div>
-                          </div>
-                          
-                          <Accordion type="single" collapsible className="mt-2">
-                            <AccordionItem value="nutrition">
-                              <AccordionTrigger className="text-sm py-2">
-                                Nutritional Analysis
-                              </AccordionTrigger>
-                              <AccordionContent>
-                                <p className="text-sm mb-2">{recipe.analysis.nutritionalValue}</p>
-                                
-                                <h4 className="text-sm font-semibold mb-1">Health Benefits:</h4>
-                                <ul className="text-sm list-disc pl-5 mb-2">
-                                  {recipe.analysis.healthBenefits.map((benefit, i) => (
-                                    <li key={i}>{benefit}</li>
-                                  ))}
-                                </ul>
-                                
-                                {recipe.analysis.alternatives.length > 0 && (
-                                  <>
-                                    <h4 className="text-sm font-semibold mb-1">Ingredient Alternatives:</h4>
-                                    <ul className="text-sm list-disc pl-5">
-                                      {recipe.analysis.alternatives.slice(0, 2).map((alt, i) => (
-                                        <li key={i}>
-                                          {alt.ingredient}: {alt.alternatives.join(', ')}
-                                        </li>
-                                      ))}
-                                    </ul>
-                                  </>
-                                )}
-                              </AccordionContent>
-                            </AccordionItem>
-                            
-                            {recipe.analysis.tips.length > 0 && (
-                              <AccordionItem value="tips">
-                                <AccordionTrigger className="text-sm py-2">
-                                  Cooking Tips
-                                </AccordionTrigger>
-                                <AccordionContent>
-                                  <ul className="text-sm list-disc pl-5">
-                                    {recipe.analysis.tips.map((tip, i) => (
-                                      <li key={i}>{tip}</li>
-                                    ))}
-                                  </ul>
-                                </AccordionContent>
-                              </AccordionItem>
-                            )}
-                          </Accordion>
-                        </div>
-                      )}
-                      
-                      <div className="flex justify-between mt-2">
-                        <Button variant="outline" size="sm" onClick={() => window.open(recipe.url, '_blank')}>
-                          <ExternalLink className="h-4 w-4 mr-1" />
-                          View Recipe
-                        </Button>
-                        <Button 
-                          variant={isRecipeSaved(recipe.url) ? "default" : "secondary"} 
-                          size="sm"
-                          onClick={() => handleSaveRecipe(recipe)}
-                          disabled={saveMutation.isPending || isRecipeSaved(recipe.url)}
-                        >
-                          {saveMutation.isPending ? (
-                            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                          ) : (
-                            <Heart className="h-4 w-4 mr-1" fill={isRecipeSaved(recipe.url) ? "currentColor" : "none"} />
-                          )}
-                          {isRecipeSaved(recipe.url) ? "Saved" : "Save Recipe"}
-                        </Button>
-                      </div>
-                    </div>
+      {/* Recipe Results */}
+      {isLoadingRecipes ? (
+        <div className="flex justify-center items-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <span className="ml-3 text-lg">Searching for recipes that match your care plan...</span>
+        </div>
+      ) : analyzedRecipes.length > 0 ? (
+        <div className="space-y-6">
+          {analyzedRecipes.map((recipe, index) => (
+            <Card key={index} className="overflow-hidden">
+              <div className="md:flex">
+                <div className="md:w-1/3">
+                  <img 
+                    src={recipe.thumbnail_url || `https://placehold.co/600x400/e6f7ff/1e6091?text=${encodeURIComponent(recipe.title.substring(0, 20))}`}
+                    alt={recipe.title}
+                    className="w-full h-48 md:h-full object-cover"
+                  />
+                </div>
+                <div className="md:w-2/3 p-4">
+                  <h3 className="font-semibold text-xl mb-2">{recipe.title}</h3>
+                  <p className="text-sm text-gray-600 mb-2 line-clamp-2">{recipe.description}</p>
+                  
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {recipe.meal_type && (
+                      <Badge variant="outline" className="bg-blue-50">
+                        {recipe.meal_type}
+                      </Badge>
+                    )}
+                    {recipe.cuisine_type && (
+                      <Badge variant="outline" className="bg-green-50">
+                        {recipe.cuisine_type}
+                      </Badge>
+                    )}
+                    <Badge variant="outline" className="bg-purple-50">
+                      {recipe.source_name}
+                    </Badge>
                   </div>
-                </Card>
-              ))}
-            </div>
-          ) : searchPerformed ? (
-            <div className="text-center py-8">
-              <p className="text-lg">No recipes found matching your criteria.</p>
-              <p>Try adjusting your search terms or dietary preferences.</p>
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <p className="text-lg">Use the search options above to find healthy recipes.</p>
-              <p>Select a meal type and your dietary preferences to get started.</p>
-            </div>
-          )}
-        </>
+                  
+                  {recipe.nutritionalAnalysis && (
+                    <div className="mb-3">
+                      <div className="flex items-center gap-4 flex-wrap">
+                        <div className="flex items-center">
+                          <Award className="h-4 w-4 text-amber-500 mr-1" />
+                          <span className="text-sm font-medium">
+                            Health Score: {recipe.healthScore || recipe.nutritionalAnalysis.healthScore || 'N/A'}
+                          </span>
+                        </div>
+                        
+                        {recipe.nutritionalAnalysis.difficulty && (
+                          <div className="flex items-center">
+                            <ChefHat className="h-4 w-4 text-blue-500 mr-1" />
+                            <span className="text-sm">
+                              Difficulty: {recipe.nutritionalAnalysis.difficulty}
+                            </span>
+                          </div>
+                        )}
+                        
+                        {recipe.nutritionalAnalysis.calories && (
+                          <div className="flex items-center">
+                            <Clock className="h-4 w-4 text-red-400 mr-1" />
+                            <span className="text-sm">
+                              ~{recipe.nutritionalAnalysis.calories} calories
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div className="flex justify-between mt-2">
+                    <Button variant="outline" size="sm" onClick={() => window.open(recipe.url, '_blank')}>
+                      <ExternalLink className="h-4 w-4 mr-1" />
+                      View Recipe
+                    </Button>
+                    <Button 
+                      variant={isRecipeSaved(recipe.url) ? "default" : "secondary"} 
+                      size="sm"
+                      onClick={() => handleSaveRecipe(recipe)}
+                      disabled={saveMutation.isPending || isRecipeSaved(recipe.url)}
+                    >
+                      {saveMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                      ) : (
+                        <Heart className="h-4 w-4 mr-1" fill={isRecipeSaved(recipe.url) ? "currentColor" : "none"} />
+                      )}
+                      {isRecipeSaved(recipe.url) ? "Saved" : "Save Recipe"}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      ) : searchPerformed ? (
+        <div className="text-center py-8">
+          <p className="text-lg">No recipes found matching your criteria.</p>
+          <p>Try adjusting your search preferences or check back later.</p>
+        </div>
+      ) : (
+        <div className="text-center py-8">
+          <p className="text-lg">Use the search options above to find recipes that match your care plan.</p>
+          <p>Set your preferences and click "Recipes that Match My CPDs" to get started.</p>
+        </div>
       )}
       
-
       </div>
     </Layout>
   );
