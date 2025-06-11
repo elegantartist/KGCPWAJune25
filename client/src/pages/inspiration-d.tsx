@@ -119,22 +119,9 @@ const InspirationD: React.FC = () => {
     queryFn: () => getSavedRecipes(userId)
   });
   
-  // Fetch user's care plan directives
+  // Fetch user's care plan directives using React Query with default authenticated fetcher
   const { data: carePlanDirectives = [], isLoading: isLoadingCPDs } = useQuery({
-    queryKey: ['/api/users', userId, 'care-plan-directives', 'active'],
-    queryFn: async () => {
-      const token = localStorage.getItem('auth_token');
-      const response = await fetch(`/api/users/${userId}/care-plan-directives/active`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      if (!response.ok) {
-        throw new Error('Failed to fetch care plan directives');
-      }
-      return response.json() as Promise<CarePlanDirective[]>;
-    },
+    queryKey: [`/api/users/${userId}/care-plan-directives/active`],
     enabled: !!userId
   });
   
