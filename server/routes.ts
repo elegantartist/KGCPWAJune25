@@ -10,6 +10,7 @@ import { userCreationService } from './services/userCreationService';
 import { uinService } from './services/uinService';
 import { AIContextService } from './services/aiContextService';
 import { emergencyPiiScan } from './services/privacyMiddleware';
+import { secureLog, validateRecipeSearch, videoSearchRateLimit, sanitizeRequestBody, handleValidationErrors } from './middleware/security';
 import { supervisorAgent } from './services/supervisorAgent';
 import { getMealInspiration, getWellnessInspiration, getWeeklyMealPlan, getWellnessProgram } from './services/inspirationMachines';
 import { analyzeHealthTrends, generatePredictiveAlerts, generateAnalyticsInsights } from './services/analyticsEngine';
