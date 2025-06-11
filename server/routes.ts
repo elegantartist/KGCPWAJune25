@@ -777,7 +777,7 @@ export function registerRoutes(app: Express) {
         try {
             const { userId, includeHealthMetrics = true, includeChatHistory = false } = req.body;
             
-            secureLog('AI context preparation requested', { 
+            secureLog('info', 'AI context preparation requested', { 
                 requestedBy: req.user!.userId, 
                 targetUser: userId 
             });
@@ -796,7 +796,7 @@ export function registerRoutes(app: Express) {
                 timestamp: context.timestamp
             });
         } catch (error: any) {
-            secureLog('Error preparing AI context', { error: error.message });
+            secureLog('error', 'Error preparing AI context', { error: error.message });
             res.status(500).json({ message: 'Failed to prepare AI context' });
         }
     });
@@ -810,7 +810,7 @@ export function registerRoutes(app: Express) {
             
             res.json(validation);
         } catch (error: any) {
-            secureLog('Error validating AI response', { error: error.message });
+            secureLog('error', 'Error validating AI response', { error: error.message });
             res.status(500).json({ message: 'Failed to validate AI response' });
         }
     });
@@ -822,7 +822,7 @@ export function registerRoutes(app: Express) {
             
             const scanResult = emergencyPiiScan(data);
             
-            secureLog('Emergency PII scan performed', { 
+            secureLog('info', 'Emergency PII scan performed', { 
                 adminUser: req.user!.userId,
                 hasPii: scanResult.hasPii,
                 piiTypes: scanResult.piiTypes 
@@ -1018,6 +1018,53 @@ export function registerRoutes(app: Express) {
             });
         }
     });
+
+    // Secured recipe video search endpoint
+    router.post(
+        '/api/recipes/videos',
+        authMiddleware(['patient', 'doctor', 'admin']), // 1. Auth first
+        sanitizeRequestBody,                            // 2. Sanitize
+        validateRecipeSearch,                           // 3. Validate
+        videoSearchRateLimit,                           // 4. Rate Limit
+        handleValidationErrors,                         // 5. Handle any validation errors
+        async (req: AuthenticatedRequest, res) => {       // 6. Finally, run the main logic
+            try {
+                const userId = req.user!.userId;
+                const { mealType, cuisineType, dietaryPreferences, ingredients, limit = 10 } = req.body;
+                
+                // Import Tavily search function
+                const { searchCookingVideos } = await import('./ai/tavilyClient');
+                
+                const searchFilters = {
+                    mealType,
+                    cuisineType,
+                    dietaryPreferences,
+                    ingredients,
+                    limit
+                };
+                
+                secureLog('info', 'Video search request', { userId, filters: searchFilters });
+                
+                const searchResult = await searchCookingVideos(searchFilters);
+                
+                res.json({
+                    success: true,
+                    videos: searchResult.videos || [],
+                    query: searchResult.query,
+                    answer: searchResult.answer,
+                    timestamp: new Date().toISOString()
+                });
+                
+            } catch (error: any) {
+                secureLog('error', 'Video search error', { error: error.message });
+                res.status(500).json({
+                    success: false,
+                    message: 'Video search unavailable',
+                    videos: []
+                });
+            }
+        }
+    );
 
     // Direct wellness inspiration endpoint
     router.post('/v2/inspiration/wellness', authMiddleware(['patient', 'doctor']), async (req: AuthenticatedRequest, res) => {

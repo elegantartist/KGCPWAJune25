@@ -207,9 +207,24 @@ export const auditLogger: IAuditMiddleware = (req: AuthenticatedRequest, res: Re
   next();
 };
 
-// Secure logging function
-export const secureLog = (level: 'info' | 'warn' | 'error', message: string, metadata?: any) => {
-  const sanitizedMetadata = metadata ? sanitizeObject(metadata) : {};
+// Secure logging function - supports both parameter orders for compatibility
+export const secureLog = (messageOrLevel: string | 'info' | 'warn' | 'error', messageOrMetadata?: string | any, metadata?: any) => {
+  let level: 'info' | 'warn' | 'error';
+  let message: string;
+  let data: any;
+
+  // Handle both parameter orders: (level, message, metadata) and (message, metadata)
+  if (typeof messageOrLevel === 'string' && ['info', 'warn', 'error'].includes(messageOrLevel)) {
+    level = messageOrLevel as 'info' | 'warn' | 'error';
+    message = messageOrMetadata as string;
+    data = metadata;
+  } else {
+    level = 'info';
+    message = messageOrLevel as string;
+    data = messageOrMetadata;
+  }
+
+  const sanitizedMetadata = data ? sanitizeObject(data) : {};
   const cleanMetadata = removeSensitiveData(sanitizedMetadata);
   
   console.log(`[${level.toUpperCase()}] ${message}`, cleanMetadata);
