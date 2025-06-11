@@ -19,6 +19,7 @@ import {
 } from "../services/recipeService";
 import { queryClient } from "../lib/queryClient";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import Layout from "@/components/layout/Layout";
 
 // Import recipe service types we need
 import type { RecipeSearchResult } from "../services/recipeService";
@@ -446,8 +447,9 @@ const InspirationD: React.FC = () => {
   };
 
   return (
-    <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-6">Inspiration Machine D</h1>
+    <Layout>
+      <div className="container mx-auto p-4">
+        <h1 className="text-2xl font-bold mb-6">Inspiration Machine D</h1>
       
       <Card className="mb-6">
         <CardHeader>
@@ -810,7 +812,8 @@ const InspirationD: React.FC = () => {
           )}
         </>
       )}
-    </div>
+      </div>
+    </Layout>
   );
 };
 
