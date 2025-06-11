@@ -75,10 +75,7 @@ const InspirationD: React.FC = () => {
     shellfish: false,
     soy: false
   });
-  const [activeTab, setActiveTab] = useState<string>("recipes");
   const [analyzedRecipes, setAnalyzedRecipes] = useState<EnhancedRecipe[]>([]);
-  const [videos, setVideos] = useState<VideoResult[]>([]);
-  const [isLoadingVideos, setIsLoadingVideos] = useState<boolean>(false);
   const [isLoadingRecipes, setIsLoadingRecipes] = useState<boolean>(false);
   const [searchPerformed, setSearchPerformed] = useState<boolean>(false);
   const [usedHeartHealthFallback, setUsedHeartHealthFallback] = useState<boolean>(false);
@@ -399,29 +396,18 @@ const InspirationD: React.FC = () => {
       
       setSearchPerformed(true);
     } catch (error) {
-      console.error(`Error searching for ${activeTab}:`, error);
+      console.error(`Error searching for recipes:`, error);
       toast({
-        title: `Error searching for ${activeTab}`,
+        title: `Error searching for recipes`,
         description: "Please check your network connection and try again",
         variant: "destructive"
       });
     } finally {
       setIsLoadingRecipes(false);
-      setIsLoadingVideos(false);
     }
   };
 
-  // Handle tab change
-  const handleTabChange = (value: string) => {
-    setActiveTab(value);
-    // Clear previous search results when switching tabs
-    if (value === "recipes") {
-      setVideos([]);
-    } else {
-      setAnalyzedRecipes([]);
-    }
-    setSearchPerformed(false);
-  };
+  // Removed tab functionality - single search type only
 
   // Save a recipe
   const handleSaveRecipe = (recipe: EnhancedRecipe) => {
