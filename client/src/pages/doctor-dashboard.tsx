@@ -48,6 +48,7 @@ export default function DoctorDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
   const [, setLocation] = useLocation();
+  const [doctorInfo, setDoctorInfo] = useState<{ name: string; firstName: string } | null>(null);
   const [doctorRemarks, setDoctorRemarks] = useState<CarePlanDirective>({
     healthy_eating_plan: "",
     exercise_wellness_routine: "",
@@ -68,6 +69,49 @@ export default function DoctorDashboard() {
     setLocation('/login');
   };
 
+  // Fetch doctor's information
+  const fetchDoctorInfo = async () => {
+    try {
+      const response = await fetch('/api/users/me', {
+        method: 'GET',
+        headers: createAuthHeaders()
+      });
+
+      if (response.status === 401) {
+        handleUnauthorized();
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch doctor information');
+      }
+
+      const doctorData = await response.json();
+      
+      // Extract first name from full name (e.g., "Dr. Marijke Collins" -> "Marijke")
+      const nameParts = doctorData.name.split(' ');
+      let firstName = 'Doctor';
+      
+      if (nameParts.length >= 2) {
+        // If name starts with "Dr.", use the next part
+        if (nameParts[0].toLowerCase().includes('dr')) {
+          firstName = nameParts[1];
+        } else {
+          // Otherwise use the first part
+          firstName = nameParts[0];
+        }
+      }
+
+      setDoctorInfo({
+        name: doctorData.name,
+        firstName: firstName
+      });
+    } catch (err: any) {
+      console.error('Error fetching doctor info:', err);
+      // Don't set error state for this, just use default welcome
+    }
+  };
+
   // Logout handler
   const handleLogout = () => {
     localStorage.removeItem('auth_token');
@@ -80,6 +124,7 @@ export default function DoctorDashboard() {
       setLocation('/login');
       return;
     }
+    fetchDoctorInfo();
     fetchPatients();
   }, [setLocation]);
 
@@ -274,7 +319,9 @@ export default function DoctorDashboard() {
         <CardHeader className="bg-emerald-50 rounded-t-xl">
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle className="text-3xl font-extrabold text-emerald-800">Welcome, Doctor</CardTitle>
+              <CardTitle className="text-3xl font-extrabold text-emerald-800">
+                Welcome, Doctor {doctorInfo?.firstName || 'Doctor'}
+              </CardTitle>
               <CardDescription className="text-emerald-600 mt-1">Your dashboard overview</CardDescription>
             </div>
             <div className="flex flex-col items-end space-y-2">
