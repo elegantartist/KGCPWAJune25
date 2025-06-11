@@ -347,6 +347,7 @@ const InspirationD: React.FC = () => {
                         <SelectValue placeholder="Select diet" />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="omnivore">Omnivore</SelectItem>
                         <SelectItem value="vegetarian">Vegetarian</SelectItem>
                         <SelectItem value="vegan">Vegan</SelectItem>
                         <SelectItem value="keto">Keto</SelectItem>

@@ -97,7 +97,7 @@ export const validateRecipeSearch: IValidationMiddleware = (req: Request, res: R
     
     body('dietaryPreferences.*')
       .optional()
-      .isIn(['vegetarian', 'vegan', 'keto', 'low-carb', 'gluten-free', 'dairy-free', 'no-nuts', 'no-dairy', 'no-gluten', 'no-shellfish', 'no-soy'])
+      .isIn(['omnivore', 'vegetarian', 'vegan', 'keto', 'low-carb', 'gluten-free', 'dairy-free', 'no-nuts', 'no-dairy', 'no-gluten', 'no-shellfish', 'no-soy'])
       .withMessage('Invalid dietary preference'),
   ];
 
