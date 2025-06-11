@@ -1,6 +1,7 @@
 import rateLimit from 'express-rate-limit';
 import { body, validationResult } from 'express-validator';
 import { Request, Response, NextFunction } from 'express';
+import { AuthenticatedRequest } from '../auth';
 import helmet from 'helmet';
 import cors from 'cors';
 
@@ -15,7 +16,7 @@ export const videoSearchRateLimit = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  skip: (req) => {
+  skip: (req: AuthenticatedRequest) => {
     // Skip rate limiting for admin users in development
     return process.env.NODE_ENV === 'development' && req.user?.role === 'admin';
   }
@@ -163,7 +164,7 @@ export const securityHeaders = helmet({
 // CORS configuration
 export const corsConfig = cors({
   origin: process.env.NODE_ENV === 'production' 
-    ? [process.env.FRONTEND_URL, /\.replit\.app$/]
+    ? ['https://localhost:3000', /\.replit\.app$/].filter(Boolean)
     : true,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],

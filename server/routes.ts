@@ -9,12 +9,21 @@ import { createAccessToken, authMiddleware, AuthenticatedRequest } from './auth'
 import { userCreationService } from './services/userCreationService';
 import { uinService } from './services/uinService';
 import { AIContextService } from './services/aiContextService';
-import { secureLog, emergencyPiiScan } from './services/privacyMiddleware';
+import { emergencyPiiScan } from './services/privacyMiddleware';
 import { supervisorAgent } from './services/supervisorAgent';
 import { getMealInspiration, getWellnessInspiration, getWeeklyMealPlan, getWellnessProgram } from './services/inspirationMachines';
 import { analyzeHealthTrends, generatePredictiveAlerts, generateAnalyticsInsights } from './services/analyticsEngine';
 import { proactiveMonitoring } from './services/proactiveMonitoring';
 import { performEnhancedSearch } from './services/enhancedSearchService';
+import { 
+    videoSearchRateLimit, 
+    aiEnhancedSearchLimit, 
+    validateRecipeSearch, 
+    validateExerciseSearch,
+    handleValidationErrors, 
+    sanitizeRequestBody, 
+    secureLog 
+} from './middleware/security';
 
 export function registerRoutes(app: Express) {
     const router = Router();
@@ -1058,117 +1067,140 @@ export function registerRoutes(app: Express) {
         }
     });
 
-    // AI-assisted YouTube video search for recipes (Inspiration Machine D)
-    router.post('/api/recipes/videos', authMiddleware(['patient', 'doctor', 'admin']), async (req: AuthenticatedRequest, res) => {
-        try {
-            console.log('Recipe videos endpoint - User:', req.user);
-            console.log('Recipe videos endpoint - Allowed roles:', ['patient', 'doctor', 'admin']);
-            
-            const { searchCookingVideos } = await import('./ai/tavilyClient');
-            
-            // Extract search filters from request
-            const filters = req.body;
-            
-            // Perform YouTube search using Tavily API
-            const searchResult = await searchCookingVideos(filters);
-            
-            if (!searchResult.videos || searchResult.videos.length === 0) {
-                return res.json({
-                    videos: [],
+    // AI-assisted YouTube video search for recipes (Inspiration Machine D) - SECURED
+    router.post('/api/recipes/videos', 
+        authMiddleware(['patient', 'doctor', 'admin']),
+        videoSearchRateLimit,
+        aiEnhancedSearchLimit,
+        sanitizeRequestBody,
+        validateRecipeSearch,
+        handleValidationErrors,
+        async (req: AuthenticatedRequest, res) => {
+            try {
+                secureLog('Recipe video search requested', { 
+                    userId: req.user?.userId, 
+                    role: req.user?.role 
+                });
+                
+                const { searchCookingVideos } = await import('./ai/tavilyClient');
+                
+                // Extract validated and sanitized search filters
+                const filters = req.body;
+                
+                // Perform YouTube search using Tavily API with OpenAI enhancement
+                const searchResult = await searchCookingVideos(filters);
+                
+                if (!searchResult.videos || searchResult.videos.length === 0) {
+                    secureLog('No recipe videos found', { filtersUsed: Object.keys(filters) });
+                    return res.json({
+                        videos: [],
+                        query: searchResult.query,
+                        message: searchResult.message || "No cooking videos found for your search criteria"
+                    });
+                }
+                
+                // Return exactly 10 YouTube video results as programmed
+                const limitedVideos = searchResult.videos.slice(0, 10);
+                
+                secureLog('Recipe videos found', { 
+                    count: limitedVideos.length,
+                    totalFound: searchResult.videos.length 
+                });
+                
+                res.json({
+                    videos: limitedVideos,
                     query: searchResult.query,
-                    message: searchResult.message || "No cooking videos found for your search criteria"
+                    answer: searchResult.answer,
+                    totalFound: searchResult.videos.length,
+                    returned: limitedVideos.length
+                });
+                
+            } catch (error: any) {
+                secureLog('Recipe video search error', { 
+                    error: error.message,
+                    userId: req.user?.userId 
+                });
+                res.status(500).json({
+                    videos: [],
+                    query: 'cooking videos',
+                    message: 'Video search temporarily unavailable'
                 });
             }
-            
-            // Return exactly 10 YouTube video results as programmed
-            const limitedVideos = searchResult.videos.slice(0, 10);
-            
-            res.json({
-                videos: limitedVideos,
-                query: searchResult.query,
-                answer: searchResult.answer,
-                totalFound: searchResult.videos.length,
-                returned: limitedVideos.length
-            });
-            
-        } catch (error: any) {
-            console.error('Recipe video search error:', error);
-            res.status(500).json({
-                videos: [],
-                query: 'cooking videos',
-                message: 'Video search temporarily unavailable'
-            });
         }
-    });
+    );
 
-    // AI-assisted YouTube video search for exercise & wellness (Inspiration Machine E&W)
-    router.post('/api/exercise-wellness/videos', authMiddleware(['patient', 'doctor', 'admin']), async (req: AuthenticatedRequest, res) => {
-        try {
-            const { searchExerciseWellnessVideos } = await import('./ai/tavilyClient');
-            
-            // Extract search filters from request
-            const { category, intensity, duration, tags, limit } = req.body;
-            
-            console.log('E&W Video search request:', { category, intensity, duration, tags, limit });
-            
-            // Validate category
-            if (!category || !['exercise', 'wellness'].includes(category)) {
-                console.error('Invalid category provided:', category);
-                return res.status(400).json({
+    // AI-assisted YouTube video search for exercise & wellness (Inspiration Machine E&W) - SECURED
+    router.post('/api/exercise-wellness/videos',
+        authMiddleware(['patient', 'doctor', 'admin']),
+        videoSearchRateLimit,
+        aiEnhancedSearchLimit,
+        sanitizeRequestBody,
+        validateExerciseSearch,
+        handleValidationErrors,
+        async (req: AuthenticatedRequest, res) => {
+            try {
+                secureLog('Exercise/Wellness video search requested', { 
+                    userId: req.user?.userId, 
+                    role: req.user?.role 
+                });
+                
+                const { searchExerciseWellnessVideos } = await import('./ai/tavilyClient');
+                
+                // Extract validated and sanitized search filters
+                const { category, intensity, duration, tags, limit } = req.body;
+                
+                // Perform YouTube search using Tavily API with intelligent filtering
+                const searchResult = await searchExerciseWellnessVideos(category, {
+                    intensity,
+                    duration,
+                    tags: tags || []
+                });
+                
+                secureLog('Exercise/Wellness search result received', {
+                    videosCount: searchResult.videos?.length || 0,
+                    category
+                });
+                
+                if (!searchResult.videos || searchResult.videos.length === 0) {
+                    secureLog('No exercise/wellness videos found', { category });
+                    return res.json({
+                        videos: [],
+                        query: searchResult.query,
+                        message: searchResult.message || `No ${category} videos found for your search criteria`
+                    });
+                }
+                
+                // Return exactly 10 YouTube video results as programmed, with AI filtering applied
+                const limitedVideos = searchResult.videos.slice(0, limit || 10);
+                
+                secureLog('Exercise/Wellness videos found', { 
+                    count: limitedVideos.length,
+                    totalFound: searchResult.videos.length,
+                    category 
+                });
+                
+                res.json({
+                    videos: limitedVideos,
+                    query: searchResult.query,
+                    answer: searchResult.answer,
+                    totalFound: searchResult.videos.length,
+                    returned: limitedVideos.length,
+                    category: category
+                });
+                
+            } catch (error: any) {
+                secureLog('Exercise/Wellness video search error', { 
+                    error: error.message,
+                    userId: req.user?.userId 
+                });
+                res.status(500).json({
                     videos: [],
                     query: 'exercise wellness videos',
-                    message: 'Category must be either "exercise" or "wellness"'
+                    message: 'Video search temporarily unavailable'
                 });
             }
-            
-            // Perform YouTube search using Tavily API with intelligent filtering
-            console.log('Calling searchExerciseWellnessVideos with:', { category, intensity, duration, tags: tags || [] });
-            const searchResult = await searchExerciseWellnessVideos(category, {
-                intensity,
-                duration,
-                tags: tags || []
-            });
-            
-            console.log('Search result received:', {
-                videosCount: searchResult.videos?.length || 0,
-                query: searchResult.query,
-                message: searchResult.message
-            });
-            
-            if (!searchResult.videos || searchResult.videos.length === 0) {
-                console.log('No videos found, returning empty result');
-                return res.json({
-                    videos: [],
-                    query: searchResult.query,
-                    message: searchResult.message || `No ${category} videos found for your search criteria`
-                });
-            }
-            
-            // Return exactly 10 YouTube video results as programmed, with AI filtering applied
-            const limitedVideos = searchResult.videos.slice(0, limit || 10);
-            
-            console.log(`Returning ${limitedVideos.length} videos out of ${searchResult.videos.length} found`);
-            
-            res.json({
-                videos: limitedVideos,
-                query: searchResult.query,
-                answer: searchResult.answer,
-                totalFound: searchResult.videos.length,
-                returned: limitedVideos.length,
-                category: category
-            });
-            
-        } catch (error: any) {
-            console.error('Exercise & Wellness video search error:', error);
-            console.error('Error stack:', error.stack);
-            res.status(500).json({
-                videos: [],
-                query: 'exercise wellness videos',
-                message: 'Video search temporarily unavailable',
-                error: error.message
-            });
         }
-    });
+    );
 
     // Enhanced location-based search for recipe providers (Inspiration Machine D)
     router.post('/api/recipes/providers', authMiddleware(['patient', 'doctor']), async (req: AuthenticatedRequest, res) => {
