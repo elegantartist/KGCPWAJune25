@@ -1,16 +1,16 @@
-import React from "react";
 import { createRoot } from "react-dom/client";
+import { StrictMode } from "react";
 import App from "./App";
 import "./index.css";
 import { ToastProvider } from "@/hooks/simple-toast";
 import * as serviceWorkerRegistration from "@/lib/serviceWorkerRegistration";
 
 createRoot(document.getElementById("root")!).render(
-  <React.StrictMode>
+  <StrictMode>
     <ToastProvider>
       <App />
     </ToastProvider>
-  </React.StrictMode>
+  </StrictMode>
 );
 
 // PERMANENTLY DISABLED: Service worker has been completely removed
