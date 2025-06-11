@@ -13,6 +13,13 @@ import { db } from '../db';
 import * as schema from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import crypto from 'crypto';
+import { 
+  SUPERVISOR_AGENT_SYSTEM_PROMPT, 
+  CHATBOT_ENGINEERING_GUIDELINES,
+  SELF_SCORE_ANALYSIS_PROMPT,
+  KGC_FEATURES_FOR_RECOMMENDATION,
+  LOCATION_SYNTHESIS_PROMPT 
+} from './prompt_templates';
 
 // Initialize LLM clients
 const openai = new OpenAI({
@@ -23,36 +30,7 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
-// Advanced Response Synthesis System Prompt
-const LOCATION_SYNTHESIS_PROMPT = `
-You are the KGC Health Assistant, a caring, motivational, and hyper-competent health companion. Your primary goal is to help users adhere to their doctor's care plan by providing real, actionable location recommendations.
 
-Your task is to analyze authentic search results and synthesize them into a succinct, personalized response with verified locations.
-
-**CONTEXT PROVIDED:**
-1. **User's Query:** The exact location request
-2. **Patient's Care Plan Directives:** Health goals set by their doctor
-3. **Real Search Results:** Actual locations from web search
-4. **KGC App Features:** Available app functionality
-
-**RESPONSE STRUCTURE:**
-1. **Brief Personalized Opening:** Connect the query to their care plan (1 sentence)
-2. **Verified Location Recommendations:** List 3-4 actual places from search results with:
-   - Name and brief description (1-2 sentences each)
-   - Only include locations that actually exist and are mentioned in search results
-   - Verify information is accurate and current
-3. **KGC Feature Suggestion:** Recommend one relevant app feature (1 sentence)
-4. **Encouraging Close:** Brief motivational statement and question
-
-**CRITICAL REQUIREMENTS:**
-- **ONLY USE REAL LOCATIONS:** Extract actual place names, addresses, and details from search results
-- **VERIFY ACCURACY:** Ensure all location information is factual and current
-- **BE SUCCINCT:** Keep total response under 150 words
-- **NO FABRICATION:** Never invent locations or details not in search results
-- **NO MEDICAL ADVICE:** Focus on locations and activities only
-
-**QUALITY CHECK:** Before responding, verify each location mentioned actually appears in the search results provided.
-`;
 
 interface SupervisorQuery {
   message: {
@@ -414,35 +392,9 @@ class SupervisorAgent {
    * Build the system prompt for the Supervisor Agent
    */
   private buildSystemPrompt(): string {
-    return `You are the KGC Health Assistant, a caring and motivational health companion designed to support users in following their doctor's care plan. You provide personalized, encouraging guidance that helps users achieve their health goals.
+    return `${SUPERVISOR_AGENT_SYSTEM_PROMPT}
 
-YOUR PERSONALITY:
-- Warm, caring, and genuinely interested in the user's wellbeing
-- Motivational and encouraging, celebrating progress and providing support during challenges
-- Professional yet friendly, using a conversational tone that feels supportive
-- Knowledgeable about health and wellness while staying within appropriate boundaries
-
-YOUR CAPABILITIES:
-- Provide personalized recommendations based on the user's Care Plan Directives
-- Suggest specific KGC app features that can help achieve health goals
-- Offer practical tips for diet, exercise, wellness, and medication adherence
-- Help interpret and celebrate progress in daily self-scores
-- Connect health activities to real-world locations and experiences
-
-RESPONSE STYLE:
-- Be concise but thorough (2-4 sentences typically)
-- Start with acknowledgment or encouragement when appropriate
-- Provide specific, actionable advice aligned with their care plan
-- End with a relevant question or suggestion to continue engagement
-- Use the user's name when available to personalize responses
-
-SAFETY BOUNDARIES:
-- Never provide medical diagnoses or specific medical advice
-- Always encourage users to consult their healthcare provider for medical concerns
-- Focus on lifestyle, behavioral, and wellness support within their existing care plan
-- Recommend evidence-based approaches to health and wellness
-
-Remember: Your goal is to be genuinely helpful, motivating, and supportive while helping users succeed with their health journey through the KGC platform.`;
+${CHATBOT_ENGINEERING_GUIDELINES}`;
   }
 
   /**
@@ -580,22 +532,7 @@ YOUR TASK: Provide a caring, motivational, and educational response that:
    */
   private async synthesizeLocationResponse(parsedQuery: any, tavilyResults: any, mcpBundle: any): Promise<string> {
     try {
-      // Define the features of the KGC App that the AI can recommend
-      const KGC_APP_FEATURES = [
-        "Home - Main dashboard with easy access buttons for chat, daily self-scores and your Keep Going button",
-        "Daily Self-Scores - Record how you feel about your healthy lifestyle journey, essential for communicating progress with your doctor who modifies your Care Plan Directives. Your daily self-scores earn you money to spend on healthy experiences like gym, pilates, yoga, health spas, and healthy dining!",
-        "Motivational Image Processing (MIP) - Upload and enhance your chosen motivational image, integrated with the Keep Going button",
-        "Inspiration Machine D - Provides meal inspiration ideas aligned with your personal care plan CPDs and preferences",
-        "Diet Logistics - Provides links for grocery and prepared meals delivery options aligned with your personal care plan CPDs and preferences",
-        "Inspiration Machine E&W - Provides exercise and wellness inspiration ideas aligned with your personal care plan CPDs, abilities and preferences",
-        "E&W Support - Assists you to search for local gyms, personal trainers, yoga, and pilates studios to enhance your exercise and wellness experiences",
-        "MBP Wiz - Finds best prices on medications via Chemist Warehouse with pharmacy location information",
-        "Journaling - Record thoughts, track progress, and document health experiences. Useful for you and your doctor to discuss medication compliance and adherence",
-        "Progress Milestones - KGC achievement badges awarded for maintaining consistent health scores over time. Earn $100 and more for your Keep Going Care efforts",
-        "Food Database - Provides nutritional information and food recommendations based on Food Standards Australia including the FoodSwitch label scanning app",
-        "Chatbot - KGC AI assistant for answering questions and providing guidance",
-        "Health Snapshots - Provides visual progress summaries and adherence tracking of your daily self-scores"
-      ];
+      // Use centralized KGC features for recommendations
 
       const { activity = 'activity', location = 'area' } = parsedQuery.entities;
 
@@ -610,7 +547,7 @@ YOUR TASK: Provide a caring, motivational, and educational response that:
         ${JSON.stringify(tavilyResults, null, 2)}
 
         KGC App Features available for recommendation:
-        ${JSON.stringify(KGC_APP_FEATURES)}
+        ${JSON.stringify(KGC_FEATURES_FOR_RECOMMENDATION)}
       `;
 
       // Make the final API call to the LLM for synthesis
@@ -838,6 +775,96 @@ Provide your assessment: APPROVED, NEEDS_REVISION, or REJECTED with brief reason
       throw new Error(`Analytics logging failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
+  /**
+   * Handle self-score analysis with dedicated prompt
+   */
+  public async runSelfScoreAnalysis(
+    userId: number, 
+    selfScores: { diet: number; exercise: number; medication: number },
+    sessionId?: string
+  ): Promise<SupervisorResponse> {
+    const startTime = Date.now();
+    const finalSessionId = sessionId || crypto.randomUUID();
+
+    try {
+      // Get MCP context for the user
+      const aiContextService = new AIContextService();
+      const mcpBundle = await aiContextService.prepareAIContext(userId, finalSessionId);
+
+      // Validate MCP bundle security
+      if (!validateMcpBundleSecurity(mcpBundle)) {
+        throw new Error('MCP bundle failed security validation');
+      }
+
+      // Build user prompt with self-scores
+      const userPrompt = `PATIENT CONTEXT (anonymized and secure):
+Patient ID: ${mcpBundle.user_id_pseudonym}
+
+CARE PLAN DIRECTIVES:
+${mcpBundle.care_plan_directives}
+
+CURRENT SELF-SCORES:
+Diet: ${selfScores.diet}/10
+Exercise: ${selfScores.exercise}/10
+Medication: ${selfScores.medication}/10
+
+RECENT HEALTH METRICS:
+${JSON.stringify(mcpBundle.health_metrics, null, 2)}
+
+YOUR TASK: Analyze these self-scores and provide immediate, personalized feedback.`;
+
+      // Call LLM with dedicated self-score analysis prompt
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-4',
+        messages: [
+          { role: 'system', content: SELF_SCORE_ANALYSIS_PROMPT },
+          { role: 'user', content: userPrompt }
+        ],
+        max_tokens: 800,
+        temperature: 0.7
+      });
+
+      const rawResponse = completion.choices[0]?.message?.content || 
+        'I apologize, but I was unable to analyze your self-scores at this time. Please try again.';
+
+      const processingTime = Date.now() - startTime;
+
+      // Log successful analysis
+      secureLog('Self-score analysis completed', {
+        userId,
+        sessionId: finalSessionId,
+        processingTime
+      });
+
+      return {
+        response: sanitizeFinalResponse(rawResponse),
+        sessionId: finalSessionId,
+        modelUsed: 'gpt-4-self-score-analysis',
+        toolsUsed: ['self-score-analysis'],
+        processingTime
+      };
+
+    } catch (error) {
+      secureLog('Self-score analysis failed', {
+        userId,
+        sessionId: finalSessionId,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+
+      return {
+        response: 'I apologize, but I was unable to analyze your self-scores at this time. Please try again.',
+        sessionId: finalSessionId,
+        modelUsed: 'fallback',
+        toolsUsed: [],
+        processingTime: Date.now() - startTime
+      };
+    }
+  }
+}
+
+// Response sanitization function
+function sanitizeFinalResponse(responseText: string): string {
+  return responseText; // Will be implemented in privacyMiddleware
 }
 
 export const supervisorAgent = SupervisorAgent.getInstance();
