@@ -27,7 +27,7 @@ const KeepGoingWithMIP: React.FC<KeepGoingWithMIPProps> = ({ onClose }) => {
   
   // User ID for demo purposes (in a real app, this would be from auth)
   // Get current authenticated user
-  const { data: currentUser } = useQuery({
+  const { data: currentUser } = useQuery<{ id: number; name: string; role: string }>({
     queryKey: ['/api/user/current-context'],
     retry: false
   });

@@ -1,6 +1,6 @@
 // In server/routes.ts
 import { Router } from 'express';
-import type { Express } from 'express';
+import type { Express, Response } from 'express';
 import twilio from 'twilio';
 import { db } from './db';
 import * as schema from '@shared/schema';
@@ -1075,7 +1075,7 @@ export function registerRoutes(app: Express) {
         sanitizeRequestBody,
         validateRecipeSearch,
         handleValidationErrors,
-        async (req: AuthenticatedRequest, res) => {
+        async (req: AuthenticatedRequest, res: Response) => {
             try {
                 secureLog('Recipe video search requested', { 
                     userId: req.user?.userId, 
@@ -1137,7 +1137,7 @@ export function registerRoutes(app: Express) {
         sanitizeRequestBody,
         validateExerciseSearch,
         handleValidationErrors,
-        async (req: AuthenticatedRequest, res) => {
+        async (req: AuthenticatedRequest, res: Response) => {
             try {
                 secureLog('Exercise/Wellness video search requested', { 
                     userId: req.user?.userId, 

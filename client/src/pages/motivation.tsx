@@ -27,7 +27,7 @@ const Motivation: React.FC = () => {
   const queryClient = useQueryClient();
   
   // Get current authenticated user
-  const { data: currentUser, isLoading: userLoading } = useQuery({
+  const { data: currentUser, isLoading: userLoading } = useQuery<{ id: number; name: string; role: string }>({
     queryKey: ['/api/user/current-context'],
     retry: false
   });
