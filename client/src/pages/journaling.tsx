@@ -9,6 +9,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { Save, BookOpen, CalendarDays } from "lucide-react";
 import { createHapticFeedback } from "@/lib/soundEffects";
+import Layout from "@/components/layout/Layout";
 
 interface JournalEntry {
   id: number;

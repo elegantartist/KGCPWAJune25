@@ -264,7 +264,9 @@ const FoodDatabase = () => {
             </Button>
           </div>
         ) : (
-          renderFoodList(cpdAlignedData?.foods || [], cpdAlignedLoading)
+          <div className="text-center py-8">
+            <p className="text-muted-foreground">Food recommendations coming soon</p>
+          </div>
         )}
       </div>
       

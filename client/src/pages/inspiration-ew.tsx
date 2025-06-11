@@ -11,6 +11,7 @@ import { Search, ExternalLink, ThumbsUp, Activity, Brain, Loader2, AlertCircle }
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import axios from "axios";
+import Layout from "@/components/layout/Layout";
 
 // Interface for video result from API
 interface VideoResult {
@@ -201,8 +202,9 @@ const InspirationEW: React.FC = () => {
   }, [userId, toast]);
 
   return (
-    <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-6">Inspiration Machine E&W</h1>
+    <Layout>
+      <div className="container mx-auto p-4">
+        <h1 className="text-2xl font-bold mb-6">Inspiration Machine E&W</h1>
 
       {/* Doctor's CPD for Exercise & Wellness */}
       {loadingCPD ? (
@@ -512,7 +514,8 @@ const InspirationEW: React.FC = () => {
           </>
         )}
       </div>
-    </div>
+      </div>
+    </Layout>
   );
 };
 
