@@ -1096,8 +1096,11 @@ export function registerRoutes(app: Express) {
             // Extract search filters from request
             const { category, intensity, duration, tags, limit } = req.body;
             
+            console.log('E&W Video search request:', { category, intensity, duration, tags, limit });
+            
             // Validate category
             if (!category || !['exercise', 'wellness'].includes(category)) {
+                console.error('Invalid category provided:', category);
                 return res.status(400).json({
                     videos: [],
                     query: 'exercise wellness videos',
@@ -1106,13 +1109,21 @@ export function registerRoutes(app: Express) {
             }
             
             // Perform YouTube search using Tavily API with intelligent filtering
+            console.log('Calling searchExerciseWellnessVideos with:', { category, intensity, duration, tags: tags || [] });
             const searchResult = await searchExerciseWellnessVideos(category, {
                 intensity,
                 duration,
                 tags: tags || []
             });
             
+            console.log('Search result received:', {
+                videosCount: searchResult.videos?.length || 0,
+                query: searchResult.query,
+                message: searchResult.message
+            });
+            
             if (!searchResult.videos || searchResult.videos.length === 0) {
+                console.log('No videos found, returning empty result');
                 return res.json({
                     videos: [],
                     query: searchResult.query,
@@ -1122,6 +1133,8 @@ export function registerRoutes(app: Express) {
             
             // Return exactly 10 YouTube video results as programmed, with AI filtering applied
             const limitedVideos = searchResult.videos.slice(0, limit || 10);
+            
+            console.log(`Returning ${limitedVideos.length} videos out of ${searchResult.videos.length} found`);
             
             res.json({
                 videos: limitedVideos,
@@ -1134,10 +1147,12 @@ export function registerRoutes(app: Express) {
             
         } catch (error: any) {
             console.error('Exercise & Wellness video search error:', error);
+            console.error('Error stack:', error.stack);
             res.status(500).json({
                 videos: [],
                 query: 'exercise wellness videos',
-                message: 'Video search temporarily unavailable'
+                message: 'Video search temporarily unavailable',
+                error: error.message
             });
         }
     });
