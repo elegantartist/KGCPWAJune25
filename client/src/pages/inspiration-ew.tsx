@@ -170,7 +170,7 @@ const InspirationEW: React.FC = () => {
 
   // Process CPD data when it loads
   useEffect(() => {
-    if (carePlanDirectives) {
+    if (carePlanDirectives && Array.isArray(carePlanDirectives)) {
       // Find the exercise or wellness directive
       const ewDirective = carePlanDirectives.find((directive: any) => 
         directive.category.toLowerCase() === 'exercise' || 
