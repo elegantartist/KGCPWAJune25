@@ -9,7 +9,6 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { Save, BookOpen, CalendarDays } from "lucide-react";
 import { createHapticFeedback } from "@/lib/soundEffects";
-import Layout from "@/components/layout/Layout";
 
 interface JournalEntry {
   id: number;
@@ -55,8 +54,7 @@ const Journaling: React.FC = () => {
   );
 
   return (
-    <Layout>
-      <div className="space-y-6">
+    <div className="space-y-6">
       <Card className="bg-[#fdfdfd] border-[#2E8BC0]/20">
         <CardHeader>
           <CardTitle className="text-[#676767] flex items-center">
@@ -138,8 +136,7 @@ const Journaling: React.FC = () => {
           </Tabs>
         </CardContent>
       </Card>
-      </div>
-    </Layout>
+    </div>
   );
 };
 

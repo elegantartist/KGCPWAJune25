@@ -14,21 +14,9 @@ import { supervisorAgent } from './services/supervisorAgent';
 import { getMealInspiration, getWellnessInspiration, getWeeklyMealPlan, getWellnessProgram } from './services/inspirationMachines';
 import { analyzeHealthTrends, generatePredictiveAlerts, generateAnalyticsInsights } from './services/analyticsEngine';
 import { proactiveMonitoring } from './services/proactiveMonitoring';
-import { performEnhancedSearch } from './services/enhancedSearchService';
-
 
 export function registerRoutes(app: Express) {
     const router = Router();
-
-    // --- API HEALTH CHECK ---
-    router.get('/health', (req, res) => {
-        res.json({ 
-            status: 'healthy', 
-            timestamp: new Date().toISOString(),
-            version: '2.0',
-            api: 'active'
-        });
-    });
 
     // --- AUTHENTICATION ---
     router.post('/auth/admin-login', async (req, res) => {
@@ -788,7 +776,10 @@ export function registerRoutes(app: Express) {
         try {
             const { userId, includeHealthMetrics = true, includeChatHistory = false } = req.body;
             
-            console.log('AI context preparation requested for user:', userId);
+            secureLog('AI context preparation requested', { 
+                requestedBy: req.user!.userId, 
+                targetUser: userId 
+            });
 
             const context = await AIContextService.prepareSecureContext({
                 userId: parseInt(userId),
@@ -804,7 +795,7 @@ export function registerRoutes(app: Express) {
                 timestamp: context.timestamp
             });
         } catch (error: any) {
-            console.error('Error preparing AI context:', error.message);
+            secureLog('Error preparing AI context', { error: error.message });
             res.status(500).json({ message: 'Failed to prepare AI context' });
         }
     });
@@ -818,7 +809,7 @@ export function registerRoutes(app: Express) {
             
             res.json(validation);
         } catch (error: any) {
-            console.error('Error validating AI response:', error.message);
+            secureLog('Error validating AI response', { error: error.message });
             res.status(500).json({ message: 'Failed to validate AI response' });
         }
     });
@@ -1052,169 +1043,6 @@ export function registerRoutes(app: Express) {
                 success: false, 
                 message: 'Wellness inspiration unavailable',
                 fallback: 'Try 10-15 minutes of gentle movement or mindfulness as outlined in your wellness plan.'
-            });
-        }
-    });
-
-    // AI-assisted YouTube video search for recipes (Inspiration Machine D)
-    router.post('/api/recipes/videos', authMiddleware(['patient', 'doctor', 'admin']), async (req: AuthenticatedRequest, res) => {
-        try {
-            console.log('Recipe videos endpoint - User:', req.user?.userId, req.user?.role);
-            
-            const { searchCookingVideos } = await import('./ai/tavilyClient');
-            
-            // Extract search filters from request
-            const filters = req.body;
-            
-            // Perform YouTube search using Tavily API
-            const searchResult = await searchCookingVideos(filters);
-            
-            if (!searchResult.videos || searchResult.videos.length === 0) {
-                return res.json({
-                    videos: [],
-                    query: searchResult.query,
-                    message: searchResult.message || "No cooking videos found for your search criteria"
-                });
-            }
-            
-            // Return exactly 10 YouTube video results as programmed
-            const limitedVideos = searchResult.videos.slice(0, 10);
-            
-            res.json({
-                videos: limitedVideos,
-                query: searchResult.query,
-                answer: searchResult.answer,
-                totalFound: searchResult.videos.length,
-                returned: limitedVideos.length
-            });
-            
-        } catch (error: any) {
-            console.error('Recipe video search error:', error);
-            res.status(500).json({
-                videos: [],
-                query: 'cooking videos',
-                message: 'Video search temporarily unavailable'
-            });
-        }
-    });
-
-    // AI-assisted YouTube video search for exercise & wellness (Inspiration Machine E&W)
-    router.post('/api/exercise-wellness/videos', authMiddleware(['patient', 'doctor', 'admin']), async (req: AuthenticatedRequest, res) => {
-        try {
-            const { searchExerciseWellnessVideos } = await import('./ai/tavilyClient');
-            
-            // Extract search filters from request
-            const { category, intensity, duration, tags, limit } = req.body;
-            
-            console.log('E&W Video search request:', { category, intensity, duration, tags, limit });
-            
-            // Validate category
-            if (!category || !['exercise', 'wellness'].includes(category)) {
-                console.error('Invalid category provided:', category);
-                return res.status(400).json({
-                    videos: [],
-                    query: 'exercise wellness videos',
-                    message: 'Category must be either "exercise" or "wellness"'
-                });
-            }
-            
-            // Perform YouTube search using Tavily API with intelligent filtering
-            console.log('Calling searchExerciseWellnessVideos with:', { category, intensity, duration, tags: tags || [] });
-            const searchResult = await searchExerciseWellnessVideos(category, {
-                intensity,
-                duration,
-                tags: tags || []
-            });
-            
-            console.log('Search result received:', {
-                videosCount: searchResult.videos?.length || 0,
-                query: searchResult.query,
-                message: searchResult.message
-            });
-            
-            if (!searchResult.videos || searchResult.videos.length === 0) {
-                console.log('No videos found, returning empty result');
-                return res.json({
-                    videos: [],
-                    query: searchResult.query,
-                    message: searchResult.message || `No ${category} videos found for your search criteria`
-                });
-            }
-            
-            // Return exactly 10 YouTube video results as programmed, with AI filtering applied
-            const limitedVideos = searchResult.videos.slice(0, limit || 10);
-            
-            console.log(`Returning ${limitedVideos.length} videos out of ${searchResult.videos.length} found`);
-            
-            res.json({
-                videos: limitedVideos,
-                query: searchResult.query,
-                answer: searchResult.answer,
-                totalFound: searchResult.videos.length,
-                returned: limitedVideos.length,
-                category: category
-            });
-            
-        } catch (error: any) {
-            console.error('Exercise & Wellness video search error:', error);
-            console.error('Error stack:', error.stack);
-            res.status(500).json({
-                videos: [],
-                query: 'exercise wellness videos',
-                message: 'Video search temporarily unavailable',
-                error: error.message
-            });
-        }
-    });
-
-    // Enhanced location-based search for recipe providers (Inspiration Machine D)
-    router.post('/api/recipes/providers', authMiddleware(['patient', 'doctor']), async (req: AuthenticatedRequest, res) => {
-        try {
-            const { ingredients, cuisineType, location } = req.body;
-            const queryType = `${cuisineType || ''} ${ingredients || ''} cooking classes restaurants`;
-            const searchLocation = location || 'Australia';
-            
-            // Use the enhanced search to find local providers
-            const results = await performEnhancedSearch(searchLocation, queryType);
-            
-            res.json({ 
-                providers: results,
-                location: searchLocation,
-                searchType: queryType,
-                totalFound: results.length
-            });
-        } catch (error: any) {
-            console.error('Recipe provider search error:', error);
-            res.status(500).json({ 
-                providers: [],
-                error: 'Failed to search for recipe providers.',
-                message: 'Provider search temporarily unavailable'
-            });
-        }
-    });
-
-    // Enhanced location-based search for exercise & wellness providers (Inspiration Machine E&W)
-    router.post('/api/exercise-wellness/providers', authMiddleware(['patient', 'doctor']), async (req: AuthenticatedRequest, res) => {
-        try {
-            const { activity, location } = req.body;
-            const searchLocation = location || 'Australia';
-            const searchType = `${activity || 'fitness wellness'} gyms trainers classes`;
-            
-            // Use the enhanced search to find local providers
-            const results = await performEnhancedSearch(searchLocation, searchType);
-            
-            res.json({ 
-                providers: results,
-                location: searchLocation,
-                searchType: searchType,
-                totalFound: results.length
-            });
-        } catch (error: any) {
-            console.error('Exercise & Wellness provider search error:', error);
-            res.status(500).json({ 
-                providers: [],
-                error: 'Failed to search for E&W support.',
-                message: 'Provider search temporarily unavailable'
             });
         }
     });
@@ -1540,11 +1368,7 @@ export function registerRoutes(app: Express) {
         }
     });
 
-    // Mount API routes with explicit precedence over Vite middleware
     app.use('/api', router);
-    
-    // Also mount routes directly without /api prefix for fallback
-    app.use(router);
 }
 
 // Helper functions for analytics dashboard

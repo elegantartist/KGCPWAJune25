@@ -134,156 +134,6 @@ class SupervisorAgent {
   }
 
   /**
-   * Advanced NLU Pre-Processing with Context-Aware Security Analysis
-   * Performs comprehensive natural language understanding with healthcare context awareness
-   */
-  private async performAdvancedNLU(userQuery: string, userId: number): Promise<any> {
-    try {
-      const nluPrompt = `
-You are an advanced NLU processor for a healthcare AI system. Analyze this user query comprehensively:
-
-Query: "${userQuery}"
-
-Perform these analyses:
-
-1. INTENT CLASSIFICATION:
-   - Primary intent (health_guidance, meal_inspiration, exercise_inspiration, medication_support, etc.)
-   - Intent confidence (0.0-1.0)
-   - Secondary intents if present
-
-2. ENTITY EXTRACTION:
-   - Health conditions mentioned
-   - Food items or dietary preferences
-   - Exercise activities or fitness goals
-   - Locations or geographical references
-   - Temporal expressions (time, dates, frequency)
-   - Emotional states or sentiment indicators
-
-3. CONTEXTUAL FACTORS:
-   - Urgency level (low, medium, high, critical)
-   - Emotional tone (positive, neutral, concerned, distressed)
-   - Complexity level (simple, moderate, complex)
-   - Care plan relevance (direct, indirect, unrelated)
-
-4. SECURITY ANALYSIS:
-   - PII risk assessment (none, low, medium, high)
-   - PHI disclosure risk (none, low, medium, high)
-   - Tooling safety assessment (safe, caution, unsafe)
-   - Response sensitivity level (public, sensitive, confidential)
-
-5. TOOL RECOMMENDATIONS:
-   - Recommended tools based on intent
-   - Tool confidence scores
-   - Fallback tools if primary fails
-
-Return JSON format with all analyses.`;
-
-      const response = await anthropic.messages.create({
-        model: 'claude-3-5-sonnet-20241022',
-        max_tokens: 1000,
-        messages: [{ role: 'user', content: nluPrompt }]
-      });
-
-      const analysisText = response.content[0].type === 'text' ? response.content[0].text : '';
-      
-      // Parse the JSON response
-      const jsonMatch = analysisText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const analysis = JSON.parse(jsonMatch[0]);
-        
-        // Add computed fields for compatibility
-        analysis.isSafeForTooling = analysis.security_analysis?.tooling_safety === 'safe';
-        analysis.securityRisk = analysis.security_analysis?.overall_risk || 'low';
-        analysis.confidence = analysis.intent_classification?.confidence || 0.8;
-        
-        return analysis;
-      }
-      
-      // Fallback if parsing fails
-      return {
-        intent: 'general_health_guidance',
-        entities: {},
-        confidence: 0.7,
-        isSafeForTooling: true,
-        securityRisk: 'low',
-        contextualFactors: { urgency: 'low', tone: 'neutral' }
-      };
-      
-    } catch (error) {
-      secureLog('NLU processing failed', { error: error instanceof Error ? error.message : String(error), userId });
-      
-      // Safe fallback
-      return {
-        intent: 'general_health_guidance',
-        entities: {},
-        confidence: 0.5,
-        isSafeForTooling: true,
-        securityRisk: 'medium',
-        contextualFactors: { urgency: 'medium', tone: 'neutral' }
-      };
-    }
-  }
-
-  /**
-   * Advanced Response Synthesis with Multi-Source Integration
-   * Combines AI responses with contextual healthcare data and safety validation
-   */
-  private async performAdvancedResponseSynthesis(
-    aiResponse: string,
-    userQuery: string,
-    userId: number,
-    toolsUsed: string[],
-    contextData: any
-  ): Promise<string> {
-    try {
-      const synthesisPrompt = `
-You are a healthcare response synthesis specialist. Your task is to enhance and validate an AI response for maximum therapeutic value and safety.
-
-ORIGINAL USER QUERY: "${userQuery}"
-
-RAW AI RESPONSE: "${aiResponse}"
-
-TOOLS USED: ${toolsUsed.join(', ')}
-
-CONTEXT DATA: ${JSON.stringify(contextData, null, 2)}
-
-SYNTHESIS REQUIREMENTS:
-1. Maintain all factual medical information from the original response
-2. Enhance personalization using context data
-3. Ensure Australian healthcare compliance
-4. Add empathetic, motivational language appropriate for healthcare
-5. Include specific, actionable next steps
-6. Validate all recommendations against KGC feature capabilities
-7. Ensure response promotes self-efficacy and positive health behaviors
-
-SAFETY VALIDATIONS:
-- No diagnostic statements
-- No specific medical advice without healthcare provider involvement
-- Clear disclaimers where appropriate
-- Encouragement to consult healthcare providers for medical concerns
-
-Return the enhanced, synthesized response that is ready for patient delivery.`;
-
-      const response = await anthropic.messages.create({
-        model: 'claude-3-5-sonnet-20241022',
-        max_tokens: 1500,
-        messages: [{ role: 'user', content: synthesisPrompt }]
-      });
-
-      const synthesizedResponse = response.content[0].type === 'text' ? response.content[0].text : aiResponse;
-      
-      // Apply final safety sanitization
-      return sanitizeFinalResponse(synthesizedResponse);
-      
-    } catch (error) {
-      secureLog('Response synthesis failed', { error: error instanceof Error ? error.message : String(error), userId });
-      
-      // Return original response with basic sanitization
-      return sanitizeFinalResponse(aiResponse);
-    }
-  }
-
-  /**
    * Main orchestration function for supervisor queries
    * Implements resilient agent orchestration with time-aware logic and decoupled primary/secondary tasks
    */
@@ -339,17 +189,15 @@ Return the enhanced, synthesized response that is ready for patient delivery.`;
         deltaInMinutes
       });
 
-      // --- NEW STEP 1: Advanced NLU Pre-Processing with Security Analysis ---
-      const parsedQuery = await this.performAdvancedNLU(userQuery, userId);
+      // --- NEW STEP 1: Parse the query to understand intent and entities ---
+      const parsedQuery = await parseUserQuery(userQuery);
       
-      secureLog('Advanced NLU completed', {
+      secureLog('Query parsed successfully', {
         sessionId: finalSessionId,
         intent: parsedQuery.intent,
         entityCount: Object.keys(parsedQuery.entities).length,
         isSafeForTooling: parsedQuery.isSafeForTooling,
-        confidence: parsedQuery.confidence,
-        securityRisk: parsedQuery.securityRisk,
-        contextualFactors: parsedQuery.contextualFactors
+        confidence: parsedQuery.confidence
       });
 
       // --- NEW STEP 2: Intelligent Tool-Use based on Intent ---
@@ -430,25 +278,14 @@ Return the enhanced, synthesized response that is ready for patient delivery.`;
           validationStatus = validatedResponse.status;
         }
 
-        // 7. Advanced Response Synthesis
-        const synthesizedResponse = await this.performAdvancedResponseSynthesis(
-          finalResponse,
-          userQuery,
-          userId,
-          [],
-          mcpBundle
-        );
-
-        // 8. Final security check on response
-        const responseValidation = await AIContextService.validateAIResponse(synthesizedResponse, finalSessionId);
+        // 7. Final security check on response
+        const responseValidation = await AIContextService.validateAIResponse(finalResponse, finalSessionId);
         if (!responseValidation.isSecure) {
           secureLog('AI response contained PII, sanitizing', { 
             sessionId: finalSessionId, 
             violations: responseValidation.violations 
           });
           finalResponse = responseValidation.sanitizedResponse;
-        } else {
-          finalResponse = synthesizedResponse;
         }
 
         mainResponse = {

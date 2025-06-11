@@ -11,7 +11,6 @@ import { Search, ExternalLink, ThumbsUp, Activity, Brain, Loader2, AlertCircle }
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import axios from "axios";
-import Layout from "@/components/layout/Layout";
 
 // Interface for video result from API
 interface VideoResult {
@@ -73,30 +72,28 @@ const InspirationEW: React.FC = () => {
   const [savedVideos, setSavedVideos] = useState<string[]>([]);
   const [videos, setVideos] = useState<VideoResult[]>([]);
   const [carePlanDirective, setCarePlanDirective] = useState<string>('');
+  const [loadingCPD, setLoadingCPD] = useState<boolean>(true);
 
   const { toast } = useToast();
   const isMobile = useIsMobile();
 
   // Default user ID (should be replaced with actual user ID from context/auth)
-  // This ensures we are using our standard, authenticated fetcher.
+  // Get current authenticated user
   const { data: currentUser } = useQuery({
-    queryKey: ['/api/users/me'],
-    queryFn: () => apiRequest<{ id: number; name: string }>('GET', '/api/users/me'),
-    retry: false,
+    queryKey: ['/api/user/current-context'],
+    retry: false
   });
 
-  // This safely handles the case where currentUser is still loading.
-  const userId = (currentUser as any)?.id;
+  const userId = currentUser?.id;
 
-  // Setup mutation for searching videos using authenticated API request
+  // Setup mutation for searching videos
   const videoSearchMutation = useMutation<VideoSearchResponse, Error, any>({
     mutationFn: async (searchData) => {
-      const response = await apiRequest<VideoSearchResponse>(
-        'POST',
+      const response = await axios.post<VideoSearchResponse>(
         '/api/exercise-wellness/videos',
         searchData
       );
-      return response;
+      return response.data;
     },
     onSuccess: (data) => {
       setVideos(data.videos);
@@ -161,52 +158,51 @@ const InspirationEW: React.FC = () => {
     return video.image || imageAssets[index % imageAssets.length];
   };
 
-  // The correct, robust implementation for CPD fetching
-  const { data: carePlanDirectives, isLoading: loadingCPD, error: cpdError } = useQuery({
-    // 1. The queryKey MUST be a string template for dynamic URLs.
-    queryKey: [`/api/users/${userId}/care-plan-directives/active`],
-    
-    // 2. The queryFn MUST use our standard authenticated apiRequest.
-    queryFn: () => apiRequest<any[]>('GET', `/api/users/${userId}/care-plan-directives/active`),
-    
-    // 3. The 'enabled' flag correctly prevents the query from running with an undefined userId.
-    enabled: !!userId,
-    retry: false
-  });
-
-
-
-  // Process CPD data when it loads
+  // Fetch care plan directives on component mount
   useEffect(() => {
-    if (carePlanDirectives && Array.isArray(carePlanDirectives)) {
-      // Find the exercise or wellness directive
-      const ewDirective = carePlanDirectives.find((directive: any) => 
-        directive.category.toLowerCase() === 'exercise' || 
-        directive.category.toLowerCase() === 'wellness' ||
-        directive.category.toLowerCase() === 'physical activity'
-      );
+    const fetchCarePlanDirectives = async () => {
+      try {
+        setLoadingCPD(true);
+        const response = await fetch(`/api/users/${userId}/care-plan-directives/active`);
 
-      if (ewDirective) {
-        // Always display the doctor's exact Exercise & Wellness CPD text in the UI
-        setCarePlanDirective(ewDirective.directive);
-      } else {
-        setCarePlanDirective('Your doctor has not yet provided any Exercise & Wellness care plan directives. Please check back later.');
+        if (!response.ok) {
+          throw new Error('Failed to fetch care plan directives');
+        }
+
+        const data = await response.json();
+
+        // Find the exercise or wellness directive
+        const ewDirective = data.find((directive: any) => 
+          directive.category.toLowerCase() === 'exercise' || 
+          directive.category.toLowerCase() === 'wellness' ||
+          directive.category.toLowerCase() === 'physical activity'
+        );
+
+        if (ewDirective) {
+          // Always display the doctor's exact Exercise & Wellness CPD text in the UI
+          setCarePlanDirective(ewDirective.directive);
+        } else {
+          setCarePlanDirective('Your doctor has not yet provided any Exercise & Wellness care plan directives. Please check back later.');
+        }
+      } catch (error) {
+        console.error('Error fetching care plan directives:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load care plan directives",
+          variant: "destructive"
+        });
+        setCarePlanDirective('Could not load Exercise & Wellness care plan directives. Please try again later.');
+      } finally {
+        setLoadingCPD(false);
       }
-    } else if (cpdError) {
-      console.error('Error fetching care plan directives:', cpdError);
-      toast({
-        title: "Error",
-        description: "Failed to load care plan directives",
-        variant: "destructive"
-      });
-      setCarePlanDirective('Could not load Exercise & Wellness care plan directives. Please try again later.');
-    }
-  }, [carePlanDirectives, cpdError, toast]);
+    };
+
+    fetchCarePlanDirectives();
+  }, [userId, toast]);
 
   return (
-    <Layout>
-      <div className="container mx-auto p-4">
-        <h1 className="text-2xl font-bold mb-6">Inspiration Machine E&W</h1>
+    <div className="container mx-auto p-4">
+      <h1 className="text-2xl font-bold mb-6">Inspiration Machine E&W</h1>
 
       {/* Doctor's CPD for Exercise & Wellness */}
       {loadingCPD ? (
@@ -516,8 +512,7 @@ const InspirationEW: React.FC = () => {
           </>
         )}
       </div>
-      </div>
-    </Layout>
+    </div>
   );
 };
 

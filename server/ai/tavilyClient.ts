@@ -1,6 +1,5 @@
 import axios from 'axios';
 import { RecipeSearchFilters, RecipeSearchResult } from '../types/recipe';
-import { enhanceRecipeSearchResults, enhanceExerciseSearchResults, enhanceProviderSearchResults } from './openaiEnhancer';
 
 // Define enhanced TavilySearchResult interface with our additional fields
 export interface TavilySearchResult {
@@ -343,48 +342,12 @@ export async function searchCookingVideos(filters: RecipeSearchFilters): Promise
       };
     }).filter((result: RecipeSearchResult): boolean => result.videoId !== null); // Filter out non-YouTube results
 
-    // Enhance results with OpenAI analysis for intelligent filtering
-    try {
-      const enhancedVideos = await enhanceRecipeSearchResults(
-        videoResults.map((video: any) => ({
-          title: video.title,
-          url: video.url,
-          content: video.description,
-          image: video.thumbnail_url,
-          videoId: video.videoId,
-          category: 'recipe'
-        })),
-        filters
-      );
-
-      // Convert enhanced results back to recipe format
-      const finalVideoResults = enhancedVideos.map(enhanced => ({
-        title: enhanced.title,
-        description: enhanced.content,
-        url: enhanced.url,
-        thumbnail_url: enhanced.image || undefined,
-        videoId: enhanced.videoId,
-        source_name: 'YouTube',
-        cuisine_type: filters.cuisineType || undefined,
-        meal_type: filters.mealType || undefined,
-        relevanceScore: enhanced.relevanceScore,
-        nutritionalAnalysis: enhanced.nutritionalAnalysis,
-        enhancedMetadata: enhanced.enhancedMetadata
-      }));
-
-      return {
-        query: searchQuery,
-        answer: response.data.answer,
-        videos: finalVideoResults.sort((a, b) => (b.relevanceScore || 0) - (a.relevanceScore || 0)) as RecipeSearchResult[]
-      };
-    } catch (enhancementError) {
-      console.warn('OpenAI enhancement failed, returning original results:', enhancementError);
-      return {
-        query: searchQuery,
-        answer: response.data.answer,
-        videos: videoResults
-      };
-    }
+    // Process results with OpenAI if available (this part would be implemented in the routes)
+    return {
+      query: searchQuery,
+      answer: response.data.answer,
+      videos: videoResults
+    };
 
   } catch (error) {
     console.error('Error searching cooking videos with Tavily:', error);
@@ -567,13 +530,6 @@ export async function searchExerciseWellnessVideos(
     console.log(`Tavily ${category}/wellness video search query: ${specificQuery}`);
     
     // Call Tavily API with specific query
-    console.log('Making Tavily API request with:', {
-      query: specificQuery,
-      search_depth: 'advanced',
-      include_domains: ['youtube.com'],
-      max_results: 25
-    });
-
     const response = await axios.post('https://api.tavily.com/search', {
       api_key: process.env.TAVILY_API_KEY,
       query: specificQuery,
@@ -585,45 +541,20 @@ export async function searchExerciseWellnessVideos(
       timeout: 20000 // 20 second timeout for reliability
     });
     
-    console.log('Tavily API response status:', response.status);
-    console.log('Tavily API response data structure:', {
-      hasData: !!response.data,
-      hasResults: !!response.data?.results,
-      resultsCount: response.data?.results?.length || 0,
-      firstResult: response.data?.results?.[0] ? {
-        title: response.data.results[0].title,
-        url: response.data.results[0].url,
-        hasContent: !!response.data.results[0].content
-      } : null
-    });
-    
     if (!response.data || !response.data.results) {
-      console.error('Tavily API returned invalid data structure');
       return { query: specificQuery, videos: [], message: "No results found" };
     }
     
     // Filter and transform results
-    console.log('Processing Tavily results:', response.data.results.length, 'total results');
-    
     let videoResults = response.data.results
-      .map((result: any, index: number): TavilySearchResult | null => {
-        console.log(`Processing result ${index + 1}:`, {
-          title: result.title,
-          url: result.url,
-          hasContent: !!result.content
-        });
-        
+      .map((result: any): TavilySearchResult | null => {
         // Extract YouTube video ID
         const videoId = extractYoutubeVideoId(result.url);
-        console.log(`Video ID extracted for result ${index + 1}:`, videoId);
         
         // Skip results without a valid YouTube video ID
-        if (!videoId) {
-          console.log(`Skipping result ${index + 1} - no valid YouTube video ID`);
-          return null;
-        }
+        if (!videoId) return null;
         
-        const processedResult = {
+        return {
           title: result.title || 'Untitled Video',
           url: result.url,
           content: result.content?.substring(0, 200) + '...' || 'No description available',
@@ -635,18 +566,8 @@ export async function searchExerciseWellnessVideos(
           duration: duration || 'short',
           relevanceScore: 0.5 // Default score, will be adjusted
         };
-        
-        console.log(`Successfully processed result ${index + 1}:`, {
-          title: processedResult.title,
-          videoId: processedResult.videoId,
-          url: processedResult.url
-        });
-        
-        return processedResult;
       })
       .filter((result: TavilySearchResult | null): result is TavilySearchResult => result !== null);
-    
-    console.log(`Filtered results: ${videoResults.length} valid YouTube videos from ${response.data.results.length} total results`);
     
     console.log(`Found ${videoResults.length} initial ${category} videos`);
     
@@ -918,36 +839,12 @@ export async function searchExerciseWellnessVideos(
       message = `Found ${finalResults.length} videos matching your criteria.`;
     }
     
-    // Enhance results with OpenAI analysis for intelligent filtering
-    try {
-      const enhancedVideos = await enhanceExerciseSearchResults(
-        finalResults,
-        { category, intensity, duration, tags }
-      );
-
-      // Convert enhanced results back to the expected format
-      const finalEnhancedResults = enhancedVideos.map(enhanced => ({
-        ...enhanced,
-        description: enhanced.content,
-        thumbnail_url: enhanced.image,
-        source_name: 'YouTube'
-      }));
-
-      return {
-        videos: finalEnhancedResults.sort((a, b) => (b.relevanceScore || 0) - (a.relevanceScore || 0)),
-        query: specificQuery,
-        answer: answer,
-        message
-      };
-    } catch (enhancementError) {
-      console.warn('OpenAI enhancement failed, returning original results:', enhancementError);
-      return {
-        videos: finalResults,
-        query: specificQuery,
-        answer: answer,
-        message
-      };
-    }
+    return {
+      videos: finalResults,
+      query: specificQuery,
+      answer: answer,
+      message
+    };
 
   } catch (error) {
     console.error(`Error searching ${category} videos with Tavily:`, error);
