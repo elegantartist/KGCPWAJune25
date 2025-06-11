@@ -870,7 +870,7 @@ export function registerRoutes(app: Express) {
                 return res.status(400).json({ message: 'message object with text and sentAt is required' });
             }
 
-            secureLog('Supervisor query received', { 
+            secureLog('info', 'Supervisor query received', { 
                 userId: req.user!.userId,
                 queryLength: queryText.length,
                 sentAt,
@@ -895,7 +895,7 @@ export function registerRoutes(app: Express) {
             });
 
         } catch (error: any) {
-            secureLog('Supervisor query endpoint error', { error: error.message });
+            secureLog('error', 'Supervisor query endpoint error', { error: error.message });
             res.status(500).json({ 
                 success: false,
                 message: 'Supervisor agent unavailable',
