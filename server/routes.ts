@@ -541,29 +541,34 @@ export function registerRoutes(app: Express) {
             }
 
             // Get care plan directives for this patient
-            const carePlan = await db.select().from(schema.carePlanDirectives).where(
-                eq(schema.carePlanDirectives.patientId, parseInt(patientId))
-            ).limit(1);
+            const carePlans = await db.select().from(schema.carePlanDirectives).where(
+                and(
+                    eq(schema.carePlanDirectives.patientId, parseInt(patientId)),
+                    eq(schema.carePlanDirectives.active, true)
+                )
+            );
 
-            if (carePlan.length) {
-                res.json({ 
-                    status: 'success', 
-                    remarks: {
-                        healthy_eating_plan: carePlan[0].healthyEatingPlan || "",
-                        exercise_wellness_routine: carePlan[0].exerciseWellnessRoutine || "",
-                        prescribed_medication: carePlan[0].prescribedMedication || ""
-                    }
-                });
-            } else {
-                res.json({ 
-                    status: 'success', 
-                    remarks: {
-                        healthy_eating_plan: "",
-                        exercise_wellness_routine: "",
-                        prescribed_medication: ""
-                    }
-                });
-            }
+            const remarks = {
+                healthy_eating_plan: "",
+                exercise_wellness_routine: "",
+                prescribed_medication: ""
+            };
+
+            // Map categories to the expected format
+            carePlans.forEach(plan => {
+                if (plan.category === 'diet' || plan.category === 'nutrition' || plan.category === 'healthy_eating') {
+                    remarks.healthy_eating_plan = plan.directive;
+                } else if (plan.category === 'exercise' || plan.category === 'wellness' || plan.category === 'physical_activity') {
+                    remarks.exercise_wellness_routine = plan.directive;
+                } else if (plan.category === 'medication' || plan.category === 'medications') {
+                    remarks.prescribed_medication = plan.directive;
+                }
+            });
+
+            res.json({ 
+                status: 'success', 
+                remarks
+            });
         } catch (error) {
             console.error('Error fetching care plan:', error);
             res.status(500).json({ message: 'Failed to fetch care plan' });
@@ -591,31 +596,58 @@ export function registerRoutes(app: Express) {
                 return res.status(403).json({ message: 'Access denied to this patient' });
             }
 
-            // Check if care plan already exists
-            const existingCarePlan = await db.select().from(schema.carePlanDirectives).where(
-                eq(schema.carePlanDirectives.patientId, parseInt(patientId))
-            ).limit(1);
+            const patientIdInt = parseInt(patientId);
 
-            if (existingCarePlan.length) {
-                // Update existing care plan
-                await db.update(schema.carePlanDirectives)
-                    .set({
-                        healthyEatingPlan: healthy_eating_plan || "",
-                        exerciseWellnessRoutine: exercise_wellness_routine || "",
-                        prescribedMedication: prescribed_medication || "",
-                        updatedAt: new Date()
-                    })
-                    .where(eq(schema.carePlanDirectives.patientId, parseInt(patientId)));
-            } else {
-                // Create new care plan
-                await db.insert(schema.carePlanDirectives).values({
-                    patientId: parseInt(patientId),
-                    healthyEatingPlan: healthy_eating_plan || "",
-                    exerciseWellnessRoutine: exercise_wellness_routine || "",
-                    prescribedMedication: prescribed_medication || "",
-                    createdAt: new Date(),
-                    updatedAt: new Date()
-                });
+            // Process each directive category separately
+            const updates = [
+                { category: 'diet', directive: healthy_eating_plan || "" },
+                { category: 'exercise', directive: exercise_wellness_routine || "" },
+                { category: 'medication', directive: prescribed_medication || "" }
+            ];
+
+            for (const update of updates) {
+                if (update.directive.trim()) {
+                    // Check if directive already exists for this category
+                    const existing = await db.select().from(schema.carePlanDirectives).where(
+                        and(
+                            eq(schema.carePlanDirectives.patientId, patientIdInt),
+                            eq(schema.carePlanDirectives.category, update.category)
+                        )
+                    ).limit(1);
+
+                    if (existing.length) {
+                        // Update existing directive
+                        await db.update(schema.carePlanDirectives)
+                            .set({
+                                directive: update.directive,
+                                active: true
+                            })
+                            .where(
+                                and(
+                                    eq(schema.carePlanDirectives.patientId, patientIdInt),
+                                    eq(schema.carePlanDirectives.category, update.category)
+                                )
+                            );
+                    } else {
+                        // Create new directive
+                        await db.insert(schema.carePlanDirectives).values({
+                            patientId: patientIdInt,
+                            directive: update.directive,
+                            category: update.category,
+                            active: true
+                        });
+                    }
+                } else {
+                    // If directive is empty, deactivate existing ones
+                    await db.update(schema.carePlanDirectives)
+                        .set({ active: false })
+                        .where(
+                            and(
+                                eq(schema.carePlanDirectives.patientId, patientIdInt),
+                                eq(schema.carePlanDirectives.category, update.category)
+                            )
+                        );
+                }
             }
 
             res.json({ status: 'success', message: 'Care plan saved successfully' });

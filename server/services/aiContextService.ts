@@ -5,7 +5,7 @@
 
 import { db } from '../db';
 import * as schema from '@shared/schema';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, and } from 'drizzle-orm';
 import { 
   createSafeMcpBundle, 
   validateMcpBundleSecurity, 
@@ -78,30 +78,32 @@ export class AIContextService {
         }
       }
 
-      // Fetch doctor's care plan directives
+      // Fetch doctor's care plan directives from the current schema
       const doctorCpds: any = {
-        diet: 'Not specified',
-        exercise: 'Not specified',
-        medication: 'Not specified'
+        diet: '',
+        exercise: '',
+        medication: ''
       };
 
-      if (patient && request.doctorId) {
-        const carePlan = await db.select()
+      if (patient) {
+        const carePlans = await db.select()
           .from(schema.carePlanDirectives)
-          .where(eq(schema.carePlanDirectives.patientId, patient.id))
-          .limit(1);
+          .where(
+            and(
+              eq(schema.carePlanDirectives.patientId, patient.id),
+              eq(schema.carePlanDirectives.active, true)
+            )
+          );
 
-        if (carePlan.length > 0) {
-          // Map the actual schema fields to expected format
-          const directive = carePlan[0];
-          if (directive.category === 'diet') {
-            doctorCpds.diet = directive.directive;
-          } else if (directive.category === 'exercise') {
-            doctorCpds.exercise = directive.directive;
-          } else if (directive.category === 'medication') {
-            doctorCpds.medication = directive.directive;
+        carePlans.forEach(plan => {
+          if (plan.category === 'diet' || plan.category === 'nutrition' || plan.category === 'healthy_eating') {
+            doctorCpds.diet = plan.directive.trim();
+          } else if (plan.category === 'exercise' || plan.category === 'wellness' || plan.category === 'physical_activity') {
+            doctorCpds.exercise = plan.directive.trim();
+          } else if (plan.category === 'medication' || plan.category === 'medications') {
+            doctorCpds.medication = plan.directive.trim();
           }
-        }
+        });
       }
 
       // Prepare chat history (placeholder for now)
