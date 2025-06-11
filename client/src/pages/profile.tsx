@@ -15,15 +15,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from "wouter";
 import Layout from "@/components/layout/Layout";
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
+import HealthProgressChart from "@/components/health/HealthProgressChart";
 
 // Types
 type Scores = { diet: number; exercise: number; medication: number; };
@@ -35,54 +27,7 @@ interface HealthMetric {
   medication: number;
 }
 
-// Progress Chart Component
-const HealthProgressChart: React.FC<{ metrics: HealthMetric[] }> = ({ metrics }) => {
-  const chartData = [...metrics].reverse().map((metric) => ({
-    date: new Date(metric.createdAt).toLocaleDateString(),
-    Diet: metric.diet,
-    Exercise: metric.exercise,
-    Medication: metric.medication,
-  }));
 
-  console.log('Chart data:', chartData); // Debug log
-
-  return (
-    <div className="mb-6 bg-white p-4 rounded shadow">
-      <h2 className="text-lg font-bold mb-2">Weekly Health Progress</h2>
-      <div className="w-full h-64">
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="date" />
-            <YAxis domain={[1, 10]} />
-            <Tooltip />
-            <Line 
-              type="monotone" 
-              dataKey="Diet" 
-              stroke="#E53935" 
-              strokeWidth={2}
-              dot={{ fill: '#E53935' }}
-            />
-            <Line 
-              type="monotone" 
-              dataKey="Exercise" 
-              stroke="#2E8BC0" 
-              strokeWidth={2}
-              dot={{ fill: '#2E8BC0' }}
-            />
-            <Line 
-              type="monotone" 
-              dataKey="Medication" 
-              stroke="#4CAF50" 
-              strokeWidth={2}
-              dot={{ fill: '#4CAF50' }}
-            />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
-    </div>
-  );
-};
 
 // Discussion Dialog Component
 function ScoreDiscussionDialog({ onYes, onNo }: { onYes: () => void; onNo: () => void }) {

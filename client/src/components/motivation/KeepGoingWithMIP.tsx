@@ -6,7 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Sparkles, Save, Edit2 } from "lucide-react";
 import { createHapticFeedback } from "@/lib/soundEffects";
 import { enhanceWithStars } from "@/lib/imageEffects";
-import KeepGoingVideo from "@/components/motivation/KeepGoingVideo";
+
 import EnhancedImageStore from "@/lib/enhancedImageStore";
 import heartImage from "@assets/image_1744127067136.jpeg";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";

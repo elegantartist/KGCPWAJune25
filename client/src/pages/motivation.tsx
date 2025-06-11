@@ -10,7 +10,7 @@ import { Sparkles, Save } from "lucide-react";
 import { createHapticFeedback } from "@/lib/soundEffects";
 import { enhanceWithStars } from "@/lib/imageEffects";
 import EnhancedImageStore from "@/lib/enhancedImageStore";
-import KeepGoingVideo from "@/components/motivation/KeepGoingVideo";
+
 import heartImage from "@assets/image_1744127067136.jpeg";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Layout from "@/components/layout/Layout";
