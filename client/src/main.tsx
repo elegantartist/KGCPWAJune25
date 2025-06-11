@@ -1,17 +1,12 @@
+import React from "react";
 import { createRoot } from "react-dom/client";
-import { StrictMode } from "react";
-import App from "./App";
+import TestApp from "./TestApp";
 import "./index.css";
-import { ToastProvider } from "@/hooks/simple-toast";
-import * as serviceWorkerRegistration from "@/lib/serviceWorkerRegistration";
 
-createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <ToastProvider>
-      <App />
-    </ToastProvider>
-  </StrictMode>
-);
+const rootElement = document.getElementById("root");
+if (!rootElement) throw new Error("Root element not found");
+
+createRoot(rootElement).render(<TestApp />);
 
 // PERMANENTLY DISABLED: Service worker has been completely removed
 // The application now requires an internet connection to function properly
