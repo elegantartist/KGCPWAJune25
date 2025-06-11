@@ -1,0 +1,81 @@
+Specific Requirements (questions from Replit Agent)
+* additional information about specific setup and requirements:
+* AWS Account Information:
+    * Do you already have an AWS account set up? - Yes
+    * What region do you plan to deploy in? (This affects screenshots and some configuration details) Sydney Australia
+* Domain and Hosting Details:
+    * Can you confirm the current domain registrar is Crazy Domains? Yes, www.keepgoingcare.com hosted through Crazy Domains’ web hosting product
+    * Any specific Unix-based hosting package you've selected or plan to select? It seems to be through CPanel and the build files that are currently loaded (for a previous KGC application that we will need to remove before we add our application) from Vercel
+* Database Requirements:
+    * Approximately how much data (GB) will need to be migrated? the application is nearly 4 GB zipped so it is very large and GitHub for example won’t accept this much at once
+ 
+Any specific performance requirements for database operations? (Gemini Response)
+* Industry best practices for database performance operations within a healthcare application like KGC, particularly as a Type 1 Software as a Medical Device (SaMD), are critical for ensuring a responsive, reliable, secure, and scalable system that handles sensitive patient data. Given KGC's real-time conversational nature and reliance on dynamic patient information, specific performance considerations come to the forefront, in addition to the paramount need for data security and compliance.
+* Here are the key performance requirements and associated industry best practices for KGC's database operations:
+* 1. Low Latency
+* Requirement: Minimal delay in retrieving and writing data to ensure the Supervisor Agent can quickly access patient context (CPDs, recent scores, chat history) for real-time interactions, and that the Doctor Dashboard loads patient information and generates reports promptly.
+* Best Practices:
+    * Efficient Schema Design and Indexing: Design the database schema to minimize complex joins for frequently accessed data. Implement appropriate indexes on columns used in WHERE clauses and JOIN conditions, such as patient IDs, timestamps for chat messages or scores, and keys for CPDs.      
+    * Caching: Implement a caching layer for frequently accessed, relatively static data like a patient's current CPDs or core profile information to reduce the need for repeated database reads.
+    * Connection Pooling: Efficiently manage database connections to reduce the overhead of establishing new connections for each request.      
+    * Proximity to Application Servers: Deploy the database geographically close to the application servers (e.g., within the same AWS region and Availability Zones) to minimize network latency.
+* 2. High Throughput
+* Requirement: The database must handle a large volume of concurrent read and write operations as multiple patients interact with the Supervisor Agent, record daily scores, use sub-agents, and doctors access dashboards or generate PPRs.
+* Best Practices:
+    * Database Clustering or Replication: Use database clusters or replicas to distribute read traffic and improve overall throughput. This is particularly useful for KGC where there might be many patients simultaneously reading their data or interacting with the AI.
+    * Load Balancing: Implement load balancing to distribute incoming database requests across multiple database instances or replicas.
+    * Optimized Queries and Transactions: Write efficient queries and keep database transactions short to minimize lock contention and allow for higher concurrency.
+    * Appropriate Hardware/Instance Sizing: Ensure the database server instances have sufficient CPU, memory, and I/O capacity to handle the expected workload. Cloud providers like AWS offer various instance types optimized for database workloads.      
+* 3. High Availability and Reliability
+* Requirement: The KGC application, being a SaMD, requires high availability to provide continuous support to patients and doctors. Data integrity must be maintained at all times.
+* Best Practices:
+    * Database Replication and Failover: Implement database replication (e.g., primary/standby, multi-primary) with automatic failover to a replica in case the primary instance fails. This ensures the application can quickly switch to a healthy database instance.
+    * Atomic Transactions: Use atomic transactions to ensure that database operations are either fully completed or completely rolled back, maintaining data consistency.      
+    * Regular Backups and Point-in-Time Restore: Implement a strategy for regular automated backups and the ability to perform point-in-time restores to recover data in case of corruption or accidental deletion.      
+    * Monitoring and Alerting: Set up comprehensive monitoring for database health, performance, and errors, with alerts to notify administrators of potential issues proactively.
+* 4. Scalability
+* Requirement: The database must be able to scale to accommodate an increasing number of patients, doctors, and growing data volumes (chat histories, scores over time, saved content) - AWS should be able to handle this.
+* Best Practices (if not provided by AWS):
+    * Vertical Scaling: Initially, scaling might involve upgrading the resources (CPU, RAM) of the existing database server (if we are not solely relying on AWS services).      
+    * Horizontal Scaling (Sharding/Partitioning): As data volume and traffic increase significantly, consider sharding or partitioning the data across multiple database servers based on criteria like patient ID range or time. This distributes the load and allows for scaling out by adding more servers.      
+    * Choosing a Scalable Database System: Select a database technology and deployment model that inherently supports scaling (e.g., managed database services from cloud providers like Amazon RDS, Amazon Aurora, or NoSQL databases designed for distributed environments like MongoDB Atlas). We are using AWS.
+    * Database Connection Management: Design the application and database to efficiently handle a growing number of concurrent connections.
+* 5. Efficient Querying
+* Requirement: Quick retrieval of specific, relevant data for the Supervisor Agent's context (CPDs, recent scores, chat history chunks), sub-agent operations (e.g., fetching saved recipes or exercise videos), and Doctor Dashboard functions (PPR generation, patient data views).
+* Best Practices:
+    * Index Optimization: Regularly review and optimize indexes based on query patterns. Remove unused indexes and add indexes for new query requirements.      
+    * Query Performance Analysis: Use database tools to analyze the execution plans of slow queries and identify areas for optimization (e.g., missing indexes, inefficient joins).      
+    * Denormalization (Selective): While normalization is generally good for data integrity, selective denormalization can improve read performance for frequently accessed, related data by reducing the need for joins. This must be balanced against potential data redundancy and update anomalies.      
+    * Materialized Views: For complex queries or reports (like PPRs) that are run frequently but don't require real-time data, consider using materialized views to precompute results.
+* 6. Data Security and Privacy
+* Requirement: As a healthcare application handling Protected Health Information (PHI), the highest standards of data security and privacy must be met, including TGA/FDA considerations for SaMDs and Australian privacy principles. While not a direct performance metric, security measures must be implemented efficiently.
+* Best Practices:
+    * Encryption: Encrypt sensitive patient data both at rest (stored in the database) and in transit (when data is moved between the application and the database).      
+    * Access Controls (RBAC): Implement strict role-based access control (RBAC) to ensure that users (patients, doctors, administrators, sub-agents) only have access to the data necessary for their specific functions.      
+    * Auditing: Enable comprehensive auditing of database access and modifications to track who accessed what data and when. This is crucial for security monitoring and compliance.
+    * Regular Security Audits and Penetration Testing: Conduct regular security assessments to identify and address potential vulnerabilities in the database and surrounding infrastructure.
+    * Secure Configuration: Configure the database server and related services securely, following best practices for hardening databases.
+* 7. Backup and Disaster Recovery
+* Requirement: Ensure that patient data is backed up regularly and a disaster recovery plan is in place to minimize data loss and downtime in case of a catastrophic event.
+* Best Practices:
+    * Automated Backups: Configure automated daily or more frequent backups of the database.      
+    * Offsite Storage: Store backups in a secure, offsite location, ideally in a different geographical region.
+    * Regular Testing: Regularly test the backup and restore process to ensure data can be recovered successfully and within acceptable timeframes.      
+    * Disaster Recovery Plan: Develop and document a comprehensive disaster recovery plan that outlines the steps to restore the KGC service, including the database, in the event of a disaster.
+* By implementing these industry best practices, the KGC database operations can achieve the necessary performance characteristics to support a seamless, responsive, and scalable user experience while upholding the critical requirements for data security and reliability inherent in a healthcare SaMD. Continuous monitoring and periodic performance tuning will be essential as the application grows and evolves.
+
+* Team Structure:
+    * Will you be the only administrator managing the AWS resources? No. I want to have a team who will access through MFA IAM if this is the most secure.
+    * Will you have any technical assistance during the actual migration process? Initially no which is why we need to keep it simple. There is email support on my AWS plan but the budget isn’t here initially to hire an expert. Once we complete the Mini Clinical Audit and can get some investor funding we plan to review everything and improve where we can.
+* Existing Security Measures:
+    * Are there any specific security protocols from your organization that must be incorporated? No. We just need to comply with the APP and TGA regulations which include storing sensitive personal medical data for 7 years.
+    * Any compliance requirements beyond the Australian Privacy Principles and TGA regulations? No. Just the medical data storage (CPDs etc and adverse event reporting for TGA)
+* Budget Considerations:
+    * Any specific budget constraints for AWS services that might affect architecture choices? We want the best performance for the lowest cost initially. The maximum use will be 10 doctors, 50 patients and 2 admin level users for the initial mini clinical audit (also referred to internally as the KGC Pilot Program - KGCPP)
+    * Preference for reserved instances (lower cost, upfront commitment) vs. on-demand (higher cost, no commitment)? - higher cost no commitment initially because it will be a slow start recruiting users and fixing issues as we kick off with the KGCPP
+* Migration Timeline:
+    * What's your target timeframe for completing the migration? As soon as possible because doctors are waiting to use the application with their patients and complete the mini clinical audit to receive their 5 hours “measuring clinical outcomes” CPD (continuing professional development in this case - not the usual KGC CPD or care plan directives) accreditation.
+    * Any specific maintenance windows preferred for the actual cutover? We need everything running and working as soon as possible but there is no one using the application apart from the developers/administrators so cutover can occur as soon as possible.
+* Availability Requirements:
+    * What level of uptime is required for the production system? (99.9%, 99.99%, etc.) - idealling 99.99% But realistically updates could occur at night when people are sleeping and if we provided notice to users this will be ok
+    * Is there an acceptable maintenance window for updates? As above, middle of the night would be best (if this is still secure) will due notice to users about the maintenance outage

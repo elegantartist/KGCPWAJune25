@@ -1,0 +1,49 @@
+Here are some ideas for the patient dashboard’s Food Database Feature
+The patient can ask the KGC chatbot/supervisor agent about general nutritional information when it has full connectivity but the database should be a reference point for offline referral and as another way for a patient to consider the nutritional value of their food choices that is more visual than the chat method. It should be related to their CPDs and should be dynamically updated by the supervisor agent as CPDs change and the application learns and memorises their patient’s preferences.
+
+Patient Usage of the Food Database
+Patients interact with the Food Database in several practical ways, leveraging its functionality to support their daily health management, particularly in offline scenarios:
+•  Searching for Specific Foods: Patients can enter the name of a food, such as “quinoa” or “almonds,” to view its nutritional profile. This is facilitated by a lightweight, client-side search index (e.g., using MiniSearch or Lunr.js) for fast offline queries, ensuring responsiveness even without connectivity.
+•  Browsing Food Categories: The database may be organized into categories like grains, proteins, vegetables, and dairy, allowing patients to explore options systematically. For example, a patient might browse “low-GI grains” to find suitable options for diabetes management, with cached data ensuring availability offline.
+•  Accessing CPD-Aligned Information: The database filters food options based on the patient’s CPDs, which are checked daily via the doctor dashboard API and dynamically updated by the supervisor agent. For instance, a patient with a CPD for low carbohydrate intake (e.g., max 30g carbs/day) will see foods tagged as “low-carb” or “diabetes-friendly,” ensuring alignment with their health goals, even offline.
+•  Viewing Detailed Nutritional Data: Patients can see detailed metrics, such as calories, macronutrients, sodium, and glycemic index, to make informed choices. For example, a patient managing hypertension might prioritize foods with low sodium content, while a diabetic patient might focus on low-GI options, all accessible via cached data.
+•  Making Informed Dietary Choices: By viewing this information, patients can select foods that support their health objectives, such as reducing calorie intake for weight loss, increasing protein for muscle health.
+
+The database is tailored to each patient’s needs, ensuring that the information is relevant to their specific health conditions and dietary preferences, such as vegetarian, gluten-free, or culturally significant options like Indigenous Australian foods (e.g., kangaroo, bush tomato), with multilingual support (e.g., food names in Mandarin, Arabic) cached for offline use.
+
+Encouraging Engagement with the Food Database
+The KGC Health Assistant incorporates a multifaceted approach to encourage regular use of the Food Database and overall engagement with the application, leveraging its ecosystem of 18 features and behavioral strategies like Cognitive Behavioral Therapy (CBT) and Motivational Interviewing (MI). Below are detailed strategies, focusing on how the database’s visual and offline nature enhances engagement:
+•  Integration with Other Features:
+	•  Inspiration Machine D: This feature provides meal inspiration (e.g., recipes for breakfast, lunch, dinner, snacks) based on the patient’s dietary preferences and CPDs. The Food Database supplies the nutritional data for these recipes, ensuring they are healthy and aligned with the patient’s needs. For example, if a patient searches for “low-carb snacks” in the Food Database, they might find options like almonds or Greek yogurt, which can then be used by Inspiration Machine D to suggest recipes like “almond-stuffed dates,” with cached YouTube thumbnails for visual engagement, accessible offline.
+	•  Diet Logistics: This feature facilitates grocery shopping by linking foods from the database to retailers like Coles or Woolworths, and prepared meal delivery services like Lite n’ Easy or Youfoodz. For instance, if a patient identifies “quinoa” as a healthy option, they can seamlessly access purchasing options for it, with cached pricing and delivery information for offline use, enhancing convenience.
+
+Use Authoritative Data Sources: Base the database on the Australian Food Composition Database (AFCD) to ensure accuracy and compliance with local standards, as suggested by Food Standards Australia New Zealand. Regularly sync with updates (e.g., every 2-4 years) to keep data current, addressing the need for dynamic updates.
+
+Enhance Offline Functionality: Optimize for offline use by caching ~1,000 foods commonly used in CPD-aligned meal plans, using compression (e.g., Brotli) for minimal storage (~5MB). Use a lightweight search index (e.g., MiniSearch) for fast queries, ensuring comprehensive offline referral, as per Integrated Database System for Mobile Dietary Assessment and Analysis.
+
+This is a crucial component for supporting informed dietary choices based on CPDs and patient preferences.
+Data Source Selection (Accuracy & Relevance):
+ * Primary Source Recommendation: Leverage the Food Standards Australia New Zealand (FSANZ) Australian Food Composition Database (formerly NUTTAB). This is the authoritative source for Australian food data, ensuring accuracy and relevance to your target users.
+   * Integration: You'll likely need to download the database files (available online) and integrate them into your backend system, perhaps using a dedicated database table or a searchable index that your Food Database agent can query.
+ * Secondary/Supplementary Source: Consider using an API like Open Food Facts. It has a large user-generated dataset, includes barcode scanning capabilities (great for UX), and often contains specific branded food items found in Australian supermarkets.
+   * Caveat: Data quality can be variable. Use it as a supplementary source, potentially cross-referencing with FSANZ data or clearly indicating the source to the user. Prioritize FSANZ data when available for core nutritional information.
+ * Avoid Relying Solely on LLM estimation to estimate recipe calories/difficulty, avoid this for foundational nutritional data. Use structured, verified databases for accuracy, especially given the SaMD context.
+3. Functionality & Features:
+ * Search Methods:
+   * Text Search: Allow users to type food names (e.g., "banana", "wholemeal bread", "chicken breast"). Implement robust search logic (handling typos, synonyms).
+   * Barcode Scanning (PWA Feature): Leverage the device camera via the PWA to scan barcodes on packaged foods. This is highly user-friendly. Integrate with Open Food Facts or a similar API that supports barcode lookups.
+ * Information Display:
+   * Key Nutrients: Display core nutritional information (calories, protein, fat, saturated fat, carbohydrates, sugars, sodium) per standard serving size (e.g., 100g) and potentially per common household measure (e.g., per slice, per cup).
+   * CPD Relevance: Highlight nutrients directly relevant to the patient's CPDs (e.g., if CPD is "reduce sugar," prominently display sugar content).
+   * Traffic Light System: Consider a simple visual indicator (like traffic lights - green, amber, red) for key nutrients based on Australian guidelines (e.g., Heart Foundation criteria) to provide quick context, while remaining non-diagnostic.
+PWA Caching & Offline Support (Service Workers):
+ * Cache Strategy:
+   * Cache Core Data: Cache essential FSANZ data locally using service workers. This might involve pre-processing the data into a more easily cacheable format (e.g., JSON files indexed by food ID or name). Focus on commonly consumed foods first.
+   * Cache User Lookups: Cache results of specific foods the user frequently looks up or scans.
+   * Cache API Responses: Cache responses from external APIs (like Open Food Facts) for a limited time (respecting API terms) to reduce calls and improve offline access.
+ * Offline Fallback: When offline, the PWA should clearly indicate it's using cached data. Search functionality might be limited to previously viewed/cached items or the core cached FSANZ dataset. Barcode scanning would likely require connectivity unless the barcode database is also cached (which could be large).
+Compliance & Safety (SaMD Type 1):
+ * Non-Diagnostic: Ensure all information presented is purely informational and educational. Avoid interpretations that could be construed as diagnostic (e.g., "This food is bad for you"). Frame it neutrally: "This food contains X amount of sugar per 100g."
+ * Data Accuracy Disclaimer: Include a disclaimer stating the source of the data (e.g., FSANZ, Open Food Facts) and that information is for general guidance, encouraging users to consult their doctor or a dietitian for specific advice.
+ * Allergy Information: If displaying ingredients for packaged foods (e.g., from Open Food Facts), ensure allergy warnings are clearly visible, but reiterate that the user should always check the physical packaging for the most accurate information.
+Implementing a robust Food Database will significantly enhance KGC's ability to support patients in making informed dietary choices aligned with their doctor's guidance.

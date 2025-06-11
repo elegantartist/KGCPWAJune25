@@ -1,0 +1,79 @@
+Based on my exploration of the codebase, I can now provide you with a comprehensive overview of your project to share with the agent in your other Repl. Here's a detailed summary of how the application is structured and functions:
+
+Recipe Discovery Platform - Codebase Overview
+Architecture
+The application is a full-stack JavaScript/TypeScript application with:
+
+Frontend: React (TypeScript) with Wouter for routing
+Backend: Express.js server
+Database: PostgreSQL with Drizzle ORM
+External APIs: Tavily for recipe search and OpenAI for recipe analysis
+Key Components
+Backend API Routes (server/routes.ts)
+The backend handles several key API endpoints:
+
+/api/search - Searches and analyzes recipes based on user filters
+/api/recipes/save - Saves recipes to a user's cookbook
+/api/recipes/saved/:userId - Retrieves a user's saved recipes
+Authentication routes (/api/login, /api/register, /api/logout, /api/user)
+External API Integration
+Tavily API (server/services/tavily.ts):
+Searches for YouTube cooking videos based on ingredients and cuisine type
+Requires TAVILY_API_KEY environment variable
+OpenAI API (server/services/openai.ts):
+Analyzes and ranks recipes based on health criteria and user preferences
+Uses GPT-4o to process recipe data and provide nutritional insights
+Requires OPENAI_API_KEY environment variable
+Database Schema (db/schema.ts)
+Two main tables:
+
+users - Stores user credentials
+savedRecipes - Stores user's saved recipes with a foreign key relationship to users
+Frontend Structure
+Pages:
+Home.tsx - Main search interface
+SavedRecipes.tsx - User's saved recipe collection
+AuthPage.tsx - Login/registration page
+Key Components:
+IngredientForm.tsx - Search form with filtering options
+RecipeGrid.tsx - Displays recipe search results
+SaveRecipeButton.tsx - Handles saving recipes to a user's cookbook
+NavigationBar.tsx - App navigation
+UI components from ShadCN (using Tailwind CSS)
+Hooks:
+useUser.ts - Manages authentication state
+useToast.ts - Handles notifications
+Data Flow
+User enters ingredients and preferences through IngredientForm
+Form data is sent to /api/search endpoint
+Backend uses Tavily API to find YouTube recipe videos
+OpenAI analyzes results and enhances them with nutritional data
+Results are returned to frontend and displayed in RecipeGrid
+User can save recipes which are stored in the database
+Saved recipes can be viewed in the SavedRecipes page
+Authentication
+Uses Passport.js with a local authentication strategy and session-based auth.
+
+Key Files to Share
+API Integration:
+server/services/tavily.ts - Shows how to integrate Tavily search API
+server/services/openai.ts - Shows OpenAI integration for recipe analysis
+Database Setup:
+db/schema.ts - Shows Drizzle ORM schema setup
+db/index.ts - Database connection
+Frontend Components:
+client/src/components/IngredientForm.tsx - Search form with Zod validation
+client/src/components/RecipeGrid.tsx - Display component for search results
+Auth Implementation:
+server/auth.ts - Passport.js setup
+client/src/hooks/use-user.ts - Frontend auth management
+Route Setup:
+server/routes.ts - API endpoint implementation
+client/src/App.tsx - Frontend routing
+Environment Variables Needed
+For this application to run properly, you need:
+
+DATABASE_URL - PostgreSQL connection string
+TAVILY_API_KEY - For recipe search functionality
+OPENAI_API_KEY - For recipe analysis and ranking
+Would you like me to provide specific code snippets from any of these files for your agent in the other Repl? Or would you prefer a more detailed explanation of any particular part of this application?

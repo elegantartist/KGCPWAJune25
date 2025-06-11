@@ -1,0 +1,55 @@
+Daily Self-Scores Process Flow
+Patient UI Experience
+Access Point:
+
+Patient accesses the Daily Self-Scores feature from their dashboard
+The interface shows three sliders for Diet, Exercise, and Medication scores
+Score Submission UI:
+
+Patient adjusts each slider between 1-10 to report their compliance
+Each category has a brief description explaining what the scores mean
+A submit button becomes active once all three scores are set
+After Submission:
+
+A confirmation animation briefly appears
+The ScoreDiscussionDialog appears with Yes/No buttons asking if they want to discuss their scores
+If "Yes" is selected, they're directed to the chatbot
+If "No" is selected, they return to the dashboard with a success message
+Backend Process Flow
+Data Capture:
+
+Scores are sent to /api/health-metrics endpoint
+Values are validated (1-10 range) before database insertion
+Timestamp is recorded with the submission
+Database Operations:
+
+New record created in health_metrics table with:
+User ID
+Three score values
+Timestamp
+Comments (if provided)
+Background Processing:
+
+System records last submission time for alert tracking
+Weekly averages are calculated and stored
+Progress tracking is updated for badge eligibility
+Doctor Notification:
+
+If any score is below 5, an optional alert flag is set
+Data becomes available in patient's progress report
+Connection to Supervisor Agent
+Chatbot Preparation:
+
+If patient chooses to discuss scores, recent metrics are passed to the chatbot
+EnhancedSupervisorAgent receives these metrics as parameters
+Analysis Flow:
+
+Chatbot examines scores in context of care plan directives
+System prepares targeted suggestions based on score values
+Lower scores trigger more supportive responses
+Response Delivery:
+
+EnhancedSupervisorAgent delivers personalized feedback
+Responses reference specific Care Plan Directives
+Additional resources or feature recommendations are provided based on scores
+That's the current implementation flow for the Daily Self-Scores feature, from UI interaction through backend processing and the optional connection to the EnhancedSupervisorAgent chatbot system.
