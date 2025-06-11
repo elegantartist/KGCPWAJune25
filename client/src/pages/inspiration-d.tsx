@@ -87,14 +87,13 @@ const InspirationD: React.FC = () => {
   const { toast } = useToast();
   const isMobile = useIsMobile();
   
-  // Default userId - in a real app, this would come from auth
   // Get current authenticated user
   const { data: currentUser } = useQuery({
-    queryKey: ['/api/user/current-context'],
+    queryKey: ['/api/users/me'],
     retry: false
   });
 
-  const userId = currentUser?.id;
+  const userId = (currentUser as any)?.id;
 
   // Functions to interact with the API
   // These are stub implementations for type checking purposes
@@ -124,59 +123,46 @@ const InspirationD: React.FC = () => {
   const { data: carePlanDirectives = [], isLoading: isLoadingCPDs } = useQuery({
     queryKey: ['/api/users', userId, 'care-plan-directives', 'active'],
     queryFn: async () => {
-      const response = await fetch(`/api/users/${userId}/care-plan-directives/active`);
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`/api/users/${userId}/care-plan-directives/active`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
       if (!response.ok) {
         throw new Error('Failed to fetch care plan directives');
       }
       return response.json() as Promise<CarePlanDirective[]>;
-    }
+    },
+    enabled: !!userId
   });
   
-  // Fetch care plan directives and update the carePlanDirective state
+  // Update care plan directive state when React Query data changes
   useEffect(() => {
-    const fetchCarePlanDirectives = async () => {
-      try {
-        setLoadingCPD(true);
-        const response = await fetch(`/api/users/${userId}/care-plan-directives/active`);
+    if (carePlanDirectives.length > 0) {
+      // Find the diet directive
+      const dietDirective = carePlanDirectives.find((directive: any) => 
+        directive.category.toLowerCase() === 'diet' || 
+        directive.category.toLowerCase() === 'nutrition' ||
+        directive.category.toLowerCase() === 'meal plan' ||
+        directive.directive.toLowerCase().includes('diet') ||
+        directive.directive.toLowerCase().includes('meal') ||
+        directive.directive.toLowerCase().includes('food') ||
+        directive.directive.toLowerCase().includes('eat')
+      );
 
-        if (!response.ok) {
-          throw new Error('Failed to fetch care plan directives');
-        }
-
-        const data = await response.json();
-
-        // Find the diet directive
-        const dietDirective = data.find((directive: any) => 
-          directive.category.toLowerCase() === 'diet' || 
-          directive.category.toLowerCase() === 'nutrition' ||
-          directive.category.toLowerCase() === 'meal plan' ||
-          directive.directive.toLowerCase().includes('diet') ||
-          directive.directive.toLowerCase().includes('meal') ||
-          directive.directive.toLowerCase().includes('food') ||
-          directive.directive.toLowerCase().includes('eat')
-        );
-
-        if (dietDirective) {
-          // Always display the doctor's exact Diet CPD text in the UI
-          setCarePlanDirective(dietDirective.directive);
-        } else {
-          setCarePlanDirective('Your doctor has not yet provided any Diet care plan directives. Please check back later.');
-        }
-      } catch (error) {
-        console.error('Error fetching care plan directives:', error);
-        toast({
-          title: "Error",
-          description: "Failed to load care plan directives",
-          variant: "destructive"
-        });
-        setCarePlanDirective('Could not load Diet care plan directives. Please try again later.');
-      } finally {
-        setLoadingCPD(false);
+      if (dietDirective) {
+        setCarePlanDirective(dietDirective.directive);
+      } else {
+        setCarePlanDirective('Your doctor has not yet provided any Diet care plan directives. Please check back later.');
       }
-    };
-
-    fetchCarePlanDirectives();
-  }, [userId, toast]);
+      setLoadingCPD(false);
+    } else if (!isLoadingCPDs && userId) {
+      setCarePlanDirective('Your doctor has not yet provided any Diet care plan directives. Please check back later.');
+      setLoadingCPD(false);
+    }
+  }, [carePlanDirectives, isLoadingCPDs, userId]);
 
   // Mutation for saving a recipe
   const saveMutation = useMutation({
