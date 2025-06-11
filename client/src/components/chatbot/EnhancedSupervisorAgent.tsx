@@ -244,32 +244,43 @@ export function EnhancedSupervisorAgent({
         content: msg.content
       }));
       
-      // Send request to the enhanced MCP service with additional error handling
+      // Send request to the Supervisor Agent with additional error handling
       let responseData;
       try {
-        const response = await axios.post('/api/mcp/generate', {
-          prompt: analysisPrompt,
-          userId,
-          healthMetrics,
-          conversationHistory,
-          currentConnectivityLevel // Ensure we're passing the current connectivity level
+        const token = localStorage.getItem('auth_token');
+        const response = await fetch('/api/v2/supervisor/query', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            message: {
+              text: analysisPrompt,
+              sentAt: new Date().toISOString()
+            },
+            userId,
+            sessionId: crypto.randomUUID(),
+            requiresValidation: false
+          })
         });
         
-        // Safety check for valid response
-        responseData = response.data || {};
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        responseData = await response.json();
       } catch (apiError) {
         console.error("API request failed:", apiError);
         throw new Error("Failed to communicate with assistant service");
       }
       
-      // Process the response with fallback values for safety
-      let primaryResponse = responseData.primaryResponse || "I'm sorry, I couldn't process your health scores properly. How else can I help you today?";
-      const provider = responseData.provider || "system";
-      const alternativeResponses = responseData.alternativeResponses || [];
-      const evaluationSummary = responseData.evaluationSummary || "No evaluation available";
-      const allResponsesValid = responseData.allResponsesValid !== false;
-      const memories = responseData.memories || { retrieved: [], created: [] };
-      const offline = responseData.offline || false;
+      // Process the response from Supervisor Agent
+      let primaryResponse = responseData.data?.response || "I'm sorry, I couldn't process your health scores properly. How else can I help you today?";
+      const modelUsed = responseData.data?.modelUsed || "supervisor-agent";
+      const toolsUsed = responseData.data?.toolsUsed || [];
+      const processingTime = responseData.data?.processingTime || 0;
+      const offline = false;
       
       // Replace placeholder with actual patient name if available
       // Check for multiple variations of the placeholder
