@@ -1087,6 +1087,60 @@ export function registerRoutes(app: Express) {
         }
     });
 
+    // AI-assisted YouTube video search for exercise & wellness (Inspiration Machine E&W)
+    router.post('/api/exercise-wellness/videos', authMiddleware(['patient', 'doctor']), async (req: AuthenticatedRequest, res) => {
+        try {
+            const { searchExerciseWellnessVideos } = await import('./ai/tavilyClient');
+            
+            // Extract search filters from request
+            const { category, intensity, duration, tags, limit } = req.body;
+            
+            // Validate category
+            if (!category || !['exercise', 'wellness'].includes(category)) {
+                return res.status(400).json({
+                    videos: [],
+                    query: 'exercise wellness videos',
+                    message: 'Category must be either "exercise" or "wellness"'
+                });
+            }
+            
+            // Perform YouTube search using Tavily API with intelligent filtering
+            const searchResult = await searchExerciseWellnessVideos(category, {
+                intensity,
+                duration,
+                tags: tags || []
+            });
+            
+            if (!searchResult.videos || searchResult.videos.length === 0) {
+                return res.json({
+                    videos: [],
+                    query: searchResult.query,
+                    message: searchResult.message || `No ${category} videos found for your search criteria`
+                });
+            }
+            
+            // Return exactly 10 YouTube video results as programmed, with AI filtering applied
+            const limitedVideos = searchResult.videos.slice(0, limit || 10);
+            
+            res.json({
+                videos: limitedVideos,
+                query: searchResult.query,
+                answer: searchResult.answer,
+                totalFound: searchResult.videos.length,
+                returned: limitedVideos.length,
+                category: category
+            });
+            
+        } catch (error: any) {
+            console.error('Exercise & Wellness video search error:', error);
+            res.status(500).json({
+                videos: [],
+                query: 'exercise wellness videos',
+                message: 'Video search temporarily unavailable'
+            });
+        }
+    });
+
     // Weekly meal planning endpoint
     router.post('/v2/inspiration/meal-plan', authMiddleware(['patient', 'doctor']), async (req: AuthenticatedRequest, res) => {
         try {
