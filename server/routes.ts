@@ -657,6 +657,49 @@ export function registerRoutes(app: Express) {
         }
     });
 
+    // Get active care plan directives for a user (for KGC features)
+    router.get('/users/:userId/care-plan-directives/active', authMiddleware(['patient', 'doctor', 'admin']), async (req: AuthenticatedRequest, res) => {
+        try {
+            const userId = parseInt(req.params.userId);
+            
+            // Security check: patients can only access their own data
+            if (req.user!.role === 'patient' && req.user!.userId !== userId) {
+                return res.status(403).json({ message: 'Access denied' });
+            }
+
+            const patient = await db.query.patients.findFirst({
+                where: eq(schema.patients.userId, userId)
+            });
+
+            if (!patient) {
+                return res.status(404).json({ message: 'Patient record not found' });
+            }
+
+            // Get active care plan directives
+            const carePlans = await db.select().from(schema.carePlanDirectives).where(
+                and(
+                    eq(schema.carePlanDirectives.patientId, patient.id),
+                    eq(schema.carePlanDirectives.active, true)
+                )
+            );
+
+            // Format directives for KGC features
+            const directives = carePlans.map(plan => ({
+                category: plan.category,
+                directive: plan.directive,
+                // Map to standardized category names for frontend
+                standardCategory: plan.category === 'diet' ? 'diet' : 
+                                plan.category === 'exercise' ? 'exercise' : 
+                                plan.category === 'medication' ? 'medication' : plan.category
+            }));
+
+            res.json(directives);
+        } catch (error) {
+            console.error('Error fetching care plan directives:', error);
+            res.status(500).json({ message: 'Failed to fetch care plan directives' });
+        }
+    });
+
     // Get latest health metrics for patient
     router.get('/users/:userId/health-metrics/latest', authMiddleware(['patient', 'doctor', 'admin']), async (req: AuthenticatedRequest, res) => {
         try {
