@@ -1059,8 +1059,11 @@ export function registerRoutes(app: Express) {
     });
 
     // AI-assisted YouTube video search for recipes (Inspiration Machine D)
-    router.post('/api/recipes/videos', authMiddleware(['patient', 'doctor']), async (req: AuthenticatedRequest, res) => {
+    router.post('/api/recipes/videos', authMiddleware(['patient', 'doctor', 'admin']), async (req: AuthenticatedRequest, res) => {
         try {
+            console.log('Recipe videos endpoint - User:', req.user);
+            console.log('Recipe videos endpoint - Allowed roles:', ['patient', 'doctor', 'admin']);
+            
             const { searchCookingVideos } = await import('./ai/tavilyClient');
             
             // Extract search filters from request
@@ -1099,7 +1102,7 @@ export function registerRoutes(app: Express) {
     });
 
     // AI-assisted YouTube video search for exercise & wellness (Inspiration Machine E&W)
-    router.post('/api/exercise-wellness/videos', authMiddleware(['patient', 'doctor']), async (req: AuthenticatedRequest, res) => {
+    router.post('/api/exercise-wellness/videos', authMiddleware(['patient', 'doctor', 'admin']), async (req: AuthenticatedRequest, res) => {
         try {
             const { searchExerciseWellnessVideos } = await import('./ai/tavilyClient');
             

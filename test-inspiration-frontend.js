@@ -3,11 +3,10 @@
  * Tests video search functionality through the frontend service layer
  */
 
-const fs = require('fs');
-const path = require('path');
+import fetch from 'node-fetch';
 
-// Mock fetch for testing
-global.fetch = require('node-fetch');
+// Set global fetch for testing
+global.fetch = fetch;
 
 // Simple test to verify video search endpoint
 async function testVideoSearchEndpoint() {
