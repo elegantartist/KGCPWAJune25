@@ -520,20 +520,109 @@ export function registerRoutes(app: Express) {
         }
     });
 
-    // Care plan endpoints temporarily disabled for Phase 1 - will be rebuilt in Phase 2
+    // Get care plan directives for a patient (doctor access)
     router.get('/doctor/patients/:patientId/care-plan', authMiddleware(['doctor']), async (req: AuthenticatedRequest, res) => {
-        res.json({ 
-            status: 'success', 
-            remarks: {
-                healthy_eating_plan: "Phase 1: Care plans will be implemented in Phase 2",
-                exercise_wellness_routine: "Phase 1: Care plans will be implemented in Phase 2",
-                prescribed_medication: "Phase 1: Care plans will be implemented in Phase 2"
+        try {
+            const { patientId } = req.params;
+            const doctorUserId = req.user!.userId;
+
+            // Verify doctor has access to this patient
+            const doctor = await db.select().from(schema.doctors).where(eq(schema.doctors.userId, doctorUserId)).limit(1);
+            if (!doctor.length) {
+                return res.status(404).json({ message: 'Doctor not found' });
             }
-        });
+
+            const patient = await db.select().from(schema.patients).where(
+                and(eq(schema.patients.id, parseInt(patientId)), eq(schema.patients.doctorId, doctor[0].id))
+            ).limit(1);
+
+            if (!patient.length) {
+                return res.status(403).json({ message: 'Access denied to this patient' });
+            }
+
+            // Get care plan directives for this patient
+            const carePlan = await db.select().from(schema.carePlanDirectives).where(
+                eq(schema.carePlanDirectives.patientId, parseInt(patientId))
+            ).limit(1);
+
+            if (carePlan.length) {
+                res.json({ 
+                    status: 'success', 
+                    remarks: {
+                        healthy_eating_plan: carePlan[0].healthyEatingPlan || "",
+                        exercise_wellness_routine: carePlan[0].exerciseWellnessRoutine || "",
+                        prescribed_medication: carePlan[0].prescribedMedication || ""
+                    }
+                });
+            } else {
+                res.json({ 
+                    status: 'success', 
+                    remarks: {
+                        healthy_eating_plan: "",
+                        exercise_wellness_routine: "",
+                        prescribed_medication: ""
+                    }
+                });
+            }
+        } catch (error) {
+            console.error('Error fetching care plan:', error);
+            res.status(500).json({ message: 'Failed to fetch care plan' });
+        }
     });
 
+    // Save care plan directives for a patient (doctor access)
     router.post('/doctor/patients/:patientId/care-plan', authMiddleware(['doctor']), async (req: AuthenticatedRequest, res) => {
-        res.json({ status: 'success', message: 'Phase 1: Care plan saving will be implemented in Phase 2' });
+        try {
+            const { patientId } = req.params;
+            const { healthy_eating_plan, exercise_wellness_routine, prescribed_medication } = req.body;
+            const doctorUserId = req.user!.userId;
+
+            // Verify doctor has access to this patient
+            const doctor = await db.select().from(schema.doctors).where(eq(schema.doctors.userId, doctorUserId)).limit(1);
+            if (!doctor.length) {
+                return res.status(404).json({ message: 'Doctor not found' });
+            }
+
+            const patient = await db.select().from(schema.patients).where(
+                and(eq(schema.patients.id, parseInt(patientId)), eq(schema.patients.doctorId, doctor[0].id))
+            ).limit(1);
+
+            if (!patient.length) {
+                return res.status(403).json({ message: 'Access denied to this patient' });
+            }
+
+            // Check if care plan already exists
+            const existingCarePlan = await db.select().from(schema.carePlanDirectives).where(
+                eq(schema.carePlanDirectives.patientId, parseInt(patientId))
+            ).limit(1);
+
+            if (existingCarePlan.length) {
+                // Update existing care plan
+                await db.update(schema.carePlanDirectives)
+                    .set({
+                        healthyEatingPlan: healthy_eating_plan || "",
+                        exerciseWellnessRoutine: exercise_wellness_routine || "",
+                        prescribedMedication: prescribed_medication || "",
+                        updatedAt: new Date()
+                    })
+                    .where(eq(schema.carePlanDirectives.patientId, parseInt(patientId)));
+            } else {
+                // Create new care plan
+                await db.insert(schema.carePlanDirectives).values({
+                    patientId: parseInt(patientId),
+                    healthyEatingPlan: healthy_eating_plan || "",
+                    exerciseWellnessRoutine: exercise_wellness_routine || "",
+                    prescribedMedication: prescribed_medication || "",
+                    createdAt: new Date(),
+                    updatedAt: new Date()
+                });
+            }
+
+            res.json({ status: 'success', message: 'Care plan saved successfully' });
+        } catch (error) {
+            console.error('Error saving care plan:', error);
+            res.status(500).json({ message: 'Failed to save care plan' });
+        }
     });
 
     // Get latest health metrics for patient
