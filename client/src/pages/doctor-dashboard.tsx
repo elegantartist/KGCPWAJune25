@@ -55,13 +55,10 @@ export default function DoctorDashboard() {
     prescribed_medication: "",
   });
 
-  // Handle textarea changes to update state
-  const handleTextareaChange = (field: keyof CarePlanDirective, value: string) => {
-    setDoctorRemarks(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
+  // Use refs to store current values and avoid re-render issues
+  const healthyEatingRef = React.useRef<HTMLTextAreaElement>(null);
+  const exerciseWellnessRef = React.useRef<HTMLTextAreaElement>(null);
+  const prescribedMedicationRef = React.useRef<HTMLTextAreaElement>(null);
 
   // Auth headers using localStorage JWT
   const createAuthHeaders = () => {
@@ -509,12 +506,13 @@ export default function DoctorDashboard() {
                 Healthy Eating Plan
               </Label>
               <Textarea
+                ref={healthyEatingRef}
                 name="healthy_eating_plan"
                 placeholder="Enter details for Healthy Eating Plan..."
                 className="w-full mt-2"
                 rows={3}
-                value={doctorRemarks.healthy_eating_plan || ""}
-                onChange={(e) => handleTextareaChange('healthy_eating_plan', e.target.value)}
+                defaultValue={doctorRemarks.healthy_eating_plan || ""}
+                key={`healthy_eating_${selectedPatient?.id}_${doctorRemarks.healthy_eating_plan}`}
               />
             </div>
 
@@ -524,12 +522,13 @@ export default function DoctorDashboard() {
                 Exercise and Wellness Routine
               </Label>
               <Textarea
+                ref={exerciseWellnessRef}
                 name="exercise_wellness_routine"
                 placeholder="Enter details for Exercise and Wellness Routine..."
                 className="w-full mt-2"
                 rows={3}
-                value={doctorRemarks.exercise_wellness_routine || ""}
-                onChange={(e) => handleTextareaChange('exercise_wellness_routine', e.target.value)}
+                defaultValue={doctorRemarks.exercise_wellness_routine || ""}
+                key={`exercise_wellness_${selectedPatient?.id}_${doctorRemarks.exercise_wellness_routine}`}
               />
             </div>
 
@@ -539,12 +538,13 @@ export default function DoctorDashboard() {
                 Prescribed Medications
               </Label>
               <Textarea
+                ref={prescribedMedicationRef}
                 name="prescribed_medication"
                 placeholder="Enter details for Prescribed Medications..."
                 className="w-full mt-2"
                 rows={3}
-                value={doctorRemarks.prescribed_medication || ""}
-                onChange={(e) => handleTextareaChange('prescribed_medication', e.target.value)}
+                defaultValue={doctorRemarks.prescribed_medication || ""}
+                key={`prescribed_medication_${selectedPatient?.id}_${doctorRemarks.prescribed_medication}`}
               />
             </div>
 
