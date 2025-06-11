@@ -278,7 +278,10 @@ const FoodDatabase = () => {
               Find recipes with favorite ingredients
             </Link>
           </div>
-          {renderFoodList(favourites || [], favouritesLoading)}
+          {/* Placeholder for favourites list */}
+          <div className="text-center py-8">
+            <p className="text-muted-foreground">Food recommendations coming soon</p>
+          </div>
         </div>
       )}
       </div>
