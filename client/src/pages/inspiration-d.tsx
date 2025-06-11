@@ -124,13 +124,13 @@ const InspirationD: React.FC = () => {
   const { data: carePlanDirectives = [], isLoading: isLoadingCPDs } = useQuery({
     queryKey: [`/api/users/${userId}/care-plan-directives/active`],
     enabled: !!userId
-  });
+  }) as { data: CarePlanDirective[], isLoading: boolean };
   
   // Update care plan directive state when React Query data changes
   useEffect(() => {
-    if (carePlanDirectives.length > 0) {
+    if (Array.isArray(carePlanDirectives) && carePlanDirectives.length > 0) {
       // Find the diet directive
-      const dietDirective = carePlanDirectives.find((directive: any) => 
+      const dietDirective = carePlanDirectives.find((directive: CarePlanDirective) => 
         directive.category.toLowerCase() === 'diet' || 
         directive.category.toLowerCase() === 'nutrition' ||
         directive.category.toLowerCase() === 'meal plan' ||
@@ -179,12 +179,12 @@ const InspirationD: React.FC = () => {
 
   // Function to get the latest diet CPD without any interpretation
   const getLatestDietCPD = (): CarePlanDirective | null => {
-    if (!carePlanDirectives || carePlanDirectives.length === 0) {
+    if (!Array.isArray(carePlanDirectives) || carePlanDirectives.length === 0) {
       return null;
     }
     
     // Get diet-related CPDs
-    const dietCPDs = carePlanDirectives.filter(cpd => 
+    const dietCPDs = carePlanDirectives.filter((cpd: CarePlanDirective) => 
       cpd.category.toLowerCase() === 'diet'
     );
     

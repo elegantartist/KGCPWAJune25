@@ -8,7 +8,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import UserHeader from '@/components/layout/UserHeader';
+import Layout from '@/components/layout/Layout';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 // Food item type definition based on our schema
@@ -169,8 +169,8 @@ const FoodDatabase = () => {
   });
   
   return (
-    <div className="container mx-auto px-4 py-6 max-w-5xl">
-      <UserHeader />
+    <Layout>
+      <div className="container mx-auto px-4 py-6 max-w-5xl">
       
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Food Database</h1>
@@ -281,37 +281,9 @@ const FoodDatabase = () => {
           {renderFoodList(favourites || [], favouritesLoading)}
         </div>
       )}
-    </div>
-  );
-  
-  // Helper function to render food list
-  function renderFoodList(foods: FoodItem[], isLoading: boolean) {
-    if (isLoading) {
-      return (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {[...Array(4)].map((_, i) => (
-            <Skeleton key={i} className="h-40 rounded-md" />
-          ))}
-        </div>
-      );
-    }
-    
-    if (!foods?.length) {
-      return (
-        <div className="text-center p-8 border rounded-md">
-          <p className="text-muted-foreground">No food recommendations found. Please consult with your doctor for updated Care Plan Directives.</p>
-        </div>
-      );
-    }
-    
-    return (
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {foods.map(food => (
-          <FoodCard key={food.id} food={food} />
-        ))}
       </div>
-    );
-  }
+    </Layout>
+  );
 };
 
 // Food card component
