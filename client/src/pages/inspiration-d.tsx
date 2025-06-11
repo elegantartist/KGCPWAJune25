@@ -595,7 +595,7 @@ const InspirationD: React.FC = () => {
               ) : (
                 <Search className="h-4 w-4 mr-2" />
               )}
-              Find {activeTab === "recipes" ? "Recipes" : "Videos"}
+              Inspiration Search
             </Button>
           </div>
         </CardContent>
