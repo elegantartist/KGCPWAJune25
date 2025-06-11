@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { RecipeSearchFilters, RecipeSearchResult } from '../types/recipe';
+import { enhanceRecipeSearchResults, enhanceExerciseSearchResults, enhanceProviderSearchResults } from './openaiEnhancer';
 
 // Define enhanced TavilySearchResult interface with our additional fields
 export interface TavilySearchResult {
@@ -342,12 +343,48 @@ export async function searchCookingVideos(filters: RecipeSearchFilters): Promise
       };
     }).filter((result: RecipeSearchResult): boolean => result.videoId !== null); // Filter out non-YouTube results
 
-    // Process results with OpenAI if available (this part would be implemented in the routes)
-    return {
-      query: searchQuery,
-      answer: response.data.answer,
-      videos: videoResults
-    };
+    // Enhance results with OpenAI analysis for intelligent filtering
+    try {
+      const enhancedVideos = await enhanceRecipeSearchResults(
+        videoResults.map((video: any) => ({
+          title: video.title,
+          url: video.url,
+          content: video.description,
+          image: video.thumbnail_url,
+          videoId: video.videoId,
+          category: 'recipe'
+        })),
+        filters
+      );
+
+      // Convert enhanced results back to recipe format
+      const finalVideoResults = enhancedVideos.map(enhanced => ({
+        title: enhanced.title,
+        description: enhanced.content,
+        url: enhanced.url,
+        thumbnail_url: enhanced.image,
+        videoId: enhanced.videoId,
+        source_name: 'YouTube',
+        cuisine_type: filters.cuisineType || undefined,
+        meal_type: filters.mealType || undefined,
+        relevanceScore: enhanced.relevanceScore,
+        nutritionalAnalysis: enhanced.nutritionalAnalysis,
+        enhancedMetadata: enhanced.enhancedMetadata
+      }));
+
+      return {
+        query: searchQuery,
+        answer: response.data.answer,
+        videos: finalVideoResults.sort((a, b) => (b.relevanceScore || 0) - (a.relevanceScore || 0))
+      };
+    } catch (enhancementError) {
+      console.warn('OpenAI enhancement failed, returning original results:', enhancementError);
+      return {
+        query: searchQuery,
+        answer: response.data.answer,
+        videos: videoResults
+      };
+    }
 
   } catch (error) {
     console.error('Error searching cooking videos with Tavily:', error);
@@ -881,12 +918,36 @@ export async function searchExerciseWellnessVideos(
       message = `Found ${finalResults.length} videos matching your criteria.`;
     }
     
-    return {
-      videos: finalResults,
-      query: specificQuery,
-      answer: answer,
-      message
-    };
+    // Enhance results with OpenAI analysis for intelligent filtering
+    try {
+      const enhancedVideos = await enhanceExerciseSearchResults(
+        finalResults,
+        { category, intensity, duration, tags }
+      );
+
+      // Convert enhanced results back to the expected format
+      const finalEnhancedResults = enhancedVideos.map(enhanced => ({
+        ...enhanced,
+        description: enhanced.content,
+        thumbnail_url: enhanced.image,
+        source_name: 'YouTube'
+      }));
+
+      return {
+        videos: finalEnhancedResults.sort((a, b) => (b.relevanceScore || 0) - (a.relevanceScore || 0)),
+        query: specificQuery,
+        answer: answer,
+        message
+      };
+    } catch (enhancementError) {
+      console.warn('OpenAI enhancement failed, returning original results:', enhancementError);
+      return {
+        videos: finalResults,
+        query: specificQuery,
+        answer: answer,
+        message
+      };
+    }
 
   } catch (error) {
     console.error(`Error searching ${category} videos with Tavily:`, error);
