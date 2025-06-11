@@ -55,6 +55,14 @@ export default function DoctorDashboard() {
     prescribed_medication: "",
   });
 
+  // Handle textarea changes to update state
+  const handleTextareaChange = (field: keyof CarePlanDirective, value: string) => {
+    setDoctorRemarks(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
   // Auth headers using localStorage JWT
   const createAuthHeaders = () => {
     const token = localStorage.getItem('auth_token');
@@ -281,8 +289,18 @@ export default function DoctorDashboard() {
         throw new Error('Failed to save care plan directives');
       }
 
+      // Update the local state with the saved data
+      setDoctorRemarks({
+        healthy_eating_plan: data.healthy_eating_plan as string || "",
+        exercise_wellness_routine: data.exercise_wellness_routine as string || "",
+        prescribed_medication: data.prescribed_medication as string || "",
+      });
+
       setShowSuccess(true);
       setTimeout(() => setShowSuccess(false), 3000);
+
+      // Refresh the care plan data from server to ensure consistency
+      fetchDoctorRemarks(selectedPatient.id);
     } catch (err: any) {
       setError('Failed to save care plan directives');
     }
@@ -495,7 +513,8 @@ export default function DoctorDashboard() {
                 placeholder="Enter details for Healthy Eating Plan..."
                 className="w-full mt-2"
                 rows={3}
-                defaultValue={doctorRemarks.healthy_eating_plan || ""}
+                value={doctorRemarks.healthy_eating_plan || ""}
+                onChange={(e) => handleTextareaChange('healthy_eating_plan', e.target.value)}
               />
             </div>
 
@@ -509,7 +528,8 @@ export default function DoctorDashboard() {
                 placeholder="Enter details for Exercise and Wellness Routine..."
                 className="w-full mt-2"
                 rows={3}
-                defaultValue={doctorRemarks.exercise_wellness_routine || ""}
+                value={doctorRemarks.exercise_wellness_routine || ""}
+                onChange={(e) => handleTextareaChange('exercise_wellness_routine', e.target.value)}
               />
             </div>
 
@@ -523,7 +543,8 @@ export default function DoctorDashboard() {
                 placeholder="Enter details for Prescribed Medications..."
                 className="w-full mt-2"
                 rows={3}
-                defaultValue={doctorRemarks.prescribed_medication || ""}
+                value={doctorRemarks.prescribed_medication || ""}
+                onChange={(e) => handleTextareaChange('prescribed_medication', e.target.value)}
               />
             </div>
 
