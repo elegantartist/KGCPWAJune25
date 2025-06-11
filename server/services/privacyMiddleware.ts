@@ -229,3 +229,25 @@ export function emergencyPiiScan(data: any): { hasPii: boolean; piiTypes: string
     piiTypes
   };
 }
+
+import { SYSTEM_DIRECTIVE_MARKERS } from './prompt_templates';
+
+/**
+ * Sanitize final response to remove any leaked system directives
+ */
+export function sanitizeFinalResponse(responseText: string): string {
+  let sanitizedResponse = responseText;
+  
+  // Remove system directive markers using the centralized patterns
+  SYSTEM_DIRECTIVE_MARKERS.forEach(pattern => {
+    sanitizedResponse = sanitizedResponse.replace(pattern, '');
+  });
+  
+  // Clean up extra whitespace and newlines
+  sanitizedResponse = sanitizedResponse
+    .replace(/\n{3,}/g, '\n\n')  // Replace 3+ newlines with 2
+    .replace(/^\s+|\s+$/g, '')   // Trim start and end
+    .replace(/\s{2,}/g, ' ');    // Replace multiple spaces with single space
+  
+  return sanitizedResponse;
+}

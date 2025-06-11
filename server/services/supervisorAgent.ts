@@ -6,7 +6,7 @@
 import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
 import { AIContextService } from './aiContextService';
-import { secureLog, validateMcpBundleSecurity } from './privacyMiddleware';
+import { secureLog, validateMcpBundleSecurity, sanitizeFinalResponse } from './privacyMiddleware';
 import { getMealInspiration, getWellnessInspiration, getWeeklyMealPlan, getWellnessProgram } from './inspirationMachines';
 import { parseUserQuery, performStructuredLocationSearch } from './queryParser';
 import { db } from '../db';
@@ -788,11 +788,15 @@ Provide your assessment: APPROVED, NEEDS_REVISION, or REJECTED with brief reason
 
     try {
       // Get MCP context for the user
-      const aiContextService = new AIContextService();
-      const mcpBundle = await aiContextService.prepareAIContext(userId, finalSessionId);
+      const contextResponse = await AIContextService.prepareSecureContext({
+        userId,
+        includeHealthMetrics: true,
+        includeChatHistory: false
+      });
+      const mcpBundle = contextResponse.secureBundle;
 
       // Validate MCP bundle security
-      if (!validateMcpBundleSecurity(mcpBundle)) {
+      if (!contextResponse.securityValidation.isSecure) {
         throw new Error('MCP bundle failed security validation');
       }
 
@@ -862,9 +866,6 @@ YOUR TASK: Analyze these self-scores and provide immediate, personalized feedbac
   }
 }
 
-// Response sanitization function
-function sanitizeFinalResponse(responseText: string): string {
-  return responseText; // Will be implemented in privacyMiddleware
-}
+
 
 export const supervisorAgent = SupervisorAgent.getInstance();
