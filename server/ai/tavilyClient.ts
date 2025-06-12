@@ -270,10 +270,18 @@ export async function searchRecipes(filters: RecipeSearchFilters): Promise<{ que
  */
 export async function searchCookingVideos(filters: RecipeSearchFilters): Promise<{ query: string, answer?: string, videos: RecipeSearchResult[], message?: string }> {
   try {
+    // API Key Validation Guard Clauses
     if (!process.env.TAVILY_API_KEY) {
-      console.error('TAVILY_API_KEY is not set in the environment');
-      return { query: 'cooking videos', videos: [], message: "API key missing" };
+      console.error('CRITICAL: TAVILY_API_KEY is not configured in environment variables');
+      throw new Error('TAVILY_API_KEY is not configured');
     }
+    
+    if (!process.env.OPENAI_API_KEY) {
+      console.error('CRITICAL: OPENAI_API_KEY is not configured in environment variables');
+      throw new Error('OPENAI_API_KEY is not configured');
+    }
+    
+    console.log('✅ API Keys validated - TAVILY_API_KEY and OPENAI_API_KEY are present');
 
     // Build cuisine prefix - use "authentic {cuisineType}" if available, otherwise "healthy"
     const cuisinePrefix = filters.cuisineType 
@@ -298,9 +306,11 @@ export async function searchCookingVideos(filters: RecipeSearchFilters): Promise
       searchQuery += ` ${filters.dietaryPreferences.join(' ')}`;
     }
 
-    console.log('Tavily video search query:', searchQuery);
+    console.log('📋 Search Query Built:', searchQuery);
+    console.log('📊 Filters received:', JSON.stringify(filters, null, 2));
 
     // Call Tavily API with the specified configuration
+    console.log('🌐 Calling Tavily API...');
     const response = await axios({
       method: 'post',
       url: 'https://api.tavily.com/search',
@@ -317,15 +327,47 @@ export async function searchCookingVideos(filters: RecipeSearchFilters): Promise
       timeout: 15000 // 15 second timeout for reliability
     });
 
-    if (!response.data || !response.data.results) {
-      console.warn('Tavily API returned no results or invalid data structure');
-      return { query: searchQuery, videos: [], message: "No results returned from API" };
+    console.log('📥 Tavily Response Status:', response.status);
+    console.log('📊 Raw Tavily Data Structure:', {
+      hasData: !!response.data,
+      hasResults: !!(response.data?.results),
+      resultCount: response.data?.results?.length || 0,
+      hasAnswer: !!response.data?.answer
+    });
+
+    if (!response.data) {
+      console.error('❌ Tavily API returned no data object');
+      throw new Error('Tavily API returned no data');
     }
 
+    if (!response.data.results) {
+      console.error('❌ Tavily API returned no results array');
+      throw new Error('Tavily API returned invalid data structure - no results array');
+    }
+
+    if (response.data.results.length === 0) {
+      console.warn('⚠️ Tavily API returned empty results array');
+      return { query: searchQuery, videos: [], message: "No videos found for this search" };
+    }
+
+    console.log('🔄 Processing Tavily results into recipe format...');
+    
     // Map Tavily results to our recipe format
-    const videoResults = response.data.results.map((result: any) => {
+    const videoResults = response.data.results.map((result: any, index: number) => {
+      console.log(`Processing result ${index + 1}:`, {
+        title: result.title?.substring(0, 50) + '...',
+        url: result.url,
+        hasContent: !!result.content,
+        hasImage: !!result.image
+      });
+      
       // Extract YouTube video ID for thumbnail generation
       const videoId = extractYoutubeVideoId(result.url);
+      
+      if (!videoId) {
+        console.log(`❌ Result ${index + 1} is not a YouTube video, skipping`);
+        return null;
+      }
 
       return {
         title: result.title || 'Recipe Video',
@@ -340,7 +382,9 @@ export async function searchCookingVideos(filters: RecipeSearchFilters): Promise
         cuisine_type: filters.cuisineType || undefined,
         meal_type: filters.mealType || undefined
       };
-    }).filter((result: RecipeSearchResult): boolean => result.videoId !== null); // Filter out non-YouTube results
+    }).filter((result: RecipeSearchResult | null): result is RecipeSearchResult => result !== null); // Filter out non-YouTube results
+
+    console.log(`✅ Processed ${videoResults.length} valid YouTube videos from ${response.data.results.length} total results`);
 
     // Process results with OpenAI if available (this part would be implemented in the routes)
     return {
@@ -349,9 +393,17 @@ export async function searchCookingVideos(filters: RecipeSearchFilters): Promise
       videos: videoResults
     };
 
-  } catch (error) {
-    console.error('Error searching cooking videos with Tavily:', error);
-    return { query: 'cooking videos', videos: [], message: "Search error" };
+  } catch (error: any) {
+    console.error('❌ CRITICAL ERROR in searchCookingVideos:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+      code: error.code,
+      response: error.response?.data
+    });
+    
+    // Always return empty array to prevent frontend crashes
+    return { query: 'cooking videos', videos: [], message: "Search error: " + error.message };
   }
 }
 
