@@ -1478,3 +1478,6 @@ function getTopRecommendations(insights: any[], activeAlerts: any[]): string[] {
     
     return Array.from(recommendations).slice(0, 5);
 }
+
+    // Mount the router to the Express app
+    app.use(router);
