@@ -1020,6 +1020,78 @@ export function registerRoutes(app: Express) {
         }
     });
 
+    // Secured exercise & wellness video search endpoint
+    router.post(
+        '/exercise-wellness/videos',
+        diagnosticLogger('EW Route Entry'), // Log entry into the route
+
+        authMiddleware(['patient', 'doctor', 'admin']),
+        diagnosticLogger('EW After Authentication'), // Log after auth
+
+        sanitizeRequestBody,
+        diagnosticLogger('EW After Sanitization'), // Log after sanitizing
+
+        validateRecipeSearch, // Reuse validation middleware 
+        diagnosticLogger('EW After Validation'), // Log after validating
+
+        videoSearchRateLimit,
+        diagnosticLogger('EW After Rate Limit'), // Log after rate limiting
+
+        handleValidationErrors,
+        diagnosticLogger('EW After Handling Errors'), // Log after error handling
+
+        async (req: AuthenticatedRequest, res) => {
+            console.log('[EW DIAGNOSTIC] Reached Exercise & Wellness route handler.');
+            try {
+                const userId = req.user!.userId;
+                const { category, intensity, duration, tags, useCPDs, limit = 10 } = req.body;
+                
+                const searchFilters = {
+                    category,
+                    intensity,
+                    duration,
+                    tags,
+                    useCPDs,
+                    limit
+                };
+                
+                secureLog('info', 'Exercise & Wellness video search request', { userId, filters: searchFilters });
+                
+                console.log('[EW DIAGNOSTIC-3] Route handler reached. Preparing to call searchExerciseWellnessVideos...');
+
+                // Import the search function
+                const { searchExerciseWellnessVideos } = await import('./ai/tavilyClient');
+                const searchResult = await searchExerciseWellnessVideos(searchFilters);
+
+                console.log('[EW DIAGNOSTIC-4] Call to searchExerciseWellnessVideos has completed. Preparing to send response.');
+
+                if (searchResult && searchResult.videos) {
+                    res.json({
+                        success: true,
+                        videos: searchResult.videos,
+                        query: searchResult.query,
+                        answer: searchResult.answer,
+                        timestamp: new Date().toISOString()
+                    });
+                } else {
+                    res.json({
+                        success: false,
+                        videos: [],
+                        message: 'No exercise or wellness videos found'
+                    });
+                }
+            } catch (error: any) {
+                console.error('Exercise & Wellness video search error:', error);
+                secureLog('error', 'Exercise & Wellness video search failed', { userId: req.user?.userId, error: error.message });
+                res.status(500).json({
+                    success: false,
+                    videos: [],
+                    message: 'Exercise & Wellness search temporarily unavailable'
+                });
+            }
+        }
+    );
+
     // Secured recipe video search endpoint
     router.post(
         '/recipes/videos',
