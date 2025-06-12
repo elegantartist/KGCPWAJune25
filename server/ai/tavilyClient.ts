@@ -1,3 +1,4 @@
+console.log(`[DIAGNOSTIC-1] tavilyClient.ts loaded. TAVILY_API_KEY present: ${!!process.env.TAVILY_API_KEY}`);
 import axios from 'axios';
 import { RecipeSearchFilters, RecipeSearchResult } from '../types/recipe';
 
@@ -269,6 +270,7 @@ export async function searchRecipes(filters: RecipeSearchFilters): Promise<{ que
  * Search for cooking videos using Tavily API with enhanced configuration
  */
 export async function searchCookingVideos(filters: RecipeSearchFilters): Promise<{ query: string, answer?: string, videos: RecipeSearchResult[], message?: string }> {
+  console.log('[DIAGNOSTIC-2] searchCookingVideos function has been executed.');
   try {
     // API Key Validation Guard Clauses
     if (!process.env.TAVILY_API_KEY) {

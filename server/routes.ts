@@ -1043,7 +1043,11 @@ export function registerRoutes(app: Express) {
                 
                 secureLog('info', 'Video search request', { userId, filters: searchFilters });
                 
+                console.log('[DIAGNOSTIC-3] Route handler reached. Preparing to call searchCookingVideos...');
+
                 const searchResult = await searchCookingVideos(searchFilters);
+
+                console.log('[DIAGNOSTIC-4] Call to searchCookingVideos has completed. Preparing to send response.');
                 
                 res.json({
                     success: true,
