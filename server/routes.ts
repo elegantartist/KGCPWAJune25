@@ -1022,7 +1022,7 @@ export function registerRoutes(app: Express) {
 
     // Secured recipe video search endpoint
     router.post(
-        '/api/recipes/videos',
+        '/recipes/videos',
         diagnosticLogger('Route Entry'), // Log entry into the route
 
         authMiddleware(['patient', 'doctor', 'admin']),
@@ -1340,7 +1340,7 @@ export function registerRoutes(app: Express) {
 
     // Analytics dashboard summary endpoint
     // Offline message synchronization endpoint
-    router.post('/api/sync-offline-messages', authMiddleware(), async (req: AuthenticatedRequest, res) => {
+    router.post('/sync-offline-messages', authMiddleware(), async (req: AuthenticatedRequest, res) => {
         try {
             const { messages } = req.body;
             
