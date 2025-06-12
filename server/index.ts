@@ -8,6 +8,14 @@ import { config } from 'dotenv';
 config();
 
 const app = express();
+
+// --- GLOBAL REQUEST LOGGER AT THE VERY TOP ---
+app.use((req, res, next) => {
+  console.log(`[GLOBAL_REQUEST_LOGGER] Received Request - Method: ${req.method}, URL: ${req.originalUrl}`);
+  next();
+});
+// ---------------------------------------------
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
