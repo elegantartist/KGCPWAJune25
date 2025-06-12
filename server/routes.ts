@@ -10,7 +10,7 @@ import { userCreationService } from './services/userCreationService';
 import { uinService } from './services/uinService';
 import { AIContextService } from './services/aiContextService';
 import { emergencyPiiScan } from './services/privacyMiddleware';
-import { secureLog, validateRecipeSearch, videoSearchRateLimit, sanitizeRequestBody, handleValidationErrors } from './middleware/security';
+import { secureLog, validateRecipeSearch, videoSearchRateLimit, sanitizeRequestBody, handleValidationErrors, diagnosticLogger } from './middleware/security';
 import { searchCookingVideos } from './ai/tavilyClient';
 import { supervisorAgent } from './services/supervisorAgent';
 import { getMealInspiration, getWellnessInspiration, getWeeklyMealPlan, getWellnessProgram } from './services/inspirationMachines';
@@ -1023,12 +1023,25 @@ export function registerRoutes(app: Express) {
     // Secured recipe video search endpoint
     router.post(
         '/api/recipes/videos',
-        authMiddleware(['patient', 'doctor', 'admin']), // 1. Auth first
-        sanitizeRequestBody,                            // 2. Sanitize
-        validateRecipeSearch,                           // 3. Validate
-        videoSearchRateLimit,                           // 4. Rate Limit
-        handleValidationErrors,                         // 5. Handle any validation errors
-        async (req: AuthenticatedRequest, res) => {       // 6. Finally, run the main logic
+        diagnosticLogger('Route Entry'), // Log entry into the route
+
+        authMiddleware(['patient', 'doctor', 'admin']),
+        diagnosticLogger('After Authentication'), // Log after auth
+
+        sanitizeRequestBody,
+        diagnosticLogger('After Sanitization'), // Log after sanitizing
+
+        validateRecipeSearch,
+        diagnosticLogger('After Validation'), // Log after validating
+
+        videoSearchRateLimit,
+        diagnosticLogger('After Rate Limit'), // Log after rate limiting
+
+        handleValidationErrors,
+        diagnosticLogger('After Handling Errors'), // Log after error handling
+
+        async (req: AuthenticatedRequest, res) => { // The main logic
+            console.log('[DIAGNOSTIC] Reached main route handler.');
             try {
                 const userId = req.user!.userId;
                 const { mealType, cuisineType, dietaryPreferences, ingredients, limit = 10 } = req.body;

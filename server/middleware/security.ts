@@ -208,6 +208,11 @@ export const auditLogger: IAuditMiddleware = (req: AuthenticatedRequest, res: Re
 };
 
 // Secure logging function - supports both parameter orders for compatibility
+export const diagnosticLogger = (stepName: string) => (req: any, res: any, next: any) => {
+  console.log(`[MIDDLEWARE_TRACE] Passed: ${stepName}`);
+  next();
+};
+
 export const secureLog = (messageOrLevel: string | 'info' | 'warn' | 'error', messageOrMetadata?: string | any, metadata?: any) => {
   let level: 'info' | 'warn' | 'error';
   let message: string;
