@@ -21,6 +21,23 @@ import {
   LOCATION_SYNTHESIS_PROMPT 
 } from './prompt_templates';
 
+// Authorized KGC features list for strict validation
+const AUTHORIZED_KGC_FEATURES = [
+  'Home', 'Daily Self-Scores', 'Motivational Image Processing', 'MIP',
+  'Inspiration Machine D', 'Diet Logistics', 'Inspiration Machine E&W',
+  'E&W Support', 'MBP Wiz', 'Journaling', 'Progress Milestones',
+  'Food Database', 'Chatbot', 'Health Snapshots'
+];
+
+// Keywords that might indicate unauthorized feature mentions
+const UNAUTHORIZED_FEATURE_KEYWORDS = [
+  'appointment', 'scheduling', 'calendar', 'booking', 'video call',
+  'telehealth', 'prescription', 'diagnos', 'treatment', 'medication management',
+  'reminder system', 'alert system', 'notification center', 'emergency',
+  'vital signs', 'blood pressure', 'heart rate', 'glucose', 'weight tracking',
+  'lab results', 'test results', 'medical records', 'health records'
+];
+
 // Initialize LLM clients
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -278,7 +295,16 @@ class SupervisorAgent {
           validationStatus = validatedResponse.status;
         }
 
-        // 7. Final security check on response
+        // 7. Validate feature recommendations before security check
+        const featureValidation = this.validateFeatureRecommendations(finalResponse);
+        if (!featureValidation.isValid && featureValidation.correctedResponse) {
+          secureLog('Response contained unauthorized features, using corrected response', { 
+            sessionId: finalSessionId 
+          });
+          finalResponse = featureValidation.correctedResponse;
+        }
+
+        // 8. Final security check on response
         const responseValidation = await AIContextService.validateAIResponse(finalResponse, finalSessionId);
         if (!responseValidation.isSecure) {
           secureLog('AI response contained PII, sanitizing', { 
@@ -386,6 +412,55 @@ class SupervisorAgent {
     }
 
     return null;
+  }
+
+  /**
+   * Validate response to ensure only authorized KGC features are mentioned
+   */
+  private validateFeatureRecommendations(response: string): { isValid: boolean; correctedResponse?: string } {
+    const responseLower = response.toLowerCase();
+    
+    // Check for unauthorized feature keywords
+    const unauthorizedMentions = UNAUTHORIZED_FEATURE_KEYWORDS.filter(keyword => 
+      responseLower.includes(keyword.toLowerCase())
+    );
+    
+    if (unauthorizedMentions.length > 0) {
+      secureLog('Unauthorized feature mentions detected', { 
+        unauthorizedMentions,
+        responsePreview: response.substring(0, 100)
+      });
+      
+      // Generate a corrected response that redirects to authorized features
+      const correctedResponse = `I understand you're looking for information about KGC's capabilities. I can help you with our 13 available features:
+
+**Health Tracking & Progress:**
+- Daily Self-Scores (earn rewards for healthy choices!)
+- Health Snapshots (visual progress summaries)
+- Progress Milestones (achievement badges and $100+ rewards)
+
+**Personalized Guidance:**
+- Inspiration Machine D (meal ideas from your care plan)
+- Inspiration Machine E&W (exercise & wellness inspiration)
+- Diet Logistics (grocery & meal delivery aligned with your plan)
+
+**Support Tools:**
+- E&W Support (find local gyms, trainers, yoga studios)
+- MBP Wiz (best medication prices via Chemist Warehouse)
+- Food Database (nutritional info & FoodSwitch scanner)
+- Journaling (track thoughts and health experiences)
+
+**Core Features:**
+- Home dashboard (easy access to all features)
+- Motivational Image Processing (enhance your "Keep Going" button)
+- Chatbot (me - your KGC AI assistant!)
+
+Which of these features would be most helpful for your health journey today?`;
+
+      return { isValid: false, correctedResponse };
+    }
+    
+    return { isValid: true };
   }
 
   /**
