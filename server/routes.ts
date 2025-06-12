@@ -11,6 +11,7 @@ import { uinService } from './services/uinService';
 import { AIContextService } from './services/aiContextService';
 import { emergencyPiiScan } from './services/privacyMiddleware';
 import { secureLog, validateRecipeSearch, videoSearchRateLimit, sanitizeRequestBody, handleValidationErrors } from './middleware/security';
+import { searchCookingVideos } from './ai/tavilyClient';
 import { supervisorAgent } from './services/supervisorAgent';
 import { getMealInspiration, getWellnessInspiration, getWeeklyMealPlan, getWellnessProgram } from './services/inspirationMachines';
 import { analyzeHealthTrends, generatePredictiveAlerts, generateAnalyticsInsights } from './services/analyticsEngine';
@@ -1031,9 +1032,6 @@ export function registerRoutes(app: Express) {
             try {
                 const userId = req.user!.userId;
                 const { mealType, cuisineType, dietaryPreferences, ingredients, limit = 10 } = req.body;
-                
-                // Import Tavily search function
-                const { searchCookingVideos } = await import('./ai/tavilyClient');
                 
                 const searchFilters = {
                     mealType,
