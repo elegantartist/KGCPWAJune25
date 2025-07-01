@@ -62,7 +62,7 @@ export default function DoctorDashboard() {
 
   // Auth headers using localStorage JWT
   const createAuthHeaders = () => {
-    const token = localStorage.getItem('auth_token');
+    const token = localStorage.getItem('accessToken');
     return {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json'
@@ -70,7 +70,7 @@ export default function DoctorDashboard() {
   };
 
   const handleUnauthorized = () => {
-    localStorage.removeItem('auth_token');
+    localStorage.removeItem('accessToken');
     setLocation('/login');
   };
 
@@ -119,12 +119,12 @@ export default function DoctorDashboard() {
 
   // Logout handler
   const handleLogout = () => {
-    localStorage.removeItem('auth_token');
+    localStorage.removeItem('accessToken');
     setLocation('/login');
   };
 
   useEffect(() => {
-    const token = localStorage.getItem('auth_token');
+    const token = localStorage.getItem('accessToken');
     if (!token) {
       setLocation('/login');
       return;

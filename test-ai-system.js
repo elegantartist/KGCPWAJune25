@@ -24,9 +24,9 @@ async function authenticateTestPatient() {
             code: '123456'
         });
         
-        if (verifyResponse.data.access_token) {
+        if (verifyResponse.data.accessToken) {
             console.log('✅ Authentication successful');
-            return verifyResponse.data.access_token;
+            return verifyResponse.data.accessToken;
         } else {
             throw new Error('No access token received');
         }
@@ -77,37 +77,6 @@ async function testSupervisorHealth(token) {
     }
 }
 
-// Test Supervisor Agent query processing
-async function testSupervisorQuery(token, query, expectedTool = null) {
-    try {
-        console.log(`\n🤖 Testing Supervisor query: "${query}"`);
-        
-        const response = await axios.post(`${BASE_URL}/v2/supervisor/query`, {
-            query: query,
-            requiresValidation: false
-        }, {
-            headers: { Authorization: `Bearer ${token}` }
-        });
-        
-        const result = response.data;
-        console.log('✅ Query processed:', {
-            modelUsed: result.modelUsed,
-            toolsUsed: result.toolsUsed,
-            responseLength: result.response.length,
-            processingTime: result.processingTime
-        });
-        
-        if (expectedTool && result.toolsUsed?.includes(expectedTool)) {
-            console.log(`✅ Expected tool "${expectedTool}" was used`);
-        }
-        
-        return result;
-    } catch (error) {
-        console.error('❌ Supervisor query failed:', error.response?.data || error.message);
-        return null;
-    }
-}
-
 // Test individual Inspiration Machines
 async function testInspirationMachine(token, type, endpoint, description) {
     try {
@@ -132,6 +101,33 @@ async function testInspirationMachine(token, type, endpoint, description) {
     }
 }
 
+// Test the new /api/chat endpoint created during the refactor.
+async function testNewChatEndpoint(token, message) {
+    try {
+        console.log(`\n💬 Testing new /api/chat endpoint with message: "${message}"`);
+
+        const response = await axios.post(`${BASE_URL}/chat`, {
+            message: message,
+            sessionId: `test-session-${Date.now()}`
+        }, {
+            headers: { Authorization: `Bearer ${token}` }
+        });
+
+        const result = response.data;
+        if (result && result.response) {
+            console.log('✅ New chat endpoint responded successfully:', {
+                responseLength: result.response.length
+            });
+            return result;
+        } else {
+            throw new Error('Invalid response format from /api/chat');
+        }
+    } catch (error) {
+        console.error('❌ New chat endpoint test failed:', error.response?.data || error.message);
+        return null;
+    }
+}
+
 // Main test suite
 async function runComprehensiveTests() {
     console.log('🚀 Starting Comprehensive AI System Tests\n');
@@ -150,13 +146,10 @@ async function runComprehensiveTests() {
     const capabilities = await testSupervisorCapabilities(token);
     const health = await testSupervisorHealth(token);
     
-    // Step 3: Test Supervisor Agent with various queries
-    await testSupervisorQuery(token, "What should I eat for lunch?", "meal-inspiration");
-    await testSupervisorQuery(token, "I'm feeling stressed, what can I do?", "wellness-inspiration");
-    await testSupervisorQuery(token, "Help me plan meals for the week", "weekly-meal-plan");
-    await testSupervisorQuery(token, "Create a wellness routine for me", "wellness-program");
-    await testSupervisorQuery(token, "Tell me about my health metrics");
-    
+    // Step 3: Test the new refactored chat endpoint with realistic queries
+    await testNewChatEndpoint(token, "What should I eat for lunch?");
+    await testNewChatEndpoint(token, "I'm feeling stressed, what can I do?");
+
     // Step 4: Test individual Inspiration Machines
     await testInspirationMachine(token, 'meal', 'meal', 'Meal Inspiration Machine');
     await testInspirationMachine(token, 'wellness', 'wellness', 'Wellness Inspiration Machine');

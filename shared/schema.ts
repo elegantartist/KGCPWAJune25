@@ -10,6 +10,9 @@ export const users = pgTable('users', {
   passwordHash: text('password_hash'),
   uin: varchar('uin', { length: 20 }).unique(), // Unique Identification Number
   isActive: boolean('is_active').default(true),
+  status: varchar('status', { length: 20 }).default('pending_payment').notNull(),
+  credits: integer('credits').default(0).notNull(),
+  stripeCustomerId: varchar('stripe_customer_id', { length: 255 }),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
@@ -50,4 +53,13 @@ export const auditLog = pgTable('audit_log', {
   userAgent: text('user_agent'),
   details: text('details'),
   timestamp: timestamp('timestamp').defaultNow().notNull(),
+});
+
+export const adminAlerts = pgTable('admin_alerts', {
+  id: serial('id').primaryKey(),
+  patientId: integer('patient_id').references(() => users.id),
+  alertType: varchar('alert_type', { length: 50 }).notNull(),
+  message: text('message'),
+  isResolved: boolean('is_resolved').default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 });

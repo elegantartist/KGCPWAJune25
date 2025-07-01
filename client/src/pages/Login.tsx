@@ -51,11 +51,11 @@ const SmsLogin: React.FC<{ role: 'doctor' | 'patient' }> = ({ role }) => {
             }
 
             // --- THIS IS THE CRITICAL HANDOFF ---
-            // 1. On success, call the login function from our AuthContext
-            //    This function should handle storing the token and setting the user state.
-            login({ accessToken: data.accessToken, user: data.user });
+            // 1. On success, call the login function from our AuthContext.
+            //    We pass the entire data object so the context can handle
+            //    the token, user, and payment status.
+            login(data);
 
-            // 2. Navigate the user to the correct dashboard based on their role.
             // Note: Navigation is handled in the AuthContext login function
             // ------------------------------------
 

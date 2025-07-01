@@ -8,28 +8,14 @@ import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Shield, Phone, Lock, CheckCircle } from 'lucide-react';
+import { Loader2, Shield, Phone, CheckCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 const phoneVerificationSchema = z.object({
   verificationCode: z.string().length(6, 'Verification code must be 6 digits').regex(/^\d{6}$/, 'Must contain only numbers')
 });
 
-const passwordSetupSchema = z.object({
-  password: z.string()
-    .min(16, 'Password must be at least 16 characters long')
-    .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
-    .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
-    .regex(/\d/, 'Password must contain at least one number')
-    .regex(/[!@#$%^&*(),.?":{}|<>]/, 'Password must contain at least one special character'),
-  confirmPassword: z.string()
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords don't match",
-  path: ["confirmPassword"]
-});
-
 type PhoneVerificationForm = z.infer<typeof phoneVerificationSchema>;
-type PasswordSetupForm = z.infer<typeof passwordSetupSchema>;
 
 export default function DoctorSetup() {
   const [location] = useLocation();
@@ -48,11 +34,6 @@ export default function DoctorSetup() {
   const phoneForm = useForm<PhoneVerificationForm>({
     resolver: zodResolver(phoneVerificationSchema),
     defaultValues: { verificationCode: '' }
-  });
-
-  const passwordForm = useForm<PasswordSetupForm>({
-    resolver: zodResolver(passwordSetupSchema),
-    defaultValues: { password: '', confirmPassword: '' }
   });
 
   // Validate token once on component mount
@@ -162,42 +143,6 @@ export default function DoctorSetup() {
       }
     } catch (error) {
       setError('Failed to verify phone number. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const onPasswordSetupSubmit = async (data: PasswordSetupForm) => {
-    try {
-      setIsLoading(true);
-      setError('');
-
-      const response = await fetch('/api/doctor/setup/complete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          token
-        })
-      });
-
-      const result = await response.json();
-
-      if (response.ok) {
-        setStep('complete');
-        toast({
-          title: "Account Setup Complete!",
-          description: "Your doctor account has been successfully activated.",
-        });
-        
-        // Redirect to doctor dashboard after 3 seconds
-        setTimeout(() => {
-          setLocation('/doctor-dashboard');
-        }, 3000);
-      } else {
-        setError(result.message || 'Failed to complete account setup.');
-      }
-    } catch (error) {
-      setError('Failed to complete setup. Please try again.');
     } finally {
       setIsLoading(false);
     }

@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { useSimpleToast } from "@/hooks/simple-toast";
 import { Brain, Heart, LogOut, Star, MessageSquare } from "lucide-react";
-import { apiRequest } from "@/lib/queryClient";
 import { EnhancedSupervisorAgent } from "@/components/chatbot/EnhancedSupervisorAgent";
 import Layout from "@/components/layout/Layout";
 import { ConnectivityLevel } from "@shared/types";
@@ -13,6 +12,7 @@ import { useBadgeAward } from "@/context/BadgeAwardContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import KeepGoingSequenceModal from "@/components/features/KeepGoingSequenceModal";
 import { ImageCarousel } from '@/components/ui/ImageCarousel';
+import { useAuth } from '@/context/auth-context';
 
 const carouselImages = [
   '/assets/carousel-image-1.jpg', // Replace with your actual image file
@@ -26,7 +26,8 @@ const carouselImages = [
 
 // Enhanced chatbot page with connectivity awareness
 const EnhancedChatbot: React.FC = () => {
-  const [userId, setUserId] = useState<number>(1); // Default user ID
+  const { user } = useAuth();
+  const userId = user?.id;
   const [healthMetrics, setHealthMetrics] = useState<any>(null);
   const [recommendedFeature, setRecommendedFeature] = useState<string | null>(null);
   const isOnline = useOnlineStatus();
@@ -71,32 +72,6 @@ const EnhancedChatbot: React.FC = () => {
     }
   }, []);
 
-  // Initialize chatbot with basic user info only
-  useEffect(() => {
-    let isMounted = true;
-    
-    const fetchUserData = async () => {
-      try {
-        // Fetch user basic info only - no health metrics analysis
-        const user = await apiRequest<{ id: number; name: string; email: string }>('GET', '/api/users/me');
-        if (!isMounted) return;
-        
-        if (user && typeof user.id === 'number') {
-          setUserId(user.id);
-        }
-      } catch (error) {
-        console.error("Error fetching user:", error);
-      }
-    };
-    
-    fetchUserData();
-    
-    // Cleanup function
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-  
   // Handle when a recommendation is accepted
   const handleRecommendationAccepted = (feature: string) => {
     console.log('Enhanced Chatbot: Recommendation accepted:', feature);

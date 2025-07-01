@@ -71,7 +71,8 @@ class OfflineQueueService {
     }
 
     try {
-      const token = localStorage.getItem('auth_token');
+      // Use the correct key for the auth token, consistent with the rest of the app.
+      const token = localStorage.getItem('accessToken');
       const response = await fetch('/api/sync-offline-messages', {
         method: 'POST',
         headers: {

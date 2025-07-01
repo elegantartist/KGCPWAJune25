@@ -5,28 +5,42 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
+  Legend,
   ResponsiveContainer,
 } from "recharts";
 import React from "react";
+import { format } from 'date-fns';
 
-// Type: HealthMetric
+/**
+ * Represents a single health metric record from the API.
+ * This interface matches the data returned from the `/api/patients/me/health-metrics/history` endpoint.
+ */
 interface HealthMetric {
-  createdAt: string; // ISO date
-  diet: number;
-  exercise: number;
-  medication: number;
+  date: string; // ISO date string from the database
+  dietScore: number;
+  exerciseScore: number;
+  medicationScore: number;
 }
 
 interface HealthProgressChartProps {
   metrics: HealthMetric[];
 }
 
+const lineColors = {
+  Diet: "#E53935",       // A reddish color
+  Exercise: "#2E8BC0",    // A blue color
+  Medication: "#4CAF50",  // A green color
+};
+
 export const HealthProgressChart: React.FC<HealthProgressChartProps> = ({ metrics }) => {
-  const chartData = [...metrics].reverse().map((metric) => ({
-    date: new Date(metric.createdAt).toLocaleDateString(),
-    Diet: metric.diet,
-    Exercise: metric.exercise,
-    Medication: metric.medication,
+  // Sort metrics by date ascending to ensure the chart displays correctly,
+  // regardless of the order they arrive from the API.
+  const chartData = [...metrics].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()).map((metric) => ({
+    // Format date as 'Month/Day' for a clean and consistent X-axis.
+    date: format(new Date(metric.date), 'MM/dd'),
+    Diet: metric.dietScore,
+    Exercise: metric.exerciseScore,
+    Medication: metric.medicationScore,
   }));
 
   return (
@@ -38,10 +52,11 @@ export const HealthProgressChart: React.FC<HealthProgressChartProps> = ({ metric
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="date" />
             <YAxis domain={[1, 10]} />
-            <Tooltip />
-            <Line type="monotone" dataKey="Diet" stroke="#E53935" />
-            <Line type="monotone" dataKey="Exercise" stroke="#2E8BC0" />
-            <Line type="monotone" dataKey="Medication" stroke="#4CAF50" />
+            <Tooltip contentStyle={{ backgroundColor: '#f5f5f5', border: '1px solid #ccc' }} />
+            <Legend />
+            <Line type="monotone" dataKey="Diet" stroke={lineColors.Diet} strokeWidth={2} activeDot={{ r: 8 }} />
+            <Line type="monotone" dataKey="Exercise" stroke={lineColors.Exercise} strokeWidth={2} activeDot={{ r: 8 }} />
+            <Line type="monotone" dataKey="Medication" stroke={lineColors.Medication} strokeWidth={2} activeDot={{ r: 8 }} />
           </LineChart>
         </ResponsiveContainer>
       </div>

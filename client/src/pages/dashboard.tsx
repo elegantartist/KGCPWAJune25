@@ -4,7 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { MessageCircle, BarChart, ArrowRight, ArrowLeft } from 'lucide-react';
+import { MessageCircle, BarChart, ArrowRight, ArrowLeft, Gem, PlusCircle } from 'lucide-react';
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { LogoutButton } from "@/components/ui/LogoutButton";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
@@ -17,6 +18,7 @@ import { KeepGoingFeature } from "@/components/keep-going/KeepGoingFeature";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/auth-context";
 import { apiRequest } from "../lib/apiRequest";
+import { BuyCredits } from "@/components/BuyCredits";
 import Layout from "@/components/layout/Layout";
 // Removed unused User import
 
@@ -35,6 +37,7 @@ const Dashboard: React.FC = () => {
   const [keepGoingVibrating, setKeepGoingVibrating] = useState(false);
   const [scoresVibrating, setScoresVibrating] = useState(false);
   const [motivationalImage, setMotivationalImage] = useState<string | null>(null);
+  const [showBuyCredits, setShowBuyCredits] = useState(false);
   
   // Get responsive layout information
   const isMobile = useIsMobile();
@@ -235,16 +238,6 @@ const Dashboard: React.FC = () => {
                       triggerVibration('chat');
                       // Clear notifications when navigating to chatbot
                       clearNotifications();
-                      
-                      // Ensure current user is stored properly for the chatbot page
-                      if (user) {
-                        localStorage.setItem('currentUser', JSON.stringify({
-                          id: user.id,
-                          name: user.name,
-                          role: user.role
-                        }));
-                        console.log('Dashboard: Stored user data for chatbot:', user);
-                      }
 
                       // Longer delay before navigation to allow full therapeutic gong sound and animation to complete
                       setTimeout(() => {
@@ -333,17 +326,33 @@ const Dashboard: React.FC = () => {
             isMobile ? "fixed bottom-6 left-4 right-4 bg-white/90 rounded-lg p-4 backdrop-blur-sm shadow-md z-40" : "border-t border-gray-100"
           )}>
             <h2 className={cn(
-              "text-2xl font-bold mb-2", 
+              "text-xl font-bold mb-1", 
               isMobile ? "text-[#2E8BC0]" : "text-[#676767]" 
             )}>
               Welcome, {user?.name}!
             </h2>
-            <p className={cn(
-              "mb-2",
-              isMobile ? "text-gray-700" : "text-[#a4a4a4]"
-            )}>
-              Let's keep your health on track today.
-            </p>
+            <div className="flex justify-between items-center">
+              <p className={cn(
+                "text-sm",
+                isMobile ? "text-gray-700" : "text-[#a4a4a4]"
+              )}>
+                Let's keep your health on track today.
+              </p>
+              <div className="flex items-center space-x-2">
+                <Gem className="h-5 w-5 text-blue-500" />
+                <span className="font-bold text-lg text-gray-700 dark:text-gray-200">{user?.credits ?? 0}</span>
+                <Dialog open={showBuyCredits} onOpenChange={setShowBuyCredits}>
+                  <DialogTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" title="Buy Credits">
+                      <PlusCircle className="h-5 w-5 text-green-600" />
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[700px] p-0">
+                    <BuyCredits />
+                  </DialogContent>
+                </Dialog>
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>
