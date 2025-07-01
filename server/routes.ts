@@ -14,6 +14,9 @@ import { secureLog, validateRecipeSearch, videoSearchRateLimit, sanitizeRequestB
 import { searchCookingVideos } from './ai/tavilyClient';
 import { supervisorAgent } from './services/supervisorAgent';
 import { getMealInspiration, getWellnessInspiration, getWeeklyMealPlan, getWellnessProgram } from './services/inspirationMachines';
+import scoresRouter from './routes/scores';
+import milestonesRouter from './routes/milestones';
+import motivationRouter from './routes/motivation';
 import { analyzeHealthTrends, generatePredictiveAlerts, generateAnalyticsInsights } from './services/analyticsEngine';
 import { proactiveMonitoring } from './services/proactiveMonitoring';
 
@@ -1502,6 +1505,11 @@ export function registerRoutes(app: Express) {
             });
         }
     });
+
+    // --- NEW KGC FEATURE ROUTES ---
+    router.use('/scores', scoresRouter);
+    router.use('/milestones', milestonesRouter);
+    router.use('/motivation', motivationRouter);
 
     app.use('/api', router);
 }

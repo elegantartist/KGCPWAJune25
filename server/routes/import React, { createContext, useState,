@@ -1,0 +1,40 @@
+import React, { createContext, useState, useContext, ReactNode } from 'react';
+import { BadgeAwardModal } from '@/components/features/BadgeAwardModal';
+
+interface Badge {
+  badgeType: string;
+  badgeTier: string;
+}
+
+interface BadgeAwardContextType {
+  showAward: (badge: Badge) => void;
+}
+
+const BadgeAwardContext = createContext<BadgeAwardContextType | undefined>(undefined);
+
+export const useBadgeAward = () => {
+  const context = useContext(BadgeAwardContext);
+  if (!context) {
+    throw new Error('useBadgeAward must be used within a BadgeAwardProvider');
+  }
+  return context;
+};
+
+export const BadgeAwardProvider = ({ children }: { children: ReactNode }) => {
+  const [awardedBadge, setAwardedBadge] = useState<Badge | null>(null);
+
+  const showAward = (badge: Badge) => {
+    setAwardedBadge(badge);
+  };
+
+  const handleClose = () => {
+    setAwardedBadge(null);
+  };
+
+  return (
+    <BadgeAwardContext.Provider value={{ showAward }}>
+      {children}
+      {awardedBadge && <BadgeAwardModal badge={awardedBadge} onClose={handleClose} />}
+    </BadgeAwardContext.Provider>
+  );
+};

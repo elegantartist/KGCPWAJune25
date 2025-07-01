@@ -14,7 +14,6 @@
 9. [API Endpoints](#api-endpoints)
 10. [Frontend Components](#frontend-components)
 11. [Real-time Functionality](#real-time-functionality)
-12. [Offline Support](#offline-support)
 13. [Security & Compliance](#security--compliance)
 14. [Optimization Strategy](#optimization-strategy)
 15. [Deployment Guide](#deployment-guide)
@@ -594,43 +593,6 @@ KGC implements WebSocket-based real-time functionality for critical features:
    - Typing indicators
 
 4. **Notification System**
-   - System alerts and updates
-   - CPD reminder notifications
-   - Report availability alerts
-
-## Offline Support
-
-KGC implements a robust offline capability system:
-
-### Offline Architecture
-
-```
-┌────────────────────┐
-│ Service Worker     │
-│ ┌────────────────┐ │
-│ │ Cache Strategy │ │
-│ └────────────────┘ │
-└─────────┬──────────┘
-          │
-┌─────────▼──────────┐
-│ IndexedDB          │
-│ ┌────────────────┐ │
-│ │ Offline Store  │ │
-│ └────────────────┘ │
-└─────────┬──────────┘
-          │
-┌─────────▼──────────┐
-│ Sync Manager       │
-│ ┌────────────────┐ │
-│ │ Background     │ │
-│ │ Synchronization│ │
-│ └────────────────┘ │
-└────────────────────┘
-```
-
-### Offline-Capable Features
-
-1. **Progress Milestone Updates**
    - Local storage for offline changes
    - Background synchronization when online
    - Conflict resolution strategy

@@ -4,9 +4,6 @@ import { Play } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { createHapticFeedback } from "@/lib/hapticFeedback";
-import OrientationVideo from "@/components/orientation/OrientationVideo";
-// Import the logo directly from the assets folder
-import kgcLogoPath from "@/assets/KGC Logo2 Nov24_1744113864434.jpg";
 // Import the sidebar
 import Sidebar from "./Sidebar";
 import { SidebarProvider } from "./SidebarContext";
@@ -20,7 +17,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [location] = useLocation();
   const isMobile = useIsMobile();
   const [logoAnimating, setLogoAnimating] = useState(false);
-  const [showOrientationVideo, setShowOrientationVideo] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   
   // Effect to trigger logo animation when any page loads or changes
@@ -66,14 +62,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         <header className="h-44 bg-[#fdfdfd] px-4 relative border-b border-[#2E8BC0]/20">
           {/* Orientation button on the left - smaller with KGC stacked above Orientation */}
           <div className="absolute left-4 top-1/2 transform -translate-y-1/2 z-10">
-            <button 
-              onClick={() => {
-                createHapticFeedback();
-                setTimeout(() => setShowOrientationVideo(true), 2000);
-              }}
-              className="flex items-center gap-2 px-3 py-2 hover:bg-[#2E8BC0]/10 rounded-md"
-              aria-label="Watch orientation"
-            >
+            <button className="flex items-center gap-2 px-3 py-2 hover:bg-[#2E8BC0]/10 rounded-md" aria-label="Orientation">
               <div className="flex flex-col items-center justify-center h-12 gap-1">
                 <div className="h-2.5 w-2.5 rounded-full dot-metallic"></div>
                 <div className="h-2.5 w-2.5 rounded-full dot-metallic"></div>
@@ -106,7 +95,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           <div className="flex justify-center items-center h-full">
             <div className="rounded-full overflow-hidden logo-metallic">
               <img 
-                src={kgcLogoPath} 
+                src="/assets/kgc-logo-prominent.png" 
                 alt="KGC Logo" 
                 className={cn(
                   "h-[180px] w-[180px] transition-all duration-300", 
@@ -116,14 +105,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               />
             </div>
           </div>
-          
-          {/* Orientation Video Modal */}
-          {showOrientationVideo && (
-            <OrientationVideo 
-              videoId="Qj5J9Uw0pEg" 
-              onClose={() => setShowOrientationVideo(false)} 
-            />
-          )}
         </header>
 
         <div className="flex flex-1 overflow-hidden relative">

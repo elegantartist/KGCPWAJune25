@@ -1,124 +1,22 @@
-import React, { useState, useEffect } from "react";
-import { useLocation } from "wouter";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { useToast } from "@/hooks/use-toast";
-import { useIsMobile } from "@/hooks/use-mobile";
-import { Sparkles, Save } from "lucide-react";
-import { createHapticFeedback } from "@/lib/soundEffects";
-import { enhanceWithStars } from "@/lib/imageEffects";
-import EnhancedImageStore from "@/lib/enhancedImageStore";
-import KeepGoingVideo from "@/components/motivation/KeepGoingVideo";
-import heartImage from "@assets/image_1744127067136.jpeg";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import Layout from "@/components/layout/Layout";
+import React, { useState, useRef, useCallback } from 'react';
+import Layout from '@/components/layout/Layout';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Upload, Sparkles, Save } from 'lucide-react';
+import { useSimpleToast } from '@/hooks/simple-toast';
+import { saveMotivationalImage, getMotivationalImage } from '@/lib/imageStore';
 
-const Motivation: React.FC = () => {
+const MotivationalImageProcessor: React.FC = () => {
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [enhancedUrl, setEnhancedUrl] = useState<string | null>(null);
-  const [processingImage, setProcessingImage] = useState(false);
-  const [showKeepGoingVideo, setShowKeepGoingVideo] = useState(false);
-  const [_, setLocation] = useLocation();
-  const { toast } = useToast();
-  const isMobile = useIsMobile();
-  const queryClient = useQueryClient();
-  
-  // Get current authenticated user
-  const { data: currentUser, isLoading: userLoading } = useQuery({
-    queryKey: ['/api/user/current-context'],
-    retry: false
-  });
+  const [isSaving, setIsSaving] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useSimpleToast();
 
-  const userId = currentUser?.id;
-
-  // Don't render if user is not authenticated
-  if (!userId && !userLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <h2 className="text-xl font-semibold mb-2">Authentication Required</h2>
-          <p className="text-gray-600">Please log in to access this feature.</p>
-        </div>
-      </div>
-    );
-  }
-  
-  // Query for getting the saved motivational image from the database
-  const { data: savedImage, isLoading: isLoadingImage } = useQuery({
-    queryKey: ['/api/users', userId, 'motivational-image'],
-    queryFn: async () => {
-      try {
-        const response = await fetch(`/api/users/${userId}/motivational-image`);
-        if (!response.ok) {
-          if (response.status === 404) {
-            // No image found, but this is not an error
-            return null;
-          }
-          throw new Error('Failed to fetch motivational image');
-        }
-        return await response.json();
-      } catch (error) {
-        console.log('No saved image found, this is expected for new users');
-        return null;
-      }
-    },
-    retry: false,
-    refetchOnWindowFocus: false,
-  });
-  
-  // Mutation for saving a new motivational image
-  const saveImageMutation = useMutation({
-    mutationFn: async (imageData: string) => {
-      return await fetch(`/api/users/${userId}/motivational-image`, {
-        method: 'PUT',
-        body: JSON.stringify({ imageData }),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-    },
-    onSuccess: () => {
-      // Invalidate the motivational image query to refetch
-      queryClient.invalidateQueries({ queryKey: ['/api/users', userId, 'motivational-image'] });
-    },
-  });
-  
-  // Check for any stored or saved images on component mount
-  useEffect(() => {
-    if (savedImage && savedImage.imageData) {
-      console.log("Motivation page: Found saved image in database");
-      setEnhancedUrl(savedImage.imageData);
-      setPreviewUrl(savedImage.imageData);
-      
-      // Also update the local caches for compatibility with other components
-      EnhancedImageStore.setImage(savedImage.imageData);
-      if (typeof window !== 'undefined') {
-        window.__KGC_ENHANCED_IMAGE__ = savedImage.imageData;
-      }
-    } else {
-      // Fall back to local storage if no database image
-      console.log("Motivation page: Checking local storage");
-      const enhancedImage = EnhancedImageStore.getImage();
-      
-      if (enhancedImage) {
-        console.log("Motivation page: Found stored enhanced image");
-        setEnhancedUrl(enhancedImage);
-        setPreviewUrl(enhancedImage);
-      } else {
-        console.log("Motivation page: No stored image found");
-      }
-    }
-  }, [savedImage]);
-
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
       setSelectedImage(file);
-      
-      // Create a URL for the preview
       const reader = new FileReader();
       reader.onloadend = () => {
         setPreviewUrl(reader.result as string);
@@ -127,237 +25,62 @@ const Motivation: React.FC = () => {
     }
   };
 
-  const handleUpload = () => {
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleSaveImage = useCallback(async () => {
     if (!selectedImage) {
-      toast({
-        title: "No image selected",
-        description: "Please select an image to upload",
-        variant: "destructive",
-      });
+      toast({ title: "No Image Selected", description: "Please select an image first.", variant: "destructive" });
       return;
     }
 
-    // Reset enhanced image if uploading a new original
-    setEnhancedUrl(null);
-    
-    // Show success message
-    toast({
-      title: "Image uploaded successfully",
-      description: "Your motivational image has been saved",
-      variant: "default",
-    });
-  };
-  
-  // Enhance the image with stars
-  const handleEnhance = async () => {
-    if (!previewUrl) {
-      toast({
-        title: "No image to enhance",
-        description: "Please upload an image first",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    // Create haptic feedback and sound effect
-    createHapticFeedback();
-    
-    // Show loading state
-    setProcessingImage(true);
-    
+    setIsSaving(true);
     try {
-      // Enhance the image with stars
-      const enhanced = await enhanceWithStars(previewUrl);
-      setEnhancedUrl(enhanced);
-      
-      // Show success message
-      toast({
-        title: "Image enhanced!",
-        description: "Your image has been enhanced with motivational stars",
-        variant: "default",
-      });
+      // In a real implementation, we would first apply the canvas enhancement
+      // For now, we save the original image blob.
+      await saveMotivationalImage(selectedImage);
+      toast({ title: "Success!", description: "Your motivational image has been saved." });
     } catch (error) {
-      console.error('Error enhancing image:', error);
-      toast({
-        title: "Enhancement failed",
-        description: "There was a problem enhancing your image",
-        variant: "destructive",
-      });
+      console.error("Failed to save image:", error);
+      toast({ title: "Error", description: "Could not save your image. Please try again.", variant: "destructive" });
     } finally {
-      setProcessingImage(false);
+      setIsSaving(false);
     }
-  };
-  
-  // Save the enhanced image and enable it for Keep Going video
-  const handleSave = async () => {
-    if (!previewUrl || !enhancedUrl) {
-      toast({
-        title: "Nothing to save",
-        description: "Please upload and enhance an image first",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    // Create haptic feedback and sound effect
-    createHapticFeedback();
-    
-    try {
-      // Save the image to the database for permanent storage
-      await saveImageMutation.mutateAsync(enhancedUrl);
-      
-      // Also preserve compatibility with window object for immediate use
-      if (typeof window !== 'undefined') {
-        window.__KGC_ENHANCED_IMAGE__ = enhancedUrl;
-        console.log("SAVED IMAGE TO GLOBAL WINDOW OBJECT");
-      }
-      
-      // Also save to our enhanced image store for redundancy
-      EnhancedImageStore.setImage(enhancedUrl);
-      
-      // Show success message
-      toast({
-        title: "Image saved!",
-        description: "Your image is now permanently saved and will appear in the Keep Going video",
-        variant: "default",
-      });
-      
-      // Show a preview of the Keep Going video with the image
-      setTimeout(() => {
-        setShowKeepGoingVideo(true);
-      }, 1500);
-    } catch (error) {
-      console.error("Error saving image to database:", error);
-      toast({
-        title: "Save error",
-        description: "There was a problem saving your image permanently. It's still available for this session.",
-        variant: "destructive",
-      });
-      
-      // Fall back to local storage only
-      if (typeof window !== 'undefined') {
-        window.__KGC_ENHANCED_IMAGE__ = enhancedUrl;
-      }
-      EnhancedImageStore.setImage(enhancedUrl);
-    }
-  };
+  }, [selectedImage, toast]);
 
   return (
     <Layout>
-      {/* Keep Going Video with enhanced image overlay */}
-      {showKeepGoingVideo && (
-        <KeepGoingVideo 
-          videoId="bKYqK1R19hM" 
-          onClose={() => setShowKeepGoingVideo(false)}
-          enhancedImageOverlay={true}
-        />
-      )}
-    
-      <div className="container mx-auto p-4">
-        <h1 className="text-2xl font-bold mb-6">Motivational Image Processor</h1>
-      
-      <div className={`grid ${isMobile ? "grid-cols-1" : "grid-cols-2"} gap-6`}>
-        <Card>
+      <div className="p-4 md:p-8">
+        <Card className="max-w-2xl mx-auto">
           <CardHeader>
-            <CardTitle>Upload Your Motivational Image</CardTitle>
+            <CardTitle className="flex items-center"><Sparkles className="mr-2 h-6 w-6 text-yellow-500" /> Motivational Image Processor</CardTitle>
+            <CardDescription>Upload an image that inspires you. This will be shown during your "Keep Going" sequence.</CardDescription>
           </CardHeader>
-          <CardContent>
-            <p className="text-gray-600 mb-4">
-              Upload an image of a special person, pet, family, or whatever motivates you to maintain a healthier lifestyle.
-            </p>
-            
-            <div className="space-y-4">
-              <div className="grid w-full max-w-sm items-center gap-1.5">
-                <Label htmlFor="picture">Picture</Label>
-                <Input 
-                  id="picture" 
-                  type="file" 
-                  accept="image/*"
-                  onChange={handleImageChange}
-                />
-              </div>
-              
-              <Button 
-                onClick={handleUpload}
-                className="bg-primary text-white hover:bg-primary/90"
-              >
-                Upload Image
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader>
-            <CardTitle>Image Preview</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col items-center justify-center">
-            <div className="relative w-full h-64 bg-gray-100 rounded-md overflow-hidden mb-4">
-              {/* Show enhanced image if available, otherwise show original or default */}
-              {enhancedUrl ? (
-                <img 
-                  src={enhancedUrl} 
-                  alt="Enhanced preview" 
-                  className="w-full h-full object-cover"
-                />
-              ) : previewUrl ? (
-                <img 
-                  src={previewUrl} 
-                  alt="Preview" 
-                  className="w-full h-full object-cover"
-                />
+          <CardContent className="space-y-6">
+            <div className="w-full aspect-video bg-muted rounded-lg flex items-center justify-center overflow-hidden">
+              {previewUrl ? (
+                <img src={previewUrl} alt="Motivational preview" className="w-full h-full object-contain" />
               ) : (
-                <img 
-                  src={heartImage} 
-                  alt="Default motivation" 
-                  className="w-full h-full object-cover"
-                />
-              )}
-              
-              {/* Loading overlay */}
-              {processingImage && (
-                <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                  <div className="flex flex-col items-center text-white">
-                    <svg className="animate-spin h-8 w-8 mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    <span>Enhancing image...</span>
-                  </div>
-                </div>
+                <p className="text-muted-foreground">Image preview will appear here</p>
               )}
             </div>
-            
-            <p className="text-center text-gray-600 mb-4">
-              Enhance your image with motivational effects, then save for the Keep Going experience.
-            </p>
-            
-            {/* Enhance and Save buttons side by side */}
-            <div className="grid grid-cols-2 gap-3 w-full">
-              <Button 
-                className="metallic-blue text-white"
-                onClick={handleEnhance}
-                disabled={!previewUrl || processingImage}
-              >
-                <Sparkles className="h-4 w-4 mr-2" />
-                Enhance Image
-              </Button>
-              
-              <Button 
-                className="metallic-blue text-white"
-                onClick={handleSave}
-                disabled={!enhancedUrl || processingImage}
-              >
-                <Save className="h-4 w-4 mr-2" />
-                Save
-              </Button>
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileChange}
+              accept="image/png, image/jpeg, image/webp"
+              className="hidden"
+            />
+            <div className="flex gap-4">
+              <Button onClick={handleUploadClick} variant="outline" className="w-full"><Upload className="mr-2 h-4 w-4" /> Select Image</Button>
+              <Button onClick={handleSaveImage} disabled={!selectedImage || isSaving} className="w-full"><Save className="mr-2 h-4 w-4" /> Save Image</Button>
             </div>
           </CardContent>
         </Card>
-      </div>
       </div>
     </Layout>
   );
 };
 
-export default Motivation;
+export default MotivationalImageProcessor;
