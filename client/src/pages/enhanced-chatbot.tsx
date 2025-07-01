@@ -1,43 +1,41 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { useSimpleToast } from "@/hooks/simple-toast";
-import { Brain, Wifi } from "lucide-react";
+import { Brain, Heart, LogOut, Star, MessageSquare } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
-import EnhancedSupervisorAgent from "@/components/chatbot/EnhancedSupervisorAgent";
+import { EnhancedSupervisorAgent } from "@/components/chatbot/EnhancedSupervisorAgent";
 import Layout from "@/components/layout/Layout";
-// ConnectivityLevel is still needed for the SupervisorAgent interface
 import { ConnectivityLevel } from "@shared/types";
 import { ConnectivityBanner } from "@/components/ui/connectivity-banner";
-import { useConnectivity } from "@/hooks/useConnectivity";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+import DailySelfScores from "@/components/features/DailySelfScores";
+import { useBadgeAward } from "@/context/BadgeAwardContext";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import KeepGoingSequenceModal from "@/components/features/KeepGoingSequenceModal";
+import { ImageCarousel } from '@/components/ui/ImageCarousel';
 
-// Sample response templates for different connectivity levels
-const CONNECTIVITY_RESPONSES = {
-  [ConnectivityLevel.OFFLINE]: [
-    "I'm currently in offline mode, but I can still help with basic information. Remember to track your health scores daily for better insights when you're back online.",
-    "I'm working in offline mode right now. I can provide general health advice based on previously cached information.",
-    "Limited connectivity detected. I'm operating with reduced capabilities, but I'm still here to support your health journey with essential guidance.",
-    "Network connection unavailable. I'm using cached data to provide basic support. For emergency health situations, please call 000 immediately."
-  ],
-  // We no longer use MINIMAL and FUNCTIONAL connectivity levels
-  // App is now online or offline only
-  
-  [ConnectivityLevel.FULL]: [
-    "I'm operating at full capacity with excellent connectivity. All features are available, including multi-model validation for the most accurate health guidance.",
-    "Full connectivity detected. I can provide comprehensive health support with access to all features, including advanced analytics and personalised recommendations.",
-    "I'm working with optimal connectivity. I can provide the most accurate and personalised health guidance using multiple AI validation systems.",
-    "I have full access to all systems. I can provide detailed analysis of your health metrics, multi-validated recommendations, and complete feature access."
-  ]
-};
+const carouselImages = [
+  '/assets/carousel-image-1.jpg', // Replace with your actual image file
+  '/assets/carousel-image-2.jpg', // Replace with your actual image file
+  '/assets/carousel-image-3.jpg', // Replace with your actual image file
+  '/assets/carousel-image-4.jpg', // Replace with your actual image file
+  '/assets/carousel-image-5.jpg', // Replace with your actual image file
+  '/assets/carousel-image-6.jpg', // Replace with your actual image file
+  '/assets/carousel-image-7.jpg', // Replace with your actual image file
+];
 
 // Enhanced chatbot page with connectivity awareness
 const EnhancedChatbot: React.FC = () => {
   const [userId, setUserId] = useState<number>(1); // Default user ID
   const [healthMetrics, setHealthMetrics] = useState<any>(null);
   const [recommendedFeature, setRecommendedFeature] = useState<string | null>(null);
-  const { connectivityLevel, isOffline } = useConnectivity();
-  const [chatKey, setChatKey] = useState<string>(`chatbot-${Date.now()}`);
+  const isOnline = useOnlineStatus();
+  const [showScoresModal, setShowScoresModal] = useState(false);
   const [initialMessage, setInitialMessage] = useState<string>('');
+  const [showKeepGoing, setShowKeepGoing] = useState(false);
+  const [showChatbot, setShowChatbot] = useState(false);
   const { toast } = useSimpleToast();
+  const { showAward } = useBadgeAward();
 
   // forceRemount callback removed - app now requires internet connection
 
@@ -62,8 +60,7 @@ const EnhancedChatbot: React.FC = () => {
           // Set a timeout to clear the message after 15 seconds
           const timeoutId = setTimeout(() => {
             console.log('Enhanced Chatbot: Clearing health scores message due to timeout (15 seconds)');
-            setInitialMessage('');
-            setChatKey(`chatbot-${Date.now()}-reset`); // Reset the chatbot to show welcome message
+            setInitialMessage(''); // This will cause the chatbot to show its default welcome.
           }, 15000); // 15 seconds timeout
           
           return () => clearTimeout(timeoutId); // Clean up timeout on component unmount
@@ -131,52 +128,103 @@ const EnhancedChatbot: React.FC = () => {
     });
   };
   
-  // Get a random response for the current connectivity level
-  const getConnectivityLevelResponse = (): string => {
-    const level = isOffline ? ConnectivityLevel.OFFLINE : ConnectivityLevel.FULL;
-    const responses = CONNECTIVITY_RESPONSES[level] || CONNECTIVITY_RESPONSES[ConnectivityLevel.FULL];
-    return responses[Math.floor(Math.random() * responses.length)];
+  const handleScoresSubmitted = async (scores: { diet: number; exercise: number; medication: number; }) => {
+    try {
+      // Call the new backend endpoint to save scores and check for badges
+      const response = await apiRequest<any>('POST', '/api/scores', scores);
+
+      // The toast with the analysis option is now handled inside DailySelfScores.
+      // This parent component just needs to handle the badge award.
+      if (response && response.newlyEarnedBadges && response.newlyEarnedBadges.length > 0) {
+        response.newlyEarnedBadges.forEach((badge: any) => {
+          showAward(badge); // Trigger the celebration modal for each new badge
+        });
+      }
+    } catch (error) {
+      console.error("Error submitting scores:", error);
+      toast({ title: "Error", description: "Could not submit scores. Please try again.", variant: "destructive" });
+    }
+  };
+
+  const handleLogout = () => {
+    // In a real app, you would also call a backend endpoint to invalidate the session/token
+    console.log('User logging out...');
+    // For now, we can clear relevant local storage and redirect
+    localStorage.clear(); // Or selectively remove items: localStorage.removeItem('authToken');
+    window.location.href = '/login'; // Redirect to a login page
   };
   
   return (
     <Layout>
-      <div className="flex flex-col h-full max-h-[calc(100vh-6rem)]">
-        <div className="flex items-center justify-between p-4 border-b">
-          <div className="flex items-center gap-2">
-            <h2 className="text-xl font-semibold">KGC Health Assistant</h2>
-          </div>
-          
-          {recommendedFeature && (
-            <div className="flex items-center">
-              <Button variant="outline" size="sm" className="flex items-center gap-1">
-                <Brain className="h-4 w-4 text-primary" />
-                <span className="text-xs">
-                  {recommendedFeature.split('-')
-                    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-                    .join(' ')}
-                </span>
+      <div className="relative flex flex-col h-full max-h-[calc(100vh-6rem)] text-white">
+        <ImageCarousel images={carouselImages} />
+        <ConnectivityBanner isOnline={isOnline} />
+
+        <div className="relative z-10 flex flex-col flex-grow">
+          <div className="absolute top-4 right-4">
+              <Button variant="ghost" size="sm" onClick={handleLogout} className="text-white hover:bg-white/20 hover:text-white">
+                <LogOut className="h-5 w-5 mr-1" /> Logout
               </Button>
-            </div>
-          )}
-        </div>
-        
-        {/* Add connectivity banner at the top of the chat area */}
-        <ConnectivityBanner level={connectivityLevel} />
-        
-        <div className="grid grid-cols-1 gap-4 flex-1">
-          <div className="relative h-full">
-            <EnhancedSupervisorAgent
-              key={chatKey}
-              userId={userId}
-              healthMetrics={healthMetrics}
-              onRecommendationAccepted={handleRecommendationAccepted}
-              onFeedbackSubmitted={handleFeedbackSubmitted}
-              hideHeader={true} // Hide the component's header since we already have one in this page
-              initialMessage={initialMessage} // Use the state variable that has the timeout logic
-              connectivityLevel={connectivityLevel}
-            />
+          </div>
+
+          <div className="flex-grow flex flex-col items-center justify-center p-4 text-center">
+            <img src="/assets/kgc-logo-prominent.png" alt="Keep Going Care Logo" className="w-32 h-32 mb-4" />
+            <h1 className="text-4xl font-bold" style={{ textShadow: '2px 2px 4px rgba(0,0,0,0.7)' }}>Keep Going Care</h1>
+            <p className="mt-2 text-lg" style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.7)' }}>Your partner in a healthier lifestyle.</p>
+          </div>
+
+          {/* Main Buttons */}
+          <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-4 max-w-4xl mx-auto w-full">
+            <Button
+              onClick={() => setShowScoresModal(true)}
+              className="h-24 text-lg bg-blue-600/80 backdrop-blur-sm border border-white/20 hover:bg-blue-700/80"
+            >
+              <Star className="mr-2 h-6 w-6" /> Daily Self-Scores
+            </Button>
+            <Button
+              onClick={() => setShowChatbot(true)}
+              className="h-24 text-lg bg-blue-600/80 backdrop-blur-sm border border-white/20 hover:bg-blue-700/80"
+            >
+              <Brain className="mr-2 h-6 w-6" /> Chat with KGC
+            </Button>
+            <Button
+              onClick={() => setShowKeepGoing(true)}
+              className="h-24 text-lg bg-green-500/80 backdrop-blur-sm border border-white/20 hover:bg-green-600/80"
+            >
+              <Heart className="mr-2 h-6 w-6" /> Keep Going
+            </Button>
           </div>
         </div>
+
+        <Dialog open={showScoresModal} onOpenChange={setShowScoresModal}>
+          <DialogContent className="sm:max-w-[600px]">
+            <DialogHeader>
+              <DialogTitle>Your Daily Self-Scores</DialogTitle>
+            </DialogHeader>
+            <DailySelfScores onSubmitted={handleScoresSubmitted} onClose={() => setShowScoresModal(false)} />
+          </DialogContent>
+        </Dialog>
+
+        <KeepGoingSequenceModal isOpen={showKeepGoing} onClose={() => setShowKeepGoing(false)} />
+
+        <Dialog open={showChatbot} onOpenChange={setShowChatbot}>
+          <DialogContent className="sm:max-w-[80vw] md:max-w-[60vw] lg:max-w-[40vw] h-[80vh] flex flex-col p-0">
+            <DialogHeader className="p-4 border-b">
+              <DialogTitle className="flex items-center">
+                <MessageSquare className="h-5 w-5 mr-2" />
+                KGC Health Assistant
+              </Dialog-title>
+              <DialogDescription>
+                Your personal AI health assistant.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex-grow overflow-y-auto">
+              {userId && (
+                <EnhancedSupervisorAgent userId={userId} healthMetrics={healthMetrics} onRecommendationAccepted={handleRecommendationAccepted} onFeedbackSubmitted={handleFeedbackSubmitted} hideHeader={true} initialMessage={initialMessage} />
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </Layout>
   );

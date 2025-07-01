@@ -1,8 +1,8 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes.js";
 import { setupVite, serveStatic, log } from "./vite";
-import { sessionTimeoutMiddleware } from "./sessionTimeout";
-
+// Load environment variables at the very top
+import { config } from 'dotenv';
 // Load environment variables
 import { config } from 'dotenv';
 config();
@@ -10,6 +10,7 @@ config();
 const app = express();
 
 // --- GLOBAL REQUEST LOGGER AT THE VERY TOP ---
+config(); // Ensure environment variables are loaded first
 app.use((req, res, next) => {
   console.log(`[GLOBAL_REQUEST_LOGGER] Received Request - Method: ${req.method}, URL: ${req.originalUrl}`);
   next();
@@ -49,7 +50,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// Apply session timeout middleware globally
+// Apply session timeout middleware globally (assuming it's defined elsewhere)
 app.use(sessionTimeoutMiddleware);
 
 (async () => {

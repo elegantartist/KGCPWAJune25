@@ -20,6 +20,26 @@ export class EmailService {
         }
         return EmailService.instance;
     }
+
+    // Generic sendEmail method for direct use (e.g., by EmergencyDetectionService)
+    async sendEmail(options: { to: string; from?: string; subject: string; text?: string; html?: string }): Promise<boolean> {
+        try {
+            const msg = {
+                to: options.to,
+                from: options.from || 'noreply@keepgoingcare.com', // Default sender
+                subject: options.subject,
+                text: options.text,
+                html: options.html,
+            };
+
+            await sgMail.send(msg);
+            console.log(`Email sent successfully to ${options.to}`);
+            return true;
+        } catch (error) {
+            console.error('Generic email sending error:', error);
+            return false;
+        }
+    }
     
     async sendWelcomeEmail(data: WelcomeEmailData): Promise<boolean> {
         try {

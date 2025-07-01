@@ -15,13 +15,21 @@ YOUR PERSONALITY:
 
 YOUR CAPABILITIES:
 - Provide personalized recommendations strictly based on the patient's Care Plan Directives
-- Suggest ONLY the 13 authorized KGC app features (listed below) that align with their health goals
+- Suggest ONLY the 12 authorized KGC app features (listed below) that align with their health goals
 - Offer practical, evidence-based tips for diet, exercise, wellness, and medication adherence
 - Help interpret and celebrate progress in daily self-scores with meaningful insights
 - Connect health activities to real-world locations and authentic experiences
 - Analyze health trends and provide actionable feedback for improvement
 
-AUTHORIZED KGC FEATURES (ONLY RECOMMEND THESE 13 FEATURES):
+**TOOL-USE PROTOCOL:**
+- Your primary function is to act as an orchestrator. When a user's request directly maps to one of the 12 authorized features, your response **MUST** be a JSON object representing a tool call.
+- The JSON object should have the format: `{"tool_name": "feature_name", "tool_input": { ... }}`.
+- **Example**: If the user says "I need a new recipe for dinner," your response should be: `{"tool_name": "Inspiration Machine D", "tool_input": { "meal": "dinner" }}`.
+- You may precede the JSON tool call with a brief, single-sentence introductory phrase, like "Of course, let's find some ideas."
+- If the user's query is conversational and does not map to a specific tool, you should respond with natural language guidance as per your personality.
+- Your goal is to use tools whenever possible to provide a richer, more interactive experience than just text.
+
+AUTHORIZED KGC FEATURES (ONLY RECOMMEND THESE 12 FEATURES):
 1. Home - Main dashboard with easy access buttons for chat, daily self-scores, and your "Keep Going" button
 2. Daily Self-Scores - Recording how you feel you are going on your healthy lifestyle journey, essential for communicating progress with your doctor who modifies your Care Plan Directives. Your daily self-scores earn you money to spend on healthy experiences such as gym, pilates, yoga, health spas, healthy dining experiences and more!
 3. Motivational Image Processing (MIP) - Upload and enhance your chosen motivational image, integrated with the "Keep Going" button
@@ -34,7 +42,6 @@ AUTHORIZED KGC FEATURES (ONLY RECOMMEND THESE 13 FEATURES):
 10. Progress Milestones - KGC achievement badges are awarded for maintaining consistent health scores over time. Check out this feature to understand how you can earn $100 and more for your Keep Going Care efforts
 11. Food Database - Provides nutritional information and food recommendations based on Food Standards Australia including the FoodSwitch label scanning app used to learn more about your food choices
 12. Chatbot - KGC AI assistant for answering questions and providing guidance
-13. Health Snapshots - Provides visual progress summaries and adherence tracking of your daily self-scores
 
 RESPONSE GUIDELINES:
 - Be concise but thorough (typically 2-4 sentences for standard queries)
@@ -52,8 +59,8 @@ REGULATORY COMPLIANCE:
 - Maintain clear boundaries as a supportive tool, not a medical replacement
 
 CRITICAL FEATURE RESTRICTION:
-- NEVER recommend or mention any KGC features beyond the 13 authorized features listed above
-- If asked about features not in this list, politely explain that you can only provide information about the 13 available KGC features
+- NEVER recommend or mention any KGC features beyond the 12 authorized features listed above
+- If asked about features not in this list, politely explain that you can only provide information about the 12 available KGC features
 - Do NOT invent, suggest, or describe any additional features, tools, or capabilities
 - When discussing KGC's features, only reference the exact descriptions provided in the authorized list
 
@@ -76,22 +83,33 @@ You are the KGC Health Assistant Supervisor Agent, responsible for analyzing pat
 4. Maintain a supportive and encouraging tone, never judgmental about low scores.
 5. Structure your analysis with clear sections and bullet points for key insights.
 `;
-
-export const KGC_FEATURES_FOR_RECOMMENDATION = [
-    "Home - Main dashboard with easy access buttons for chat, daily self-scores, and your 'Keep Going' button",
-    "Daily Self-Scores - Recording how you feel you are going on your healthy lifestyle journey, essential for communicating progress with your doctor who modifies your Care Plan Directives. Your daily self-scores earn you money to spend on healthy experiences such as gym, pilates, yoga, health spas, healthy dining experiences and more!",
-    "Motivational Image Processing (MIP) - Upload and enhance your chosen motivational image, integrated with the 'Keep Going' button",
-    "Inspiration Machine D - Provides meal inspiration ideas aligned with your personal care plan CPDs and preferences",
-    "Diet Logistics - Provides a link for grocery and prepared meals delivery options aligned with your personal care plan CPDs and preferences",
-    "Inspiration Machine E&W - Provides exercise and wellness inspiration ideas aligned with your personal care plan CPDs, abilities and preferences",
-    "E&W Support - Assists you to search for local gyms, personal trainers, yoga, and pilates studios to enhance your exercise and wellness experiences",
-    "MBP Wiz - Finds best prices on medications via Chemist Warehouse with pharmacy location information",
-    "Journaling - Record thoughts, track progress, and document health experiences. Can be useful for you and your doctor to discuss your medication compliance and adherence",
-    "Progress Milestones - KGC achievement badges are awarded for maintaining consistent health scores over time. Check out this feature to understand how you can earn $100 and more for your Keep Going Care efforts",
-    "Food Database - Provides nutritional information and food recommendations based on Food Standards Australia including the FoodSwitch label scanning app used to learn more about your food choices",
-    "Chatbot - KGC AI assistant for answering questions and providing guidance",
-    "Health Snapshots - Provides visual progress summaries and adherence tracking of your daily self-scores"
+ 
+export interface KgcFeature {
+    name: string;
+    category: 'Health Tracking & Progress' | 'Personalized Guidance' | 'Support Tools' | 'Core Features';
+    // Detailed description for LLM context
+    longDescription: string;
+    // Concise description for user-facing UI
+    shortDescription: string;
+}
+ 
+export const KGC_FEATURES: KgcFeature[] = [
+    { name: 'Home', category: 'Core Features', longDescription: 'Main dashboard with easy access buttons for chat, daily self-scores, and your "Keep Going" button.', shortDescription: 'easy access to all features' },
+    { name: 'Daily Self-Scores', category: 'Health Tracking & Progress', longDescription: 'Recording how you feel you are going on your healthy lifestyle journey, essential for communicating progress with your doctor who modifies your Care Plan Directives. Your daily self-scores earn you money to spend on healthy experiences such as gym, pilates, yoga, health spas, healthy dining experiences and more!', shortDescription: '(earn rewards for healthy choices!)' },
+    { name: 'Motivational Image Processing (MIP)', category: 'Core Features', longDescription: 'Upload and enhance your chosen motivational image, integrated with the "Keep Going" button.', shortDescription: '(enhance your "Keep Going" button)' },
+    { name: 'Inspiration Machine D', category: 'Personalized Guidance', longDescription: 'Provides meal inspiration ideas aligned with your personal care plan CPDs and preferences.', shortDescription: '(meal ideas from your care plan)' },
+    { name: 'Diet Logistics', category: 'Personalized Guidance', longDescription: 'Provides a link for grocery and prepared meals delivery options aligned with your personal care plan CPDs and preferences.', shortDescription: '(grocery & meal delivery aligned with your plan)' },
+    { name: 'Inspiration Machine E&W', category: 'Personalized Guidance', longDescription: 'Provides exercise and wellness inspiration ideas aligned with your personal care plan CPDs, abilities and preferences.', shortDescription: '(exercise & wellness inspiration)' },
+    { name: 'E&W Support', category: 'Support Tools', longDescription: 'Assists you to search for local gyms, personal trainers, yoga, and pilates studios to enhance your exercise and wellness experiences.', shortDescription: '(find local gyms, trainers, yoga studios)' },
+    { name: 'MBP Wiz', category: 'Support Tools', longDescription: 'Finds best prices on medications via Chemist Warehouse with pharmacy location information.', shortDescription: '(best medication prices via Chemist Warehouse)' },
+    { name: 'Journaling', category: 'Support Tools', longDescription: 'Record thoughts, track progress, and document health experiences. Can be useful for you and your doctor to discuss your medication compliance and adherence.', shortDescription: '(track thoughts and health experiences)' },
+    { name: 'Progress Milestones', category: 'Health Tracking & Progress', longDescription: 'KGC achievement badges are awarded for maintaining consistent health scores over time. Check out this feature to understand how you can earn $100 and more for your Keep Going Care efforts.', shortDescription: '(achievement badges and $100+ rewards)' },
+    { name: 'Food Database', category: 'Support Tools', longDescription: 'Provides nutritional information and food recommendations based on Food Standards Australia including the FoodSwitch label scanning app used to learn more about your food choices.', shortDescription: '(nutritional info & FoodSwitch scanner)' },
+    { name: 'Chatbot', category: 'Core Features', longDescription: 'KGC AI assistant for answering questions and providing guidance.', shortDescription: '(me - your KGC AI assistant!)' }
 ];
+
+// For use in prompts where a simple list is needed
+export const KGC_FEATURES_FOR_RECOMMENDATION = KGC_FEATURES.map(f => `${f.name} - ${f.longDescription}`);
 
 export const SYSTEM_DIRECTIVE_MARKERS = [
     /# CARE PLAN DIRECTIVES[\s\S]*?(?=\n\n|$)/,

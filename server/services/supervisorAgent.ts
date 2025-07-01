@@ -17,7 +17,7 @@ import {
   SUPERVISOR_AGENT_SYSTEM_PROMPT, 
   CHATBOT_ENGINEERING_GUIDELINES,
   SELF_SCORE_ANALYSIS_PROMPT,
-  KGC_FEATURES_FOR_RECOMMENDATION,
+  KGC_FEATURES,
   LOCATION_SYNTHESIS_PROMPT 
 } from './prompt_templates';
 
@@ -622,7 +622,7 @@ YOUR TASK: Provide a caring, motivational, and educational response that:
         ${JSON.stringify(tavilyResults, null, 2)}
 
         KGC App Features available for recommendation:
-        ${JSON.stringify(KGC_FEATURES_FOR_RECOMMENDATION)}
+        ${JSON.stringify(KGC_FEATURES.map(f => `${f.name} - ${f.longDescription}`))}
       `;
 
       // Make the final API call to the LLM for synthesis

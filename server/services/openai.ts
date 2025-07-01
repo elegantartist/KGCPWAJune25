@@ -9,7 +9,7 @@ const scoreCache = new Map<string, number>();
 let openai: OpenAI;
 try {
   if (!process.env.OPENAI_API_KEY) {
-    throw new Error('OPENAI_API_KEY environment variable is not set');
+    throw new Error('CRITICAL: OPENAI_API_KEY environment variable is not set. OpenAI client cannot be initialized.');
   }
   
   openai = new OpenAI({

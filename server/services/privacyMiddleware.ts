@@ -130,25 +130,6 @@ export function createSafeMcpBundle(
 }
 
 /**
- * Context-aware function to detect location-based queries
- */
-function isLocationQuery(queryText: string): boolean {
-  const locationKeywords = [' in ', ' near ', ' where is ', ' directions to ', ' around ', ' a walk ', ' walk in ', ' going to ', ' travel to ', ' visit ', ' trip to '];
-  const lowerCaseQuery = queryText.toLowerCase();
-  return locationKeywords.some(keyword => lowerCaseQuery.includes(keyword));
-}
-
-/**
- * Check for potential real names in text content
- */
-function checkForPotentialRealName(content: any): string | null {
-  const namePattern = /\b[A-Z][a-z]+ [A-Z][a-z]+\b/;
-  const contentStr = typeof content === 'string' ? content : JSON.stringify(content);
-  const match = contentStr.match(namePattern);
-  return match ? match[0] : null;
-}
-
-/**
  * Additional security function: Validate that bundle contains no PII leakage
  * Enhanced with context-aware validation for location queries
  */
@@ -167,23 +148,12 @@ export function validateMcpBundleSecurity(bundle: SafeMCPBundle, queryText?: str
     violations.push('Phone number detected in bundle');
   }
 
-  // --- START MODIFICATION ---
-  // Enhanced name detection with context awareness
-  const potentialName = checkForPotentialRealName(bundle.redacted_chat_history);
-
-  if (potentialName) {
-    // If a potential name is found, check if it's likely a location instead
-    if (queryText && isLocationQuery(queryText)) {
-      // The query is about a location, so the "name" is likely a place
-      // We can add more sophisticated logic here, but for now, we will allow it
-      // This bypasses the false positive for "Cairns"
-      secureLog('Potential name detected in location query, validation bypassed for this check.', { potentialName });
-    } else {
-      // The query is NOT about a location, so the name detection is a real failure
-      violations.push(`Potential real name detected in bundle: ${potentialName}`);
-    }
+  // Re-enable strict name detection. The previous context-aware bypass was a temporary measure.
+  // For production, names should be handled by the PII/PHI manager before reaching this stage.
+  const namePattern = /\b[A-Z][a-z]+ [A-Z][a-z]+\b/; // Simple pattern for full names
+  if (namePattern.test(JSON.stringify(bundle.redacted_chat_history))) {
+    violations.push('Potential real name detected in bundle (chat history)');
   }
-  // --- END MODIFICATION ---
 
   return {
     isSecure: violations.length === 0,
