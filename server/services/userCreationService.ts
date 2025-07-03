@@ -3,10 +3,12 @@ import { db } from '../db';
 import * as schema from '@shared/schema';
 import { uinService } from './uinService';
 import { emailService } from './emailService';
+import bcrypt from 'bcrypt';
 
 export interface CreateUserData {
     name: string;
     email: string;
+    password: string;
     phoneNumber: string;
     role: 'doctor' | 'patient';
     doctorId?: number; // For patients, link to their doctor
@@ -31,12 +33,17 @@ export class UserCreationService {
         }
         
         const uin = uinService.generateUIN('doctor');
+        const saltRounds = 10;
         
         try {
+            // Securely hash the password before storing it
+            const hashedPassword = await bcrypt.hash(data.password, saltRounds);
+
             // Create user record
             const [user] = await db.insert(schema.users).values({
                 name: data.name,
                 email: data.email,
+                hashedPassword: hashedPassword,
                 phoneNumber: data.phoneNumber,
                 role: 'doctor',
                 uin: uin,
@@ -84,12 +91,17 @@ export class UserCreationService {
         }
         
         const uin = uinService.generateUIN('patient');
+        const saltRounds = 10;
         
         try {
+            // Securely hash the password before storing it
+            const hashedPassword = await bcrypt.hash(data.password, saltRounds);
+
             // Create user record
             const [user] = await db.insert(schema.users).values({
                 name: data.name,
                 email: data.email,
+                hashedPassword: hashedPassword,
                 phoneNumber: data.phoneNumber,
                 role: 'patient',
                 uin: uin,
@@ -135,6 +147,10 @@ export class UserCreationService {
             errors.push('Name is required');
         }
         
+        if (!data.password || data.password.length < 8) {
+            errors.push('Password must be at least 8 characters long');
+        }
+
         if (!data.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
             errors.push('Valid email is required');
         }

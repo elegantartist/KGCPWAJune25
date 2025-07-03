@@ -1,12 +1,12 @@
 /**
  * KEEP GOING CARE - DOCTOR DASHBOARD
- * Refactored from legacy blueprint to work with new secure architecture
+ * Refactored to use the centralized useAuth hook for authentication and user management.
  */
 
 import React, { useState, useEffect } from 'react';
-import { useLocation } from "wouter";
 import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { ArrowLeft, LogOut, UserCircle, Clipboard, Calendar, MessageSquare, Activity } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -47,91 +47,21 @@ export default function DoctorDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
-  const [, setLocation] = useLocation();
-  const [doctorInfo, setDoctorInfo] = useState<{ name: string; firstName: string } | null>(null);
   const [doctorRemarks, setDoctorRemarks] = useState<CarePlanDirective>({
     healthy_eating_plan: "",
     exercise_wellness_routine: "",
     prescribed_medication: "",
   });
+  const { user, token, logout } = useAuth();
 
   // Use refs to store current values and avoid re-render issues
   const healthyEatingRef = React.useRef<HTMLTextAreaElement>(null);
   const exerciseWellnessRef = React.useRef<HTMLTextAreaElement>(null);
   const prescribedMedicationRef = React.useRef<HTMLTextAreaElement>(null);
 
-  // Auth headers using localStorage JWT
-  const createAuthHeaders = () => {
-    const token = localStorage.getItem('accessToken');
-    return {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    };
-  };
-
-  const handleUnauthorized = () => {
-    localStorage.removeItem('accessToken');
-    setLocation('/login');
-  };
-
-  // Fetch doctor's information
-  const fetchDoctorInfo = async () => {
-    try {
-      const response = await fetch('/api/users/me', {
-        method: 'GET',
-        headers: createAuthHeaders()
-      });
-
-      if (response.status === 401) {
-        handleUnauthorized();
-        return;
-      }
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch doctor information');
-      }
-
-      const doctorData = await response.json();
-      
-      // Extract first name from full name (e.g., "Dr. Marijke Collins" -> "Marijke")
-      const nameParts = doctorData.name.split(' ');
-      let firstName = 'Doctor';
-      
-      if (nameParts.length >= 2) {
-        // If name starts with "Dr.", use the next part
-        if (nameParts[0].toLowerCase().includes('dr')) {
-          firstName = nameParts[1];
-        } else {
-          // Otherwise use the first part
-          firstName = nameParts[0];
-        }
-      }
-
-      setDoctorInfo({
-        name: doctorData.name,
-        firstName: firstName
-      });
-    } catch (err: any) {
-      console.error('Error fetching doctor info:', err);
-      // Don't set error state for this, just use default welcome
-    }
-  };
-
-  // Logout handler
-  const handleLogout = () => {
-    localStorage.removeItem('accessToken');
-    setLocation('/login');
-  };
-
   useEffect(() => {
-    const token = localStorage.getItem('accessToken');
-    if (!token) {
-      setLocation('/login');
-      return;
-    }
-    fetchDoctorInfo();
     fetchPatients();
-  }, [setLocation]);
+  }, []);
 
   // Fetch doctor's patients (adapted from legacy API)
   const fetchPatients = async () => {
@@ -141,11 +71,14 @@ export default function DoctorDashboard() {
       
       const response = await fetch('/api/doctor/patients', {
         method: 'GET',
-        headers: createAuthHeaders()
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
       });
 
       if (response.status === 401) {
-        handleUnauthorized();
+        logout(); // Token is invalid or expired, log out.
         return;
       }
 
@@ -167,11 +100,14 @@ export default function DoctorDashboard() {
     try {
       const response = await fetch(`/api/doctor/patients/${patientId}/health-metrics`, {
         method: 'GET',
-        headers: createAuthHeaders()
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
       });
 
       if (response.status === 401) {
-        handleUnauthorized();
+        logout();
         return;
       }
 
@@ -209,11 +145,14 @@ export default function DoctorDashboard() {
     try {
       const response = await fetch(`/api/doctor/patients/${patientId}/care-plan`, {
         method: 'GET',
-        headers: createAuthHeaders(),
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
       });
 
       if (response.status === 401) {
-        handleUnauthorized();
+        logout();
         return;
       }
 
@@ -273,12 +212,15 @@ export default function DoctorDashboard() {
     try {
       const response = await fetch(`/api/doctor/patients/${selectedPatient.id}/care-plan`, {
         method: 'POST',
-        headers: createAuthHeaders(),
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify(data)
       });
 
       if (response.status === 401) {
-        handleUnauthorized();
+        logout();
         return;
       }
 
@@ -317,10 +259,10 @@ export default function DoctorDashboard() {
         {error}
         <Button
           variant="link"
-          onClick={() => error?.includes('authentication') ? setLocation('/login') : fetchPatients()}
+          onClick={() => error?.includes('authentication') ? logout() : fetchPatients()}
           className="ml-2 text-red-600 hover:text-red-800 underline"
         >
-          {error?.includes('authentication') ? 'Go to Login' : 'Try again'}
+          {error?.includes('authentication') ? 'Logout' : 'Try again'}
         </Button>
       </AlertDescription>
     </Alert>
@@ -335,13 +277,13 @@ export default function DoctorDashboard() {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="text-3xl font-extrabold text-emerald-800">
-                Welcome, Doctor {doctorInfo?.firstName || 'Doctor'}
+                Welcome, {user?.name || 'Doctor'}
               </CardTitle>
               <CardDescription className="text-emerald-600 mt-1">Your dashboard overview</CardDescription>
             </div>
             <div className="flex flex-col items-end space-y-2">
               <Button
-                onClick={handleLogout}
+                onClick={logout}
                 className="bg-green-600 text-white hover:bg-green-700 w-36"
               >
                 <LogOut size={18} className="mr-2" />
@@ -419,7 +361,7 @@ export default function DoctorDashboard() {
 
         <div className="flex flex-col items-end space-y-2">
           <Button
-            onClick={handleLogout}
+            onClick={logout}
             className="bg-green-600 text-white hover:bg-green-700"
           >
             <LogOut size={18} className="mr-2" />

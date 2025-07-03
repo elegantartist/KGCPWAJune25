@@ -1,3 +1,86 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 207 65% 47%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 222.2 84% 4.9%;
+    --radius: 0.5rem;
+    --chart-1: 0 87% 62%;
+    --chart-2: 122 67% 45%;
+    --chart-3: 291 77% 30%;
+    --chart-4: 210 79% 46%;
+    --chart-5: 45 93% 47%;
+  }
+
+  body {
+    @apply bg-gray-50 text-gray-800;
+  }
+}
+
+/* Custom button and animation styles from your design */
+@keyframes vibrate {
+  0% { transform: translate(0) scale(1); box-shadow: 0 0 0 rgba(0,0,0,0); }
+  5% { transform: translate(-5px, 5px) scale(1.05) rotate(-1deg); box-shadow: 0 0 10px rgba(0,0,0,0.3); }
+  10% { transform: translate(5px, -5px) scale(1.07) rotate(1deg); box-shadow: 0 0 15px rgba(0,0,0,0.4); }
+  15% { transform: translate(-6px, -4px) scale(1.08) rotate(-2deg); box-shadow: 0 0 18px rgba(0,0,0,0.45); }
+  20% { transform: translate(6px, 4px) scale(1.08) rotate(2deg); box-shadow: 0 0 20px rgba(0,0,0,0.5); }
+  25% { transform: translate(-5px, 5px) scale(1.07) rotate(-1.5deg); box-shadow: 0 0 20px rgba(0,0,0,0.5); }
+  30% { transform: translate(5px, -5px) scale(1.07) rotate(1.5deg); box-shadow: 0 0 20px rgba(0,0,0,0.5); }
+  35% { transform: translate(-6px, -4px) scale(1.08) rotate(-2deg); box-shadow: 0 0 18px rgba(0,0,0,0.45); }
+  40% { transform: translate(6px, 4px) scale(1.08) rotate(2deg); box-shadow: 0 0 18px rgba(0,0,0,0.45); }
+  45% { transform: translate(-5px, 5px) scale(1.07) rotate(-1.5deg); box-shadow: 0 0 16px rgba(0,0,0,0.4); }
+  50% { transform: translate(5px, -5px) scale(1.07) rotate(1.5deg); box-shadow: 0 0 16px rgba(0,0,0,0.4); }
+  55% { transform: translate(-6px, -4px) scale(1.06) rotate(-1.5deg); box-shadow: 0 0 14px rgba(0,0,0,0.35); }
+  60% { transform: translate(6px, 4px) scale(1.06) rotate(1.5deg); box-shadow: 0 0 14px rgba(0,0,0,0.35); }
+  65% { transform: translate(-4px, 4px) scale(1.05) rotate(-1deg); box-shadow: 0 0 12px rgba(0,0,0,0.3); }
+  70% { transform: translate(4px, -4px) scale(1.05) rotate(1deg); box-shadow: 0 0 12px rgba(0,0,0,0.3); }
+  75% { transform: translate(-4px, -3px) scale(1.04) rotate(-0.5deg); box-shadow: 0 0 10px rgba(0,0,0,0.25); }
+  80% { transform: translate(4px, 3px) scale(1.04) rotate(0.5deg); box-shadow: 0 0 10px rgba(0,0,0,0.25); }
+  85% { transform: translate(-3px, -2px) scale(1.02) rotate(-0.5deg); box-shadow: 0 0 8px rgba(0,0,0,0.2); }
+  90% { transform: translate(3px, 2px) scale(1.02) rotate(0.5deg); box-shadow: 0 0 8px rgba(0,0,0,0.2); }
+  95% { transform: translate(-1px, 1px) scale(1.01) rotate(-0.25deg); box-shadow: 0 0 4px rgba(0,0,0,0.1); }
+  100% { transform: translate(0) scale(1) rotate(0); box-shadow: 0 0 0 rgba(0,0,0,0); }
+}
+
+.btn-vibrate {
+  animation: vibrate 2s cubic-bezier(0.2, 0.07, 0.19, 0.97) both;
+  backface-visibility: hidden;
+  perspective: 1000px;
+  transform-style: preserve-3d;
+  will-change: transform, box-shadow;
+}
+
+.metallic-blue {
+  background: linear-gradient(165deg, #2E8BC0 0%, #145DA0 100%);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1), inset 0 1px 2px rgba(255, 255, 255, 0.2);
+  transition: all 0.3s ease;
+}
+
+.metallic-blue:hover {
+  background: linear-gradient(165deg, #3399CC 0%, #1466B3 100%);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2), inset 0 2px 3px rgba(255, 255, 255, 0.3);
+}

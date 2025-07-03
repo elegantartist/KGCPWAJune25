@@ -20,6 +20,7 @@ import {
   KGC_FEATURES,
   LOCATION_SYNTHESIS_PROMPT 
 } from './prompt_templates';
+import { AppError, LLMError, SecurityError, APIError } from './errors';
 
 // Authorized KGC features list for strict validation
 const AUTHORIZED_KGC_FEATURES = [
@@ -49,7 +50,7 @@ const anthropic = new Anthropic({
 
 
 
-interface SupervisorQuery {
+export interface SupervisorQuery {
   message: {
     text: string;
     sentAt: string;
@@ -153,219 +154,277 @@ class SupervisorAgent {
   /**
    * Main orchestration function for supervisor queries
    * Implements resilient agent orchestration with time-aware logic and decoupled primary/secondary tasks
+   * This method is now a high-level orchestrator that delegates tasks to private helpers.
    */
   async runSupervisorQuery(query: SupervisorQuery): Promise<SupervisorResponse> {
-    const { message, userId, sessionId } = query;
-    const { text: userQuery, sentAt } = message;
     const startTime = Date.now();
-    const finalSessionId = sessionId || crypto.randomUUID();
+    const finalSessionId = query.sessionId || crypto.randomUUID();
+    const queryWithSession = { ...query, sessionId: finalSessionId };
 
-    const timeSent = new Date(sentAt);
-    const timeProcessed = new Date();
-    
-    // Calculate the time difference in minutes
-    const deltaInMinutes = (timeProcessed.getTime() - timeSent.getTime()) / 60000;
-
-    // --- TIME-AWARE LOGIC GATE ---
-    // If the message is more than 15 minutes old, it's stale. Re-engage instead of answering.
-    if (deltaInMinutes > 15) {
-      secureLog('Stale offline message received. Pivoting to re-engagement.', { 
-        userId, 
-        sessionId: finalSessionId, 
-        deltaInMinutes 
-      });
-      
-      // Instead of processing the old query, return a context-aware re-engagement message.
-      const reEngagementResponse: SupervisorResponse = {
-        response: "Welcome back online! I've just received your message from earlier. I hope you were able to resolve what you needed. How can I help you right now?",
-        sessionId: finalSessionId,
-        modelUsed: 're-engagement',
-        processingTime: Date.now() - startTime
-      };
-      
-      // Run analytics as a non-critical side effect
-      this.logAnalytics(userId, "staleMessageReEngagement", finalSessionId).catch((err: Error | unknown) => {
-        secureLog("Non-critical error in analytics logging for stale message", { 
-          sessionId: finalSessionId, 
-          error: err instanceof Error ? err.message : 'Unknown error' 
-        });
-      });
-
-      return reEngagementResponse;
+    // 1. Handle stale messages first
+    const staleResponse = await this._handleStaleMessage(queryWithSession, startTime);
+    if (staleResponse) {
+      return staleResponse;
     }
 
-    // --- If the message is recent, proceed with the normal resilient workflow ---
     let mainResponse: SupervisorResponse;
-
-    // --- STAGE 1: Execute the critical, primary task ---
     try {
-      secureLog('Supervisor query initiated', { 
-        userId, 
-        sessionId: finalSessionId,
-        queryLength: userQuery.length,
-        deltaInMinutes
-      });
-
-      // --- NEW STEP 1: Parse the query to understand intent and entities ---
-      const parsedQuery = await parseUserQuery(userQuery);
-      
-      secureLog('Query parsed successfully', {
-        sessionId: finalSessionId,
-        intent: parsedQuery.intent,
-        entityCount: Object.keys(parsedQuery.entities).length,
-        isSafeForTooling: parsedQuery.isSafeForTooling,
-        confidence: parsedQuery.confidence
-      });
-
-      // --- NEW STEP 2: Intelligent Tool-Use based on Intent ---
-      if (parsedQuery.intent === 'find_location_for_activity' && 
-          parsedQuery.entities.location && 
-          parsedQuery.isSafeForTooling &&
-          parsedQuery.confidence > 0.7) {
-        
-        secureLog('Location intent detected. Using structured location search.', { 
-          entities: parsedQuery.entities,
-          sessionId: finalSessionId
-        });
-
-        // Enhanced location search with synthesis
-        const searchResponse = await this.performAdvancedLocationSearch(
-          parsedQuery,
-          userQuery,
-          userId,
-          finalSessionId
-        );
-
-        mainResponse = {
-          response: searchResponse,
-          sessionId: finalSessionId,
-          modelUsed: 'advanced-location-synthesis',
-          toolsUsed: ['nlu-parser', 'location-search', 'care-plan-synthesis'],
-          processingTime: Date.now() - startTime
-        };
-      } else {
-        // Normal flow for non-location queries
-        
-        // 1. Create secure MCP bundle using privacy middleware
-        const contextData = await AIContextService.prepareSecureContext({
-          userId,
-          includeHealthMetrics: true,
-          includeChatHistory: true,
-          maxHistoryItems: 10
-        });
-
-        const mcpBundle = contextData.secureBundle;
-
-        // 2. Validate MCP bundle security with query context
-        const securityValidation = validateMcpBundleSecurity(mcpBundle, userQuery);
-        if (!securityValidation.isSecure) {
-          throw new Error(`Security validation failed: ${securityValidation.violations.join(', ')}`);
-        }
-
-        // 3. Enhanced tool calling with parsed intent context
-        const toolResponse = await this.checkForToolCalling(userQuery, mcpBundle);
-        if (toolResponse) {
-          mainResponse = {
-            response: toolResponse.response,
-            sessionId: finalSessionId,
-            modelUsed: 'tool-based',
-            toolsUsed: toolResponse.tools,
-            processingTime: Date.now() - startTime
-          };
-        } else {
-        // 4. Construct primary LLM prompt
-        const systemPrompt = this.buildSystemPrompt();
-        const userPrompt = this.buildUserPrompt(userQuery, mcpBundle);
-
-        // 5. Call primary LLM (OpenAI GPT-4)
-        const primaryResponse = await this.callPrimaryLLM(systemPrompt, userPrompt);
-
-        // 6. Multi-model validation if required
-        let finalResponse = primaryResponse;
-        let validationStatus = 'not-required';
-
-        if (query.requiresValidation || this.requiresValidation(userQuery)) {
-          secureLog('Multi-model validation triggered', { sessionId: finalSessionId });
-          const validatedResponse = await this.performMultiModelValidation(
-            systemPrompt, 
-            userPrompt, 
-            primaryResponse
-          );
-          finalResponse = validatedResponse.response;
-          validationStatus = validatedResponse.status;
-        }
-
-        // 7. Validate feature recommendations before security check
-        const featureValidation = this.validateFeatureRecommendations(finalResponse);
-        if (!featureValidation.isValid && featureValidation.correctedResponse) {
-          secureLog('Response contained unauthorized features, using corrected response', { 
-            sessionId: finalSessionId 
-          });
-          finalResponse = featureValidation.correctedResponse;
-        }
-
-        // 8. Final security check on response
-        const responseValidation = await AIContextService.validateAIResponse(finalResponse, finalSessionId);
-        if (!responseValidation.isSecure) {
-          secureLog('AI response contained PII, sanitizing', { 
-            sessionId: finalSessionId, 
-            violations: responseValidation.violations 
-          });
-          finalResponse = responseValidation.sanitizedResponse;
-        }
-
-        mainResponse = {
-          response: finalResponse,
-          sessionId: finalSessionId,
-          modelUsed: 'gpt-4',
-          validationStatus,
-          processingTime: Date.now() - startTime
-        };
-        }
-      }
-
-      secureLog('Supervisor query completed successfully', { 
-        sessionId: finalSessionId, 
-        processingTime: Date.now() - startTime 
-      });
-
+      // 2. Process the query using the main logic handler
+      mainResponse = await this._processQuery(queryWithSession, startTime);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      secureLog('CRITICAL ERROR in main agent flow', { sessionId: finalSessionId, error: errorMessage });
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      const errorName = error instanceof Error ? error.name : 'UnknownError';
+      
+      secureLog('ERROR in supervisor agent flow', { 
+        sessionId: finalSessionId, 
+        error: errorMessage,
+        errorName: errorName,
+        stack: error instanceof Error ? error.stack : undefined
+      });
 
-      // --- PART 3 ENHANCEMENT: Improved Error Message ---
-      // Return a context-aware, privacy-affirming error message
+      let userFacingMessage = "I'm sorry, an unexpected error occurred. Our technical team has been notified. Please try again later.";
+      let modelUsed = 'error-handler-general';
+
+      if (error instanceof AppError && error.isOperational) {
+        userFacingMessage = error.message;
+        modelUsed = `error-handler-${error.name.toLowerCase()}`;
+      }
+      
       return {
-        response: "For your privacy and security, my system automatically blocks requests that might contain personal names. If you were asking about a person, please try rephrasing your question more generally. If you were asking about a place, please try again.",
+        response: userFacingMessage,
         sessionId: finalSessionId,
-        modelUsed: 'error-handler',
+        modelUsed: modelUsed,
         processingTime: Date.now() - startTime
       };
     }
 
     // --- STAGE 2: Execute non-critical side effects asynchronously ---
     // We do NOT use 'await' here. This is "fire-and-forget".
-    this.updateProgressMilestones(userId, "chatbotInteraction", finalSessionId)
+    this.updateProgressMilestones(query.userId, "chatbotInteraction", finalSessionId)
       .catch((err: Error | unknown) => {
         // Log the error for developers but DO NOT let it crash the response to the user.
         secureLog("Non-critical error in milestone update", { 
           sessionId: finalSessionId, 
-          userId,
+          userId: query.userId,
           error: err instanceof Error ? err.message : 'Unknown error'
         });
       });
     
-    this.logAnalytics(userId, "queryExecuted", finalSessionId)
+    this.logAnalytics(query.userId, "queryExecuted", finalSessionId)
       .catch((err: Error | unknown) => {
         secureLog("Non-critical error in analytics logging", { 
           sessionId: finalSessionId, 
-          userId,
+          userId: query.userId,
           error: err instanceof Error ? err.message : 'Unknown error'
         });
       });
 
     // --- STAGE 3: Return the successful main response to the user immediately ---
     return mainResponse;
+  }
+
+  /**
+   * Handles the core logic of processing a user query after initial checks.
+   */
+  private async _processQuery(
+    query: SupervisorQuery & { sessionId: string },
+    startTime: number
+  ): Promise<SupervisorResponse> {
+    const { message: { text: userQuery } } = query;
+
+    secureLog('Supervisor query processing started', { userId: query.userId, sessionId: query.sessionId, queryLength: userQuery.length });
+    const parsedQuery = await parseUserQuery(userQuery);
+    secureLog('Query parsed successfully', { sessionId: query.sessionId, intent: parsedQuery.intent });
+
+    if (this._isLocationQuery(parsedQuery)) {
+      return this._handleLocationQuery(parsedQuery, query, startTime);
+    } else {
+      return this._handleGeneralQuery(parsedQuery, query, startTime);
+    }
+  }
+
+  /**
+   * Checks if a message is stale (older than 15 minutes) and returns a re-engagement response if so.
+   * @returns A SupervisorResponse if the message is stale, otherwise null.
+   */
+  private async _handleStaleMessage(
+    query: SupervisorQuery & { sessionId: string },
+    startTime: number
+  ): Promise<SupervisorResponse | null> {
+    const { message, userId, sessionId } = query;
+    const timeSent = new Date(message.sentAt);
+    const timeProcessed = new Date();
+    const deltaInMinutes = (timeProcessed.getTime() - timeSent.getTime()) / 60000;
+
+    if (deltaInMinutes <= 15) {
+      return null; // Message is not stale
+    }
+
+    secureLog('Stale offline message received. Pivoting to re-engagement.', {
+      userId,
+      sessionId,
+      deltaInMinutes,
+    });
+
+    const reEngagementResponse: SupervisorResponse = {
+      response:
+        "Welcome back online! I've just received your message from earlier. I hope you were able to resolve what you needed. How can I help you right now?",
+      sessionId: sessionId,
+      modelUsed: 're-engagement',
+      processingTime: Date.now() - startTime,
+    };
+
+    // Run analytics as a non-critical side effect
+    this.logAnalytics(userId, 'staleMessageReEngagement', sessionId).catch(
+      (err: Error | unknown) => {
+        secureLog('Non-critical error in analytics logging for stale message', {
+          sessionId: sessionId,
+          error: err instanceof Error ? err.message : 'Unknown error',
+        });
+      }
+    );
+
+    return reEngagementResponse;
+  }
+
+  /**
+   * Determines if a parsed query is for finding a location.
+   */
+  private _isLocationQuery(parsedQuery: any): boolean {
+    return (
+      parsedQuery.intent === 'find_location_for_activity' &&
+      parsedQuery.entities.location &&
+      parsedQuery.isSafeForTooling &&
+      parsedQuery.confidence > 0.7
+    );
+  }
+
+  /**
+   * Handles location-specific queries by using search tools.
+   */
+  private async _handleLocationQuery(
+    parsedQuery: any,
+    query: SupervisorQuery & { sessionId: string },
+    startTime: number
+  ): Promise<SupervisorResponse> {
+    const { message: { text: userQuery }, userId, sessionId } = query;
+
+    secureLog('Location intent detected. Using structured location search.', {
+      entities: parsedQuery.entities,
+      sessionId,
+    });
+
+    const searchResponse = await this.performAdvancedLocationSearch(
+      parsedQuery,
+      userQuery,
+      userId,
+      sessionId
+    );
+
+    return {
+      response: searchResponse,
+      sessionId,
+      modelUsed: 'advanced-location-synthesis',
+      toolsUsed: ['nlu-parser', 'location-search', 'care-plan-synthesis'],
+      processingTime: Date.now() - startTime,
+    };
+  }
+
+  /**
+   * Handles general, non-location-based queries.
+   */
+  private async _handleGeneralQuery(
+    parsedQuery: any,
+    query: SupervisorQuery & { sessionId: string },
+    startTime: number
+  ): Promise<SupervisorResponse> {
+    const { message: { text: userQuery }, userId, sessionId, requiresValidation } = query;
+
+    const contextData = await AIContextService.prepareSecureContext({
+      userId,
+      includeHealthMetrics: true,
+      includeChatHistory: true,
+      maxHistoryItems: 10,
+    });
+    const mcpBundle = contextData.secureBundle;
+
+    const securityValidation = validateMcpBundleSecurity(mcpBundle, userQuery);
+    if (!securityValidation.isSecure) {
+      throw new SecurityError(
+        'For your privacy and security, my system blocked this request. Please try rephrasing your question without any personal information.'
+      );
+    }
+
+    const toolResponse = await this.checkForToolCalling(userQuery, mcpBundle, parsedQuery);
+    if (toolResponse) {
+      return {
+        response: toolResponse.response,
+        sessionId,
+        modelUsed: 'tool-based',
+        toolsUsed: toolResponse.tools,
+        processingTime: Date.now() - startTime,
+      };
+    }
+
+    const systemPrompt = this.buildSystemPrompt();
+    const userPrompt = this.buildUserPrompt(userQuery, mcpBundle);
+    const primaryResponse = await this.callPrimaryLLM(systemPrompt, userPrompt);
+
+    const { finalResponse, validationStatus } = await this._finalizeResponse(
+      primaryResponse,
+      { systemPrompt, userPrompt, requiresValidation: requiresValidation || this.requiresValidation(userQuery) },
+      sessionId
+    );
+
+    secureLog('General query processing completed successfully', { sessionId, processingTime: Date.now() - startTime });
+
+    return {
+      response: finalResponse,
+      sessionId,
+      modelUsed: 'gpt-4',
+      validationStatus,
+      processingTime: Date.now() - startTime,
+    };
+  }
+
+  /**
+   * Applies a series of validation and sanitization steps to the raw LLM response.
+   */
+  private async _finalizeResponse(
+    rawResponse: string,
+    validationContext: { systemPrompt: string; userPrompt: string; requiresValidation: boolean },
+    sessionId: string
+  ): Promise<{ finalResponse: string; validationStatus: string }> {
+    let currentResponse = rawResponse;
+    let validationStatus = 'not-required';
+
+    // 1. Multi-model validation if required
+    if (validationContext.requiresValidation) {
+      secureLog('Multi-model validation triggered', { sessionId });
+      const validated = await this.performMultiModelValidation(
+        validationContext.systemPrompt,
+        validationContext.userPrompt,
+        currentResponse
+      );
+      currentResponse = validated.response;
+      validationStatus = validated.status;
+    }
+
+    // 2. KGC feature recommendation validation
+    const featureValidation = this.validateFeatureRecommendations(currentResponse);
+    if (!featureValidation.isValid && featureValidation.correctedResponse) {
+      secureLog('Response contained unauthorized features, using corrected response', { sessionId });
+      currentResponse = featureValidation.correctedResponse;
+    }
+
+    // 3. Final PII/PHI security scan on the response
+    const responseValidation = await AIContextService.validateAIResponse(currentResponse, sessionId);
+    if (!responseValidation.isSecure) {
+      secureLog('AI response contained PII, sanitizing', { sessionId, violations: responseValidation.violations });
+      currentResponse = responseValidation.sanitizedResponse;
+    }
+
+    return { finalResponse: currentResponse, validationStatus };
   }
 
   /**
@@ -518,7 +577,10 @@ YOUR TASK: Provide a caring, motivational, and educational response that:
       return completion.choices[0]?.message?.content || 'I apologize, but I was unable to generate a response. Please try again.';
     } catch (error) {
       secureLog('Primary LLM call failed', { error: error instanceof Error ? error.message : 'Unknown error' });
-      throw new Error('Primary LLM unavailable');
+      // Throw a specific, operational error that can be caught and handled gracefully.
+      throw new LLMError(
+        'I am having trouble connecting to my core AI services. Please try again in a moment.'
+      );
     }
   }
 
@@ -575,7 +637,12 @@ YOUR TASK: Provide a caring, motivational, and educational response that:
     if (!TAVILY_API_KEY) {
       // Also update the log message to be accurate.
       secureLog('CRITICAL_ERROR: TAVILY_API_KEY is not configured for location searches.', { sessionId, userId });
-      return "I'm sorry, my location search feature is not configured correctly at the moment. I can still help with other questions you might have.";
+      throw new APIError(
+        'LocationSearchMisconfigured', 
+        500, 
+        "I'm sorry, my location search feature is currently unavailable.", 
+        false // This is a non-operational error, needs fixing by dev
+      );
     }
 
     // Part 2: Comprehensive try...catch Error Insulation
@@ -596,8 +663,13 @@ YOUR TASK: Provide a caring, motivational, and educational response that:
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       secureLog('ERROR during performAdvancedLocationSearch', { sessionId, userId, error: errorMessage });
 
-      // Return a graceful, user-facing fallback message.
-      return "I'm having a little trouble accessing specific location details right now, but I can still help with other questions or provide general wellness tips!";
+      // Throw an operational error that the main handler can show to the user.
+      throw new APIError(
+        'LocationSearchFailed', 
+        503, 
+        "I'm having a little trouble accessing specific location details right now, but I can still help with other questions or provide general wellness tips!",
+        true // This is an operational error (e.g., Tavily is down)
+      );
     }
     // --- END OF MODIFICATIONS ---
   }
@@ -924,19 +996,20 @@ YOUR TASK: Analyze these self-scores and provide immediate, personalized feedbac
       };
 
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       secureLog('Self-score analysis failed', {
         userId,
         sessionId: finalSessionId,
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: errorMessage
       });
 
-      return {
-        response: 'I apologize, but I was unable to analyze your self-scores at this time. Please try again.',
-        sessionId: finalSessionId,
-        modelUsed: 'fallback',
-        toolsUsed: [],
-        processingTime: Date.now() - startTime
-      };
+      // Throw a specific error that the API route can catch and handle.
+      throw new APIError(
+        'SelfScoreAnalysisError', 
+        500, 
+        'I apologize, but I was unable to analyze your self-scores at this time. Please try again.',
+        true
+      );
     }
   }
 }

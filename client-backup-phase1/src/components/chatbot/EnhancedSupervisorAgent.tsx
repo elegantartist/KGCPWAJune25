@@ -1,4 +1,4 @@
-/**
+keep coding according to the plan/**
  * Enhanced SupervisorAgent Component
  * 
  * This component extends the original SupervisorAgent with:
@@ -24,14 +24,15 @@ import {
   Mic,
   MicOff
 } from 'lucide-react';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import axios from 'axios';
 import { useSimpleToast } from '@/hooks/simple-toast';
 import { ConnectivityLevel } from '@/../../shared/types';
 import { useProgressMilestones } from '@/hooks/useProgressMilestones';
 import { useConnectivity } from '@/hooks/useConnectivity';
 import { speakText, stopSpeaking } from '@/lib/speechUtils';
 // We'll implement a simplified connectivity check directly rather than removing it entirely
+import { healthAnalysisService, AnalysisResult, HealthMetrics } from '@/services/healthAnalysisService';
+import { sendChatMessage, ChatApiResponse } from '@/services/chatService';
+import { ConnectivityBanner } from '@/components/ui/ConnectivityBanner';
 
 // Speech synthesis for text-to-speech
 const synth = typeof window !== 'undefined' ? window.speechSynthesis : null;
@@ -118,6 +119,8 @@ export function EnhancedSupervisorAgent({
   const [isListening, setIsListening] = useState(false);
   const [speechRecognition, setSpeechRecognition] = useState<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
+  const [sessionId, setSessionId] = useState<string | undefined>(undefined);
   const { toast } = useSimpleToast();
   
   // Initialize progress milestone hook
@@ -131,23 +134,12 @@ export function EnhancedSupervisorAgent({
   const [patientName, setPatientName] = useState<string>('');
   
   // Use the connectivity hook
-  const { 
-    connectivityLevel: detectedConnectivityLevel, 
-    setConnectivity,
-    isOffline: detectedIsOffline,
-    isMinimal: detectedIsMinimal,
-    isFunctional: detectedIsFunctional,
-    isFull: detectedIsFull 
+  const {
+    connectivityLevel,
+    isOffline,
+    isMinimal,
+    // We get setConnectivity but won't call it directly, letting the hook manage state.
   } = useConnectivity();
-  
-  // Always force connectivity to FULL to avoid error messages
-  // This ensures compatibility with mobile devices that may have intermittent connectivity
-  const connectivityLevel = ConnectivityLevel.FULL;
-  const isOffline = false; // Force to always appear online
-  // These connectivity levels no longer exist in the enum, keeping variables for backward compatibility
-  const isMinimal = false;
-  const isFunctional = false;
-  const isFull = true; // Always show as fully connected
 
   // Setup service worker message handler for notifications from the service worker
   useEffect(() => {
@@ -236,13 +228,6 @@ export function EnhancedSupervisorAgent({
     };
     setMessages([welcomeMessage]);
     
-    // Check network connectivity
-    checkConnectivity();
-    
-    // Setup connectivity monitoring
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    
     // Initialize engagement milestone if it doesn't exist
     const initializeEngagementMilestone = async () => {
       try {
@@ -292,149 +277,35 @@ export function EnhancedSupervisorAgent({
     }
     
     return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
       // Stop any ongoing speech when component unmounts
       stopSpeaking();
     };
-  }, [initialMessage, isOffline, healthMetrics]);
+  }, [initialMessage, healthMetrics]); // Removed isOffline dependency as it's now from a hook
   
-  // Function to handle health metrics analysis
-  const handleHealthMetricsAnalysis = async () => {
-    // Set the agent to thinking state
-    setAgentStatus('thinking');
-    
-    try {
-      // Create a specific prompt for health metrics analysis with formal Australian English and KGC feature recommendations
-      const analysisPrompt = `Please analyze my recent health scores using formal, professional Australian English (avoiding colloquialisms) and provide specific, personalised feedback with KGC feature recommendations:
-      Diet: ${healthMetrics?.dietScore}/10
-      Exercise: ${healthMetrics?.exerciseScore}/10
-      Medication: ${healthMetrics?.medicationScore}/10
-      
-      Always respond quickly with:
-      1. Specific praise for scores 7-10
-      2. Supportive encouragement for any scores below 7
-      3. Concrete recommendations of specific KGC features that could help improve lower scores
-      4. Examples of how to use these features
-      5. End with a direct question about which feature they'd like to try first`;
-      
-      // Create a pending message
-      const pendingMessage: Message = {
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: '...',
-        timestamp: new Date(),
-        pending: true
-      };
-      
-      // Add the analysis request as if from the user
-      const userMessage: Message = {
-        id: crypto.randomUUID(),
-        role: 'user',
-        content: analysisPrompt,
-        timestamp: new Date()
-      };
-      
-      // Add messages
-      setMessages(prev => [...prev, userMessage, pendingMessage]);
-      
-      // Get conversation history
-      const conversationHistory = [
-        ...messages.slice(-5),
-        userMessage
-      ].map(msg => ({
-        role: msg.role,
-        content: msg.content
-      }));
-      
-      // Send request to the enhanced MCP service with additional error handling
-      let responseData;
-      try {
-        const response = await axios.post('/api/mcp/generate', {
-          prompt: analysisPrompt,
-          userId,
-          healthMetrics,
-          conversationHistory,
-          connectivityLevel // Ensure we're passing the current connectivity level
-        });
-        
-        // Safety check for valid response
-        responseData = response.data || {};
-      } catch (apiError) {
-        console.error("API request failed:", apiError);
-        throw new Error("Failed to communicate with assistant service");
-      }
-      
-      // Process the response with fallback values for safety
-      let primaryResponse = responseData.primaryResponse || "I'm sorry, I couldn't process your health scores properly. How else can I help you today?";
-      const provider = responseData.provider || "system";
-      const alternativeResponses = responseData.alternativeResponses || [];
-      const evaluationSummary = responseData.evaluationSummary || "No evaluation available";
-      const allResponsesValid = responseData.allResponsesValid !== false;
-      const memories = responseData.memories || { retrieved: [], created: [] };
-      const offline = responseData.offline || false;
-      
-      // Replace placeholder with actual patient name if available
-      // Check for multiple variations of the placeholder
-      if (patientName) {
-        if (primaryResponse.includes("[Patient's First Name]") || 
-            primaryResponse.includes("[User's First Name]") ||
-            primaryResponse.includes("[Patients First Name]") ||
-            primaryResponse.includes("[Users First Name]")) {
-          // Replace all possible variations
-          primaryResponse = primaryResponse
-            .replace(/\[Patient's First Name\]/g, patientName)
-            .replace(/\[User's First Name\]/g, patientName)
-            .replace(/\[Patients First Name\]/g, patientName)
-            .replace(/\[Users First Name\]/g, patientName);
-          console.log('EnhancedSupervisorAgent: Replaced patient name placeholder');
+  // Subscribe to the centralized health analysis service
+  useEffect(() => {
+    const subscription = healthAnalysisService.results$.subscribe(result => {
+      if (result) {
+        setAnalysisResult(result);
+        // Format the analysis from the server into a user-friendly message
+        const analysisMessageContent = `${result.summary}\n\n**Recommendations:**\n- ${result.recommendations.join('\n- ')}`;
+        const analysisMessage: Message = {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: analysisMessageContent,
+          timestamp: new Date(),
+        };
+        setMessages(prev => [...prev, analysisMessage]);
+        if (isSpeechEnabled) {
+          speakTextWithStatus(analysisMessageContent);
+        } else {
+          setAgentStatus('idle');
         }
       }
-      
-      // Remove pending message
-      setMessages(prev => 
-        prev.filter(msg => msg.id !== pendingMessage.id)
-      );
-      
-      // Add assistant response
-      const assistantMessage: Message = {
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: primaryResponse,
-        timestamp: new Date(),
-        offline
-      };
-      
-      setMessages(prev => [...prev, assistantMessage]);
-      
-      // Read the response aloud if speech is enabled
-      if (isSpeechEnabled) {
-        speakTextWithStatus(primaryResponse);
-      } else {
-        // Set the agent back to idle only if we're not speaking
-        setAgentStatus('idle');
-      }
-      
-    } catch (error) {
-      console.error('Error analyzing health metrics:', error);
-      
-      // Add an error message
-      const errorMessage: Message = {
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: "I'm sorry, I wasn't able to analyze your health scores at this time. Let me know if you'd like to try again.",
-        timestamp: new Date()
-      };
-      
-      // Remove any pending messages
-      setMessages(prev => 
-        prev.filter(msg => !msg.pending).concat(errorMessage)
-      );
-      
-      // Set the agent back to idle
-      setAgentStatus('idle');
-    }
-  };
+    });
+
+    return () => subscription.unsubscribe();
+  }, [isSpeechEnabled]); // Re-subscribe if speech-related functions change
 
   // Scroll to the bottom of the chat when messages change
   useEffect(() => {
@@ -447,36 +318,6 @@ export function EnhancedSupervisorAgent({
       stopSpeaking();
     }
   }, [isSpeechEnabled]);
-
-  // Simplified connectivity check - just try to ping the server
-  const checkConnectivity = async () => {
-    try {
-      const response = await fetch('/api/connectivity/test');
-      // Always set connectivity to FULL regardless of response
-      // This prevents error messages on mobile devices with intermittent connectivity
-      setConnectivity(ConnectivityLevel.FULL);
-    } catch (error) {
-      // Even if we can't reach the server, keep showing as online
-      // to avoid disrupting the user experience
-      console.log('Connectivity check failed, but keeping status as online');
-      setConnectivity(ConnectivityLevel.FULL);
-    }
-  };
-
-  // Handle online status change
-  const handleOnline = () => {
-    setConnectivity(ConnectivityLevel.FULL);
-    // Try to sync any pending data
-    fetch('/api/sync', { method: 'POST' }).catch(() => {}); // Ignore errors
-  };
-
-  // Handle offline status change - but keep showing as online
-  const handleOffline = () => {
-    // Log the offline event but keep the UI showing as online
-    console.log('Browser reported offline status, but keeping UI as online');
-    // Don't change connectivity status to avoid disrupting user experience
-    setConnectivity(ConnectivityLevel.FULL);
-  };
 
   // Get the conversation history for context
   const getConversationHistory = () => {
@@ -523,58 +364,72 @@ export function EnhancedSupervisorAgent({
     if (healthMetrics && 
         positiveResponses.some(response => userInputLower.includes(response)) && 
         messages.length <= 3) { // Only trigger this for the first user response after initial prompt
-      
-      console.log('Detected user wants to analyze health scores');
-      // Cancel this regular response
+
+      console.log('User confirmed health score analysis. Triggering centralized service.');
+      // Remove the pending "thinking..." bubble and set agent status
       setMessages(prev => prev.filter(msg => msg.id !== pendingMessage.id));
+      setAgentStatus('thinking');
       
-      // Directly call health metrics analysis instead
-      handleHealthMetricsAnalysis();
+      // Trigger analysis through the new service.
+      // The service will publish the result, and the useEffect hook will handle displaying it.
+      (async () => {
+        try {
+          // Map the component's healthMetrics prop to the format expected by the service.
+          // This highlights an area for future refactoring to unify data models.
+          const metricsToAnalyze: HealthMetrics[] = [{
+            sleep: healthMetrics.sleepScore || 0, // Assuming sleepScore might exist, otherwise 0
+            nutrition: healthMetrics.dietScore,
+            activity: healthMetrics.exerciseScore,
+            date: new Date().toISOString(),
+          }];
+
+          // The service call is fire-and-forget from the component's perspective.
+          // The result is handled by the subscription in the useEffect hook.
+          await healthAnalysisService.analyzeHealthMetrics(metricsToAnalyze);
+
+        } catch (error) {
+          console.error('Failed to trigger health metrics analysis:', error);
+          const errorMessage: Message = {
+            id: crypto.randomUUID(),
+            role: 'assistant',
+            content: "I'm sorry, I wasn't able to analyze your health scores at this time. Let me know if you'd like to try again.",
+            timestamp: new Date(),
+          };
+          setMessages(prev => [...prev, errorMessage]);
+          setAgentStatus('idle'); // Reset status on error
+        }
+      })();
+      
       return;
     }
     
     try {
-      // Check connectivity before sending request
-      await checkConnectivity();
-      
       // Get conversation history
       const conversationHistory = getConversationHistory();
       
       // Log the connectivity level we're sending to the server
       console.log(`Sending request with connectivity level: ${ConnectivityLevel[connectivityLevel]} (${connectivityLevel})`);
       
-      // Send request to the enhanced MCP service with additional error handling
-      let responseData;
-      try {
-        const response = await axios.post('/api/mcp/generate', {
-          prompt: userMessage.content,
-          userId,
-          healthMetrics,
-          conversationHistory,
-          connectivityLevel: connectivityLevel // Ensure we're passing the current connectivity level
-        });
-        
-        // Safety check for valid response
-        responseData = response.data || {};
-      } catch (apiError) {
-        console.error("API request failed:", apiError);
-        throw new Error("Failed to communicate with assistant service");
+      // --- REFACTORED: Use the new centralized chatService ---
+      const apiResponse: ChatApiResponse = await sendChatMessage(userMessage.content, sessionId);
+
+      // Update session ID if the server provides a new one
+      if (apiResponse.sessionId && !sessionId) {
+        setSessionId(apiResponse.sessionId);
       }
-      
+
+      // Check for errors returned by the service itself (e.g., auth errors)
+      if (apiResponse.error) {
+        throw new Error(apiResponse.response); // Use the user-friendly response as the error message
+      }
+
       // Process the response with fallback values for safety
-      let primaryResponse = responseData.primaryResponse || "I'm sorry, I couldn't process that properly. How else can I help you today?";
-      const provider = responseData.provider || "system";
-      const alternativeResponses = responseData.alternativeResponses || [];
-      const evaluationSummary = responseData.evaluationSummary || "No evaluation available";
-      const allResponsesValid = responseData.allResponsesValid !== false;
-      const memories = responseData.memories || { retrieved: [], created: [] };
-      const offline = responseData.offline || false;
+      let primaryResponse = apiResponse.response || "I'm sorry, I couldn't process that properly. How else can I help you today?";
       
       // Sanitize the response to remove any system prompt directives or markers that might have leaked through
       primaryResponse = sanitizeChatbotResponse(primaryResponse);
       
       // Replace placeholder with actual patient name if available
-      // Check for multiple variations of the placeholder
       if (patientName) {
         if (primaryResponse.includes("[Patient's First Name]") || 
             primaryResponse.includes("[User's First Name]") ||
@@ -601,17 +456,10 @@ export function EnhancedSupervisorAgent({
         role: 'assistant',
         content: primaryResponse,
         timestamp: new Date(),
-        offline
+        // The 'offline' flag is no longer part of the new API response, which simplifies the model.
       };
       
       setMessages(prev => [...prev, assistantMessage]);
-      
-      // If there were alternative responses that were rejected during evaluation,
-      // we can log them or use them in some way
-      if (!allResponsesValid && alternativeResponses && alternativeResponses.length > 0) {
-        console.debug('Alternative responses were rejected:', alternativeResponses);
-        console.debug('Evaluation summary:', evaluationSummary);
-      }
       
       // Read the response aloud if speech is enabled
       if (isSpeechEnabled) {
@@ -669,25 +517,13 @@ export function EnhancedSupervisorAgent({
       if (!isOffline) {
         updateEngagementMilestone();
       }
-      
-      // Log memories for debugging - with safe access checks
-      if (memories && memories.retrieved && memories.created) {
-        try {
-          console.debug('Retrieved memories:', memories.retrieved);
-          console.debug('Created memories:', memories.created);
-        } catch (memoryError) {
-          console.error('Error accessing memory data:', memoryError);
-        }
-      }
-      
-    } catch (error) {
-      console.error('Error getting MCP response:', error);
+    } catch (error: any) {
+      console.error('Error in handleSubmit:', error);
       
       // Remove pending message
       setMessages(prev => 
         prev.filter(msg => msg.id !== pendingMessage.id)
       );
-      
       // Add error message
       const errorMessage: Message = {
         id: crypto.randomUUID(),
@@ -696,18 +532,9 @@ export function EnhancedSupervisorAgent({
           "I'm sorry, but I can't process your request while offline. Basic features are still available, but I need an internet connection for full functionality." :
           "I'm sorry, but I'm having trouble processing your request right now. Could you please try again?",
         timestamp: new Date(),
-        offline: isOffline || isMinimal
+        offline: isOffline
       };
-      
       setMessages(prev => [...prev, errorMessage]);
-      
-      // Disable error toast notifications for better mobile experience
-      console.log('Error getting response, but not showing toast notification');
-      // toast({
-      //   title: 'Error',
-      //   description: 'Failed to get a response from the assistant.',
-      //   variant: 'destructive',
-      // });
     } finally {
       setAgentStatus('idle');
     }
@@ -839,31 +666,12 @@ export function EnhancedSupervisorAgent({
 
   return (
     <div className="flex flex-col h-full bg-card rounded-lg shadow-md">
-      {/* Only show header if hideHeader is false */}
-      {/* Always show the accessibility controls, but conditionally show the header title */}
+      <ConnectivityBanner />
       <div className="p-4 border-b flex justify-between items-center">
         {!hideHeader && (
           <h2 className="text-xl font-semibold">KGC Health Assistant</h2>
         )}
         <div className={`flex items-center gap-2 ${hideHeader ? 'ml-auto' : ''}`}>
-          {/* Connectivity indicator */}
-          {isOffline ? (
-            <div className="flex items-center gap-1 text-destructive">
-              <WifiOff size={16} />
-              <span className="text-xs">Offline</span>
-            </div>
-          ) : isMinimal ? (
-            <div className="flex items-center gap-1 text-amber-500">
-              <Wifi size={16} />
-              <span className="text-xs">Limited</span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-1 text-green-500">
-              <Wifi size={16} />
-              <span className="text-xs">Online</span>
-            </div>
-          )}
-          
           {/* Speech toggle (text-to-speech) - with improved label positioning */}
           <div className="relative flex flex-col items-center mx-1">
             <Button 
