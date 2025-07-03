@@ -25,7 +25,6 @@ import {
   MicOff
 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import axios from 'axios';
 import { useSimpleToast } from '@/hooks/simple-toast';
 import { ConnectivityLevel } from '@/../../shared/types';
 import { useProgressMilestones } from '@/hooks/useProgressMilestones';
@@ -33,6 +32,7 @@ import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { offlineQueueService } from '@/services/offlineQueueService';
 import { useNotificationStore } from '@/stores/notificationStore';
 import { speakText, stopSpeaking } from '@/lib/speechUtils';
+import { sendChatMessage } from '@/services/chatService';
 // We'll implement a simplified connectivity check directly rather than removing it entirely
 
 // Speech synthesis for text-to-speech
@@ -227,60 +227,21 @@ export function EnhancedSupervisorAgent({
       // Add the analysis request as if from the user
       const userMessage: Message = {
         id: crypto.randomUUID(),
-        role: 'user',
-        content: analysisPrompt,
+        role: 'system', // This is a system-initiated action, not a direct user message
+        content: "Analyzing health scores...",
         timestamp: new Date()
       };
       
       // Add messages
       setMessages(prev => [...prev, userMessage, pendingMessage]);
       
-      // Get conversation history
-      const conversationHistory = [
-        ...messages.slice(-5),
-        userMessage
-      ].map(msg => ({
-        role: msg.role,
-        content: msg.content
-      }));
-      
-      // Send request to the Supervisor Agent with additional error handling
-      let responseData;
-      try {
-        const token = localStorage.getItem('auth_token');
-        const response = await fetch('/api/v2/supervisor/query', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            message: {
-              text: analysisPrompt,
-              sentAt: new Date().toISOString()
-            },
-            userId,
-            sessionId: crypto.randomUUID(),
-            requiresValidation: false
-          })
-        });
-        
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-        
-        responseData = await response.json();
-      } catch (apiError) {
-        console.error("API request failed:", apiError);
-        throw new Error("Failed to communicate with assistant service");
-      }
-      
-      // Process the response from Supervisor Agent
-      let primaryResponse = responseData.data?.response || "I'm sorry, I couldn't process your health scores properly. How else can I help you today?";
-      const modelUsed = responseData.data?.modelUsed || "supervisor-agent";
-      const toolsUsed = responseData.data?.toolsUsed || [];
-      const processingTime = responseData.data?.processingTime || 0;
-      const offline = false;
+      // --- REFACTORED API CALL ---
+      // Use the new chat service to send the analysis prompt to the backend.
+      const apiResponse = await sendChatMessage(analysisPrompt, crypto.randomUUID());
+
+      // Process the response from the service
+      let primaryResponse = apiResponse.response;
+      const offline = !!apiResponse.error;
       
       // Replace placeholder with actual patient name if available
       // Check for multiple variations of the placeholder
@@ -316,7 +277,7 @@ export function EnhancedSupervisorAgent({
       setMessages(prev => [...prev, assistantMessage]);
       
       // Read the response aloud if speech is enabled
-      if (isSpeechEnabled) {
+      if (isSpeechEnabled && !offline) {
         speakTextWithStatus(primaryResponse);
       } else {
         // Set the agent back to idle only if we're not speaking
@@ -387,20 +348,17 @@ export function EnhancedSupervisorAgent({
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     
-    if (!input.trim() || agentStatus !== 'idle') return;
-    
-    // --- START MODIFICATION ---
-    // 1. Create a payload object that includes the message text and a timestamp.
-    const messagePayload = {
-      text: input,
-      sentAt: new Date().toISOString() // e.g., "2025-06-11T23:30:00.000Z"
-    };
+    const userInput = input.trim();
+    if (!userInput || agentStatus !== 'idle') return;
+
+    // Clear input immediately for better UX
+    setInput('');
 
     // Create user message for UI
     const userMessage: Message = {
       id: crypto.randomUUID(),
       role: 'user',
-      content: input,
+      content: userInput,
       timestamp: new Date()
     };
     
@@ -415,7 +373,6 @@ export function EnhancedSupervisorAgent({
     
     // Update messages and clear input
     setMessages(prev => [...prev, userMessage, pendingMessage]);
-    setInput('');
     setAgentStatus('thinking');
     
     // If offline, queue the message for later processing
@@ -426,7 +383,7 @@ export function EnhancedSupervisorAgent({
       // Add to offline queue
       offlineQueueService.addToQueue({
         id: crypto.randomUUID(),
-        text: input,
+        text: userInput,
         sentAt: new Date().toISOString(),
         userId,
         sessionId: crypto.randomUUID()
@@ -469,57 +426,18 @@ export function EnhancedSupervisorAgent({
     }
     
     try {
-      // Check connectivity before sending request
-      await checkConnectivity();
-      
-      // Get conversation history
-      const conversationHistory = getConversationHistory();
-      
-      // Log the connectivity level we're sending to the server
-      console.log(`Sending request - online status: ${isOnline}`);
-      
-      // Send request to the Supervisor Agent with timestamped message payload
-      let responseData;
-      try {
-        const token = localStorage.getItem('auth_token');
-        const response = await fetch('/api/v2/supervisor/query', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          // 2. Send the entire payload object in the body.
-          body: JSON.stringify({ 
-            message: messagePayload,
-            userId,
-            sessionId: crypto.randomUUID(),
-            requiresValidation: false
-          })
-        });
-        
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-        
-        // Safety check for valid response
-        responseData = await response.json();
-      } catch (apiError) {
-        console.error("API request failed:", apiError);
-        throw new Error("Failed to communicate with assistant service");
-      }
-      
-      // Process the response from Supervisor Agent
-      let primaryResponse = responseData.data?.response || responseData.response || "I'm sorry, I couldn't process that properly. How else can I help you today?";
-      const sessionId = responseData.data?.sessionId || responseData.sessionId;
-      const modelUsed = responseData.data?.modelUsed || responseData.modelUsed || "supervisor-agent";
-      const toolsUsed = responseData.data?.toolsUsed || responseData.toolsUsed || [];
-      const offline = false; // Supervisor agent responses are always online
+      // --- REFACTORED API CALL ---
+      // Use the new chat service to send the message to the backend.
+      const apiResponse = await sendChatMessage(userInput, crypto.randomUUID());
+
+      // Process the response from the service
+      let primaryResponse = apiResponse.response;
+      const offline = !!apiResponse.error; // Check if the service returned an error
       
       // Sanitize the response to remove any system prompt directives or markers that might have leaked through
       primaryResponse = sanitizeChatbotResponse(primaryResponse);
       
       // Replace placeholder with actual patient name if available
-      // Check for multiple variations of the placeholder
       if (patientName) {
         if (primaryResponse.includes("[Patient's First Name]") || 
             primaryResponse.includes("[User's First Name]") ||
@@ -551,15 +469,8 @@ export function EnhancedSupervisorAgent({
       
       setMessages(prev => [...prev, assistantMessage]);
       
-      // Log supervisor agent response details
-      console.debug('Supervisor agent response details:', {
-        modelUsed,
-        toolsUsed,
-        sessionId
-      });
-      
       // Read the response aloud if speech is enabled
-      if (isSpeechEnabled) {
+      if (isSpeechEnabled && !offline) {
         speakTextWithStatus(primaryResponse);
       }
       
@@ -619,33 +530,26 @@ export function EnhancedSupervisorAgent({
       console.debug('Time-aware supervisor agent interaction completed successfully');
       
     } catch (error) {
-      console.error('Error getting MCP response:', error);
+      // The chatService handles its own errors and returns a user-friendly message,
+      // so this top-level catch block is less critical but good for catching
+      // unexpected issues in the UI logic itself.
+      console.error('Error in handleSubmit UI logic:', error);
       
       // Remove pending message
       setMessages(prev => 
         prev.filter(msg => msg.id !== pendingMessage.id)
       );
       
-      // Add error message
+      // Add a generic error message
       const errorMessage: Message = {
         id: crypto.randomUUID(),
         role: 'assistant',
-        content: isOffline ?
-          "I'm sorry, but I can't process your request while offline. Basic features are still available, but I need an internet connection for full functionality." :
-          "I'm sorry, but I'm having trouble processing your request right now. Could you please try again?",
+        content: "I'm sorry, but an unexpected error occurred. Please try again.",
         timestamp: new Date(),
-        offline: isOffline || isMinimal
+        offline: true
       };
       
       setMessages(prev => [...prev, errorMessage]);
-      
-      // Disable error toast notifications for better mobile experience
-      console.log('Error getting response, but not showing toast notification');
-      // toast({
-      //   title: 'Error',
-      //   description: 'Failed to get a response from the assistant.',
-      //   variant: 'destructive',
-      // });
     } finally {
       setAgentStatus('idle');
     }
