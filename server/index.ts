@@ -3,6 +3,7 @@ import cors from "cors";
 import { registerRoutes } from "./routes.js";
 import { setupVite, serveStatic, log } from "./vite";
 import { sessionTimeoutMiddleware } from "./sessionTimeout.js";
+import adminRoutes from './api/adminRoutes'; // Import the new admin routes
 import authRoutes from './api/authRoutes'; // Import the new auth routes
 // Load environment variables at the very top
 import { config } from 'dotenv';
@@ -65,6 +66,7 @@ app.use(sessionTimeoutMiddleware);
 (async () => {
   // Register the new, centralized API routes under the /api prefix
   app.use('/api', apiRoutes);
+  app.use('/api/admin', adminRoutes); // Register the admin routes
   app.use('/api/auth', authRoutes); // Register the auth routes
 
   await registerRoutes(app);

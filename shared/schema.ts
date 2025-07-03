@@ -55,6 +55,19 @@ export const auditLog = pgTable('audit_log', {
   timestamp: timestamp('timestamp').defaultNow().notNull(),
 });
 
+export const progressMilestones = pgTable('progress_milestones', {
+  id: serial('id').primaryKey(),
+  patientId: integer('patient_id').notNull().references(() => patients.id, { onDelete: 'cascade' }),
+  title: varchar('title', { length: 255 }).notNull(),
+  description: text('description').notNull(),
+  category: varchar('category', { length: 50 }).notNull(), // e.g., 'Engagement', 'Health'
+  progress: integer('progress').default(0).notNull(), // e.g., 0-100
+  isCompleted: boolean('is_completed').default(false).notNull(),
+  iconType: varchar('icon_type', { length: 50 }).default('Trophy').notNull(), // 'Trophy', 'Star', 'Award'
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
 export const adminAlerts = pgTable('admin_alerts', {
   id: serial('id').primaryKey(),
   patientId: integer('patient_id').references(() => users.id),
