@@ -1,0 +1,36 @@
+import React from 'react';
+import { useAuth } from '@/hooks/useAuth';
+import { Redirect } from 'wouter';
+import { Loader2 } from 'lucide-react';
+
+interface ProtectedRouteProps {
+  children: React.ReactNode;
+}
+
+/**
+ * A component that protects routes from unauthenticated access.
+ * It checks the authentication state and redirects to the login page if the user is not logged in.
+ * It also handles the initial loading state of the authentication context.
+ */
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  // While the auth state is being determined (e.g., checking localStorage), show a loading spinner.
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
+
+  // If not authenticated, redirect to the login page.
+  if (!isAuthenticated) {
+    return <Redirect to="/login" />;
+  }
+
+  // If authenticated, render the requested component.
+  return <>{children}</>;
+};
+
+export default ProtectedRoute;

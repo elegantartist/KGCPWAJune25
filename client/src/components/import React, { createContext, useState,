@@ -1,0 +1,101 @@
+import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
+
+// Define the shape of the user object for type safety.
+interface User {
+  id: number;
+  name: string;
+  email: string;
+  role: string;
+}
+
+// Define the shape of the authentication context.
+interface AuthContextType {
+  user: User | null;
+  token: string | null;
+  isAuthenticated: boolean;
+  login: (email: string, password: string) => Promise<void>;
+  logout: () => void;
+  isLoading: boolean;
+}
+
+// Create the context with an undefined initial value.
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+/**
+ * AuthProvider component that wraps the application and provides authentication state.
+ * It should be placed at the top level of your component tree (e.g., in main.tsx or App.tsx).
+ */
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
+  const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // On initial load, check for an existing token and user info in localStorage.
+  useEffect(() => {
+    try {
+      const storedToken = localStorage.getItem('accessToken');
+      const storedUser = localStorage.getItem('currentUser');
+      if (storedToken && storedUser) {
+        setToken(storedToken);
+        setUser(JSON.parse(storedUser));
+      }
+    } catch (error) {
+      console.error("Failed to parse auth data from localStorage", error);
+      // Clear potentially corrupted data.
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('currentUser');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  /**
+   * Logs in the user by calling the backend API and storing the token.
+   */
+  const login = async (email: string, password: string) => {
+    const response = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Login failed. Please check your credentials.');
+    }
+
+    const { token: newToken, user: newUser } = data;
+    setToken(newToken);
+    setUser(newUser);
+    localStorage.setItem('accessToken', newToken);
+    localStorage.setItem('currentUser', JSON.stringify(newUser));
+  };
+
+  /**
+   * Logs out the user by clearing the token and user state.
+   */
+  const logout = () => {
+    setToken(null);
+    setUser(null);
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('currentUser');
+    // Optionally, redirect to the login page after logout.
+    window.location.href = '/login';
+  };
+
+  const value = { user, token, isAuthenticated: !!token, login, logout, isLoading };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+};
+
+/**
+ * Custom hook to easily access the authentication context from any component.
+ */
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};
