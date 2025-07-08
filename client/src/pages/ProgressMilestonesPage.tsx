@@ -1,32 +1,44 @@
 import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Gift, Crown, Info, Trophy, Loader2 } from 'lucide-react';
-import { Link } from 'wouter';
-import { AchievementBadge, BadgeDetails, BadgeType } from '@/components/AchievementBadge';
+import { Gift, Crown, Info, Trophy } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import { useBadges } from '@/hooks/useBadges';
+import { AchievementBadge, BadgeDetails } from '@/components/AchievementBadge';
 import BadgeInfoDialog from '@/components/features/BadgeInfoDialog';
 import FinancialRewardsDialog from '@/components/features/FinancialRewardsDialog';
+import BadgeAwardModal from '@/components/features/BadgeAwardModal';
 import { BadgeProgressCard } from '@/components/features/BadgeProgressCard';
+import { MilestoneSkeleton } from '@/components/features/MilestoneSkeleton';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const ProgressMilestonesPage: React.FC = () => {
   const [isBadgeInfoOpen, setIsBadgeInfoOpen] = useState(false);
   const [isRewardsInfoOpen, setIsRewardsInfoOpen] = useState(false);
+  const { user } = useAuth();
 
-  const { data: milestoneData, isLoading, error } = useQuery({
-    queryKey: ['progressMilestones'],
-    queryFn: async () => {
-      const token = localStorage.getItem('accessToken');
-      const response = await fetch('/api/patient/milestones', {
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
-      if (!response.ok) {
-        throw new Error('Failed to fetch milestone data.');
-      }
-      return response.json();
-    }
-  });
+  const {
+    badges,
+    badgeProgress,
+    isLoading,
+    error,
+    newlyAwardedBadge,
+    isAwardModalOpen,
+    closeAwardModal,
+  } = useBadges(user?.id);
+
+  if (isLoading) {
+    return (
+      <div className="p-4 sm:p-6 space-y-6">
+        <div className="flex flex-col items-center justify-center text-center">
+          <Skeleton className="h-8 w-64 mb-4" />
+          <Skeleton className="h-12 w-full max-w-xs" />
+        </div>
+        <MilestoneSkeleton />
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
@@ -60,15 +72,11 @@ const ProgressMilestonesPage: React.FC = () => {
           </Button>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
-            <div className="flex justify-center items-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-          ) : error ? (
+           {error instanceof Error ? (
             <p className="text-center text-destructive py-8">Could not load badges.</p>
-          ) : milestoneData?.earnedBadges?.length > 0 ? (
+          ) : badges.length > 0 ? (
             <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-4 py-4">
-              {milestoneData.earnedBadges.map((badge: BadgeDetails, index: number) => (
+              {badges.map((badge: BadgeDetails, index: number) => (
                 <AchievementBadge key={index} badge={badge} />
               ))}
             </div>
@@ -96,27 +104,23 @@ const ProgressMilestonesPage: React.FC = () => {
               <TabsTrigger value="meal" className="text-[#676767]">Nutrition</TabsTrigger>
               <TabsTrigger value="medication" className="text-[#676767]">Medication</TabsTrigger>
             </TabsList>
-            {isLoading ? (
-              <div className="flex justify-center items-center py-8">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              </div>
-            ) : error ? (
+            {error instanceof Error ? (
               <p className="text-center text-destructive py-8">Could not load progress.</p>
             ) : (
               <>
                 <TabsContent value="exercise">
-                  {milestoneData?.badgeProgress?.exercise ? (
-                    <BadgeProgressCard type="exercise" title="Exercise Consistency Champion" description="Maintain your exercise self-scores" {...milestoneData.badgeProgress.exercise} />
+                  {badgeProgress?.exercise && badgeProgress.exercise.progress < 100 ? (
+                    <BadgeProgressCard type="exercise" title="Exercise Consistency Champion" description="Maintain your exercise self-scores" {...badgeProgress.exercise} />
                   ) : <p className="text-center text-muted-foreground py-4">All exercise badges earned!</p>}
                 </TabsContent>
                 <TabsContent value="meal">
-                  {milestoneData?.badgeProgress?.meal ? (
-                    <BadgeProgressCard type="meal" title="Healthy Eating Hero" description="Maintain your healthy meal plan scores" {...milestoneData.badgeProgress.meal} />
+                  {badgeProgress?.meal && badgeProgress.meal.progress < 100 ? (
+                    <BadgeProgressCard type="meal" title="Healthy Eating Hero" description="Maintain your healthy meal plan scores" {...badgeProgress.meal} />
                   ) : <p className="text-center text-muted-foreground py-4">All nutrition badges earned!</p>}
                 </TabsContent>
                 <TabsContent value="medication">
-                  {milestoneData?.badgeProgress?.medication ? (
-                    <BadgeProgressCard type="medication" title="Medication Maverick" description="Maintain your medication self-scores" {...milestoneData.badgeProgress.medication} />
+                  {badgeProgress?.medication && badgeProgress.medication.progress < 100 ? (
+                    <BadgeProgressCard type="medication" title="Medication Maverick" description="Maintain your medication self-scores" {...badgeProgress.medication} />
                   ) : <p className="text-center text-muted-foreground py-4">All medication badges earned!</p>}
                 </TabsContent>
               </>
@@ -127,6 +131,15 @@ const ProgressMilestonesPage: React.FC = () => {
 
       <BadgeInfoDialog isOpen={isBadgeInfoOpen} onClose={() => setIsBadgeInfoOpen(false)} />
       <FinancialRewardsDialog isOpen={isRewardsInfoOpen} onClose={() => setIsRewardsInfoOpen(false)} />
+
+      {/* Badge Award Celebration Modal */}
+      {newlyAwardedBadge && (
+        <BadgeAwardModal
+          badge={newlyAwardedBadge}
+          isOpen={isAwardModalOpen}
+          onClose={closeAwardModal}
+        />
+      )}
     </div>
   );
 };

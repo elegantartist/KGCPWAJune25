@@ -1810,6 +1810,11 @@ KGC follows a set of development guidelines to ensure consistency and quality ac
    - Add explicit return types for non-trivial functions
    - Use enum or union types for bounded values
 
+5. **AI Agent Guidelines (Care Plan Directives)**:
+   - **Align with Doctor's Guidance**: All AI recommendations and interactions must align with the patient's specific Care Plan Directives (CPD) set by their doctor.
+   - **Reference Patient Goals**: The AI should reference patient-specific goals to provide personalized and relevant support.
+   - **Maintain Clinical Context**: Conversations must always maintain a safe and appropriate clinical context, avoiding advice that contradicts professional medical guidance.
+
 ---
 
 This document provides comprehensive guidance on the frontend architecture of the Keep Going Care (KGC) application. For further details or specific implementation questions, please refer to the codebase or contact the frontend development team.

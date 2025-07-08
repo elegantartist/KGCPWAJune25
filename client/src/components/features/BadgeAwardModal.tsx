@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { AchievementBadge, BadgeDetails } from '@/components/AchievementBadge';
 import { Trophy } from 'lucide-react';
+import { format } from 'date-fns';
 
 interface BadgeAwardModalProps {
   badge: BadgeDetails;
@@ -42,6 +43,9 @@ const BadgeAwardModal: React.FC<BadgeAwardModalProps> = ({ badge, isOpen, onClos
           <div className="animate-bounce"><AchievementBadge badge={badge} size="lg" /></div>
           <h2 className="text-xl font-bold mt-4">{badgeTitles[badge.type] || 'New Badge'}</h2>
           <p className="capitalize text-lg font-medium text-primary my-1">{badge.level} Level</p>
+          {badge.earnedDate && (
+            <p className="text-sm text-muted-foreground mt-2">Earned on {format(new Date(badge.earnedDate), 'MMMM d, yyyy')}</p>
+          )}
         </div>
       </DialogContent>
     </Dialog>

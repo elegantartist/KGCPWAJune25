@@ -8,6 +8,7 @@ import AdminDashboard from '@/pages/AdminDashboard';
 import PatientProfilePage from '@/pages/PatientProfilePage';
 import DailyScoresPage from '@/pages/DailyScoresPage';
 import ProgressMilestonesPage from '@/pages/ProgressMilestonesPage';
+import DoctorSetupPage from '@/pages/DoctorSetupPage';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import ImpersonationBanner from '@/components/ImpersonationBanner';
 
@@ -19,8 +20,9 @@ function App() {
       {isImpersonating && <ImpersonationBanner />}
       <main className={isImpersonating ? 'pt-12' : ''}>
         <Switch>
-          {/* Public Route */}
+          {/* Public Routes */}
           <Route path="/login" component={LoginPage} />
+          <Route path="/doctor/setup" component={DoctorSetupPage} />
 
           {/* Patient Routes */}
           <Route path="/patient-dashboard">

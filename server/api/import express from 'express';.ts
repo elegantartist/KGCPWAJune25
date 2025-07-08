@@ -1,18 +1,10 @@
 import express from 'express';
 import { supervisorAgent, SupervisorQuery } from '../services/supervisorAgent';
 import { AnalysisResult } from '../../client/src/services/healthAnalysisService';
-
-// A placeholder for your real authentication middleware
-const authMiddleware = (req: any, res: express.Response, next: express.NextFunction) => {
-  // In a real app, you'd validate a JWT or session here.
-  // For now, we'll simulate a logged-in user.
-  if (!req.headers.authorization) {
-    return res.status(401).json({ error: 'Unauthorized: No token provided' });
-  }
-  // This is a placeholder. Replace with real user lookup from token.
-  req.user = { id: 1 }; 
-  next();
-};
+import { db } from '../db';
+import * as schema from '@shared/schema';
+import { authMiddleware, AuthenticatedRequest } from '../auth';
+import { z } from 'zod';
 
 const router = express.Router();
 
@@ -20,13 +12,17 @@ const router = express.Router();
  * Main chat endpoint.
  * Handles general conversation with the Supervisor Agent.
  */
-router.post('/chat', authMiddleware, async (req: any, res) => {
-  const { message, sessionId } = req.body;
-  const userId = req.user.id;
+const chatSchema = z.object({
+  message: z.object({
+    text: z.string().min(1),
+    sentAt: z.string().datetime().optional(),
+  }),
+  sessionId: z.string().uuid(),
+});
 
-  if (!message || typeof message.text !== 'string') {
-    return res.status(400).json({ error: 'Invalid message format' });
-  }
+router.post('/chat', authMiddleware(), async (req: AuthenticatedRequest, res) => {
+  const { message, sessionId } = req.body;
+  const userId = req.user!.id;
 
   try {
     const supervisorQuery: SupervisorQuery = {
@@ -34,7 +30,7 @@ router.post('/chat', authMiddleware, async (req: any, res) => {
         text: message.text,
         sentAt: message.sentAt || new Date().toISOString(),
       },
-      userId,
+      userId: userId,
       sessionId,
     };
 
@@ -42,6 +38,9 @@ router.post('/chat', authMiddleware, async (req: any, res) => {
     return res.json(response);
 
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Invalid request format.', details: error.errors });
+    }
     console.error('Error in /api/chat endpoint:', error);
     res.status(500).json({
       response: "I'm sorry, an unexpected error occurred. Please try again later.",
@@ -54,14 +53,17 @@ router.post('/chat', authMiddleware, async (req: any, res) => {
  * Health metrics analysis endpoint.
  * Handles requests for AI-powered analysis of user health scores.
  */
-router.post('/analyze-health-metrics', authMiddleware, async (req: any, res) => {
+router.post('/analyze-health-metrics', authMiddleware(), async (req: AuthenticatedRequest, res) => {
   try {
     const { metrics } = req.body;
-    const userId = req.user.id;
+    const userId = req.user!.id;
 
     if (!metrics || !Array.isArray(metrics) || metrics.length === 0) {
       return res.status(400).json({ message: "Invalid or empty metrics data provided." });
     }
+
+    // Assuming metrics have nutrition, activity, and medication properties.
+    // Add Zod validation here for production robustness.
 
     // The agent expects a single, recent set of scores.
     const latestMetrics = metrics[metrics.length - 1];
@@ -87,6 +89,48 @@ router.post('/analyze-health-metrics', authMiddleware, async (req: any, res) => 
   } catch (error) {
     console.error("Error in /api/analyze-health-metrics:", error);
     return res.status(500).json({ message: "An internal error occurred while analyzing health metrics." });
+  }
+});
+
+const healthScoresSchema = z.object({
+  dietScore: z.number().min(1).max(10),
+  exerciseScore: z.number().min(1).max(10),
+  medicationScore: z.number().min(1).max(10),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format."),
+});
+
+/**
+ * POST /api/health-scores
+ * Submits or updates the user's daily self-reported health scores.
+ * This implements an "upsert" logic based on the user and date.
+ */
+router.post('/health-scores', authMiddleware(), async (req: AuthenticatedRequest, res) => {
+  try {
+    const { dietScore, exerciseScore, medicationScore, date } = healthScoresSchema.parse(req.body);
+    const userId = req.user!.id;
+
+    // Use Drizzle's `onConflictDoUpdate` for an atomic upsert operation.
+    // This relies on the unique constraint on (userId, date) which was added in a migration.
+    await db.insert(schema.healthScores)
+      .values({
+        userId,
+        date,
+        dietScore,
+        exerciseScore,
+        medicationScore,
+      })
+      .onConflictDoUpdate({
+        target: [schema.healthScores.userId, schema.healthScores.date],
+        set: { dietScore, exerciseScore, medicationScore, updatedAt: new Date() },
+      });
+
+    res.status(201).json({ message: 'Health scores submitted successfully.' });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Invalid score format.', details: error.errors });
+    }
+    console.error("Error in /api/health-scores:", error);
+    return res.status(500).json({ message: "An internal error occurred while submitting scores." });
   }
 });
 

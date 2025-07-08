@@ -4,9 +4,14 @@ import { cn } from '@/lib/utils';
 export type BadgeLevel = 'bronze' | 'silver' | 'gold' | 'platinum';
 export type BadgeType = 'meal' | 'diet' | 'exercise' | 'medication';
 
+/**
+ * Represents the details of an earned achievement badge.
+ * This interface is used throughout the application to display badges.
+ */
 export interface BadgeDetails {
   type: BadgeType;
   level: BadgeLevel;
+  earnedDate?: Date; // Optional: The date the badge was earned.
 }
 
 const badgeBaseColors: Record<BadgeType, string> = {
@@ -57,11 +62,20 @@ const getBadgeFilter = (type: BadgeType, level: BadgeLevel): string => {
   return `${typeFilter} ${levelAdjustment}`;
 };
 
+/**
+ * Props for the AchievementBadge component.
+ */
 interface AchievementBadgeProps {
+  /** The badge details object containing type and level. */
   badge: BadgeDetails;
+  /** The display size of the badge. */
   size?: 'sm' | 'md' | 'lg';
 }
 
+/**
+ * A reusable component to display a KGC Achievement Badge.
+ * It renders the KGC logo with dynamic color filters and a tier ring based on the badge properties.
+ */
 export const AchievementBadge: React.FC<AchievementBadgeProps> = ({ badge, size = 'md' }) => {
   const sizeClasses = {
     sm: "w-12 h-12",

@@ -1,100 +1,489 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { Trophy, Medal, Star, Award, Calendar, Target, Plus, Loader2, Crown, Info, Gift, Activity, Utensils, Pill, Heart, Repeat } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Loader2, Crown, Info, Gift, Trophy } from "lucide-react";
-import { useMilestones, EarnedBadge } from "@/hooks/useMilestones";
+import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Slider } from "@/components/ui/slider";
+import { useProgressMilestones, ProgressMilestone } from "@/hooks/useProgressMilestones";
+import { useToast } from "@/hooks/use-toast";
+import { AchievementBadge, BadgeCollection, BadgeDetails, BadgeType, BadgeLevel, getBadgeFilter } from "@/components/achievement-badge";
 
-// A simplified badge component for display within the list.
-const AchievementBadge: React.FC<{ badge: EarnedBadge }> = ({ badge }) => {
-  const tierColors: Record<string, string> = {
-    bronze: 'bg-amber-700 text-white',
-    silver: 'bg-slate-400 text-white',
-    gold: 'bg-yellow-400 text-gray-900',
-    platinum: 'bg-white text-gray-900 border-2 border-blue-300',
+// Define badge ring colors
+const badgeRingColors = {
+  bronze: "#CD7F32",   // Brown
+  silver: "#C0C0C0",   // Grey
+  gold: "#FFD700",     // Yellow
+  platinum: "#FFFFFF"  // White
+};
+
+// Icon mapping function
+const getIconComponent = (iconType?: string) => {
+  switch (iconType) {
+    case 'Medal':
+      return <Medal className="h-6 w-6 text-[#2E8BC0]" />;
+    case 'Star':
+      return <Star className="h-6 w-6 text-[#2E8BC0]" />;
+    case 'Award':
+      return <Award className="h-6 w-6 text-[#2E8BC0]" />;
+    case 'Target':
+      return <Target className="h-6 w-6 text-[#2E8BC0]" />;
+    case 'Calendar':
+      return <Calendar className="h-6 w-6 text-[#2E8BC0]" />;
+    case 'Trophy':
+    default:
+      return <Trophy className="h-6 w-6 text-[#2E8BC0]" />;
+  }
+};
+
+// Form validation schema
+const milestoneFormSchema = z.object({
+  title: z.string().min(3, { message: "Title must be at least 3 characters" }),
+  description: z.string().min(5, { message: "Description must be at least 5 characters" }),
+  category: z.string().min(1, { message: "Please select a category" }),
+  progress: z.number().min(0).max(100),
+  iconType: z.string().optional(),
+});
+
+// Milestone creation/edit form
+const MilestoneForm: React.FC<{
+  userId: number;
+  existingMilestone?: ProgressMilestone;
+  onComplete: () => void;
+}> = ({ userId, existingMilestone, onComplete }) => {
+  const { createMilestone, updateMilestone } = useProgressMilestones(userId);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { toast } = useToast();
+  
+  // Initialize form with default values or existing milestone
+  const form = useForm<z.infer<typeof milestoneFormSchema>>({
+    resolver: zodResolver(milestoneFormSchema),
+    defaultValues: existingMilestone ? {
+      title: existingMilestone.title,
+      description: existingMilestone.description || "",
+      category: existingMilestone.category,
+      progress: existingMilestone.progress,
+      iconType: existingMilestone.iconType || "Trophy"
+    } : {
+      title: "",
+      description: "",
+      category: "Health",
+      progress: 0,
+      iconType: "Trophy"
+    }
+  });
+  
+  // Handle form submission
+  const onSubmit = async (data: z.infer<typeof milestoneFormSchema>) => {
+    setIsSubmitting(true);
+    
+    try {
+      if (existingMilestone) {
+        // Update existing milestone
+        await updateMilestone({
+          ...existingMilestone,
+          ...data,
+          completed: data.progress >= 100 ? true : existingMilestone.completed,
+          completedDate: data.progress >= 100 && !existingMilestone.completedDate ? new Date() : existingMilestone.completedDate
+        });
+        toast({
+          title: "Milestone updated",
+          description: "Your progress milestone has been updated successfully.",
+        });
+      } else {
+        // Create new milestone
+        await createMilestone({
+          userId,
+          ...data,
+          completed: data.progress >= 100,
+          completedDate: data.progress >= 100 ? new Date() : null,
+        });
+        toast({
+          title: "Milestone created",
+          description: "New progress milestone has been created successfully.",
+        });
+      }
+      
+      onComplete();
+    } catch (error) {
+      console.error("Error saving milestone:", error);
+      toast({
+        title: "Error",
+        description: "There was a problem saving your milestone. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
+  
   return (
-    <div className="flex flex-col items-center text-center gap-2">
-      <div className={`w-20 h-20 rounded-full flex items-center justify-center shadow-md ${tierColors[badge.tier]}`}>
-        <Trophy className="w-10 h-10" />
-      </div>
-      <p className="text-sm font-semibold capitalize">{badge.tier} {badge.category}</p>
-      <p className="text-xs text-muted-foreground">{new Date(badge.earnedDate).toLocaleDateString()}</p>
-    </div>
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <FormField
+          control={form.control}
+          name="title"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Title</FormLabel>
+              <FormControl>
+                <Input placeholder="Enter milestone title..." {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        
+        <FormField
+          control={form.control}
+          name="description"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Description</FormLabel>
+              <FormControl>
+                <Textarea placeholder="Describe this milestone..." {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        
+        <FormField
+          control={form.control}
+          name="category"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Category</FormLabel>
+              <Select 
+                onValueChange={field.onChange} 
+                defaultValue={field.value}
+              >
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="Health">Health</SelectItem>
+                  <SelectItem value="Diet">Diet</SelectItem>
+                  <SelectItem value="Exercise">Exercise</SelectItem>
+                  <SelectItem value="Medication">Medication</SelectItem>
+                  <SelectItem value="Wellness">Wellness</SelectItem>
+                  <SelectItem value="Engagement">Engagement</SelectItem>
+                  <SelectItem value="Goal">Goal</SelectItem>
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        
+        <FormField
+          control={form.control}
+          name="iconType"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Icon</FormLabel>
+              <Select 
+                onValueChange={field.onChange} 
+                defaultValue={field.value || "Trophy"}
+              >
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select icon" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="Trophy">Trophy</SelectItem>
+                  <SelectItem value="Medal">Medal</SelectItem>
+                  <SelectItem value="Star">Star</SelectItem>
+                  <SelectItem value="Award">Award</SelectItem>
+                  <SelectItem value="Target">Target</SelectItem>
+                  <SelectItem value="Calendar">Calendar</SelectItem>
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        
+        <FormField
+          control={form.control}
+          name="progress"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Progress: {field.value}%</FormLabel>
+              <FormControl>
+                <Slider
+                  max={100}
+                  step={5}
+                  value={[field.value]}
+                  onValueChange={(vals) => field.onChange(vals[0])}
+                  className="py-4"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        
+        <DialogFooter>
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {existingMilestone ? "Update Milestone" : "Create Milestone"}
+          </Button>
+        </DialogFooter>
+      </form>
+    </Form>
   );
 };
 
-const ProgressMilestonesPage: React.FC = () => {
-  const { data, isLoading, error } = useMilestones();
-  const [isRewardsInfoOpen, setIsRewardsInfoOpen] = useState(false);
-  const [isBadgeInfoOpen, setIsBadgeInfoOpen] = useState(false);
+// Sample earned badges data - in production this would come from API/backend
+const getSampleBadges = (): BadgeDetails[] => {
+  return [
+    {
+      type: 'meal',
+      level: 'bronze',
+      earnedDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) // 30 days ago
+    },
+    {
+      type: 'exercise',
+      level: 'silver',
+      earnedDate: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000) // 15 days ago
+    },
+    {
+      type: 'medication',
+      level: 'bronze',
+      earnedDate: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000) // 10 days ago
+    }
+  ];
+};
 
-  const renderBadgeContent = () => {
-    if (isLoading) {
-      return (
-        <div className="flex justify-center items-center py-8">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+// Sample badge progress
+const getBadgeProgress = (type: BadgeType, level: BadgeLevel): number => {
+  switch(level) {
+    case 'bronze':
+      return type === 'exercise' ? 100 : 80;  // Exercise has reached bronze
+    case 'silver':
+      return type === 'exercise' ? 55 : 0;    // Exercise halfway to silver
+    case 'gold':
+      return 0;                               // No badges have gold progress yet
+    case 'platinum':
+      return 0;                               // No badges have platinum progress
+    default:
+      return 0;
+  }
+};
+
+// Progress Badge Card component
+interface BadgeProgressCardProps {
+  type: BadgeType;
+  title: string;
+  description: string;
+  currentLevel: BadgeLevel | null;
+  nextLevel: BadgeLevel;
+  progress: number;
+  weeksCompleted: number;
+  weeksRequired: number;
+}
+
+const BadgeProgressCard: React.FC<BadgeProgressCardProps> = ({
+  type,
+  title,
+  description,
+  currentLevel,
+  nextLevel,
+  progress,
+  weeksCompleted,
+  weeksRequired
+}) => {
+  // Determine the required weeks based on the next level
+  const getWeeksForLevel = (level: BadgeLevel): number => {
+    switch(level) {
+      case 'bronze': return 2;
+      case 'silver': return 4;
+      case 'gold': return 16;
+      case 'platinum': return 24;
+      default: return 2;
+    }
+  };
+  
+  // Get the color for the badge type
+  const getTypeColor = (badgeType: BadgeType): string => {
+    switch(badgeType) {
+      case 'meal': return "#4CAF50";      // Green
+      case 'exercise': return "#9C27B0";  // Purple
+      case 'medication': return "#2196F3"; // Blue
+      default: return "#2E8BC0";          // Default blue
+    }
+  };
+  
+  // Get the color for the badge level
+  const getLevelColor = (level: BadgeLevel): string => {
+    return badgeRingColors[level];
+  };
+  
+  return (
+    <Card className="border-[#2E8BC0]/20 hover:border-[#2E8BC0]/10 transition-all">
+      <CardContent className="p-4">
+        <div className="flex items-start mb-3">
+          <div className="flex-shrink-0 mr-4">
+            <div 
+              className="w-16 h-16 rounded-full overflow-hidden"
+              style={{ 
+                backgroundColor: getTypeColor(type),
+                border: `3px solid ${getLevelColor(nextLevel)}`,
+                boxShadow: `0 0 10px ${getLevelColor(nextLevel)}`
+              }}
+            >
+              <img 
+                src="/assets/kgc-logo.jpg" 
+                alt={`${title} - ${nextLevel}`} 
+                className="w-full h-full object-cover"
+                style={{ filter: getBadgeFilter(type, nextLevel) }}
+              />
+            </div>
+          </div>
+          
+          <div className="flex-1">
+            <div className="flex justify-between items-start">
+              <div>
+                <h3 className="text-lg font-medium text-[#676767]">{title}</h3>
+                <p className="text-sm text-[#a4a4a4]">{description}</p>
+              </div>
+              {currentLevel && (
+                <Badge className="bg-primary">
+                  {currentLevel.charAt(0).toUpperCase() + currentLevel.slice(1)}
+                </Badge>
+              )}
+            </div>
+            
+            <div className="mt-3">
+              <div className="flex justify-between items-center text-sm mb-1">
+                <span className="text-[#676767]">Progress to {nextLevel.charAt(0).toUpperCase() + nextLevel.slice(1)}</span>
+                <span className="text-[#2E8BC0] font-medium">{progress}%</span>
+              </div>
+              <Progress 
+                value={progress} 
+                className="h-3"
+                style={{ 
+                  backgroundColor: "#f0f0f0",
+                  "--progress-background": getTypeColor(type)
+                } as any} 
+              />
+            </div>
+            
+            <div className="mt-3 text-sm text-[#676767] flex items-center justify-between">
+              <div className="flex items-center">
+                <Calendar className="h-4 w-4 mr-1" />
+                <span>{weeksCompleted} of {weeksRequired} weeks completed</span>
+              </div>
+              
+              <div className="text-xs text-muted-foreground">
+                {Math.round((weeksRequired - weeksCompleted) * 7)} days remaining
+              </div>
+            </div>
+          </div>
         </div>
-      );
+        
+        <div className="mt-2 text-xs text-muted-foreground text-center">
+          <p>Maintain a self-score of {nextLevel === 'bronze' ? '5-10' : 
+             nextLevel === 'silver' ? '7-10' : 
+             nextLevel === 'gold' ? '8-10' : '9-10'} 
+             to achieve {nextLevel} level</p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+// Main component
+import { useBadges } from '@/hooks/useBadges';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { useQuery } from "@tanstack/react-query";
+
+const ProgressMilestones: React.FC = () => {
+  // Get current authenticated user
+  const { data: currentUser } = useQuery({
+    queryKey: ['/api/user/current-context'],
+    retry: false
+  });
+
+  const userId = currentUser?.id;
+  const { 
+    badges: fetchedBadges, 
+    badgeProgress, 
+    loading
+  } = useBadges(userId);
+  
+  const [rewardsInfoOpen, setRewardsInfoOpen] = useState(false);
+  const [badgeInfoOpen, setBadgeInfoOpen] = useState(false);
+  const [rewardSequenceStep, setRewardSequenceStep] = useState(0);
+  
+  // Use badges from the hook if available, otherwise use sample badges
+  const badges = fetchedBadges.length > 0 ? fetchedBadges : getSampleBadges();
+  
+  // Track if all platinum badges are achieved
+  const hasPlatinumExercise = badges.some(b => b.type === 'exercise' && b.level === 'platinum');
+  const hasPlatinumMeal = badges.some(b => b.type === 'meal' && b.level === 'platinum');
+  const hasPlatinumMedication = badges.some(b => b.type === 'medication' && b.level === 'platinum');
+  const hasAllPlatinumBadges = hasPlatinumExercise && hasPlatinumMeal && hasPlatinumMedication;
+  
+  // Separate badges by type for display
+  const getMealBadges = () => badges.filter(b => b.type === 'meal');
+  const getExerciseBadges = () => badges.filter(b => b.type === 'exercise');
+  const getMedicationBadges = () => badges.filter(b => b.type === 'medication');
+  
+  // No need to handle badge animation from hook as we removed those features
+  
+  // Badge reward sequence animation
+  const advanceRewardSequence = () => {
+    if (rewardSequenceStep < 3) {
+      setRewardSequenceStep(prev => prev + 1);
+    } else {
+      // Reset and close dialog when sequence is complete
+      setRewardSequenceStep(0);
+      setRewardsInfoOpen(false);
     }
-    if (error) {
-      return <p className="text-center text-destructive py-8">Could not load badges. Please try again later.</p>;
-    }
-    if (!data || data.earnedBadges.length === 0) {
-      return <p className="text-center text-muted-foreground py-8">No badges earned yet. Keep up the great work!</p>;
-    }
-    return (
-      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-4 py-4">
-        {data.earnedBadges.map((badge, index) => (
-          <AchievementBadge key={index} badge={badge} />
-        ))}
-      </div>
-    );
   };
 
   return (
-    <div className="space-y-6 p-4 md:p-6">
-      {/* Page Header */}
+    <div className="space-y-6">
+      {/* Page Title and Earn $100 Button */}
       <div className="flex flex-col items-center justify-center mb-6">
         <h1 className="text-2xl font-bold text-[#2E8BC0] mb-4">Progress Milestones</h1>
-        <Button
-          onClick={() => setIsRewardsInfoOpen(true)}
-          size="lg"
-          className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold px-6 py-3 rounded-lg shadow-md w-full max-w-xs justify-center"
+        
+        {/* Prominent Earn $100 Button */}
+        <Button 
+          variant="default" 
+          size="lg" 
+          className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold px-6 py-2 rounded-lg shadow-md w-full max-w-xs justify-center"
+          onClick={() => {
+            setRewardSequenceStep(0);
+            setRewardsInfoOpen(true);
+          }}
         >
           <span className="text-lg">Earn $100</span>
           <Gift className="h-5 w-5" />
         </Button>
       </div>
-
-      {/* Achievement Badges Card */}
+      
+      {/* Achievement Badges Section */}
       <Card className="bg-[#fdfdfd] border-[#2E8BC0]/20">
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <div>
             <CardTitle className="text-[#676767] flex items-center">
-              <Crown className="w-6 h-6 text-[#2E8BC0] mr-2" />
-              <span>Achievement Badges</span>
-            </CardTitle>
-            <CardDescription className="text-[#a4a4a4]">
-              Badges earned for consistently maintaining good health habits
-            </CardDescription>
-          </div>
-          <Button variant="ghost" size="icon" className="rounded-full h-8 w-8" onClick={() => setIsBadgeInfoOpen(true)}>
-            <Info className="h-4 w-4" />
-          </Button>
-        </CardHeader>
-        <CardContent>
-          {renderBadgeContent()}
-        </CardContent>
-      </Card>
-
-      {/* TODO: Add Progress to Next Badge Level Card */}
-
-      {/* TODO: Add Dialogs */}
-    </div>
-  );
-};
-
-export default ProgressMilestonesPage;
+              <Crown className="
   }
 };
 
