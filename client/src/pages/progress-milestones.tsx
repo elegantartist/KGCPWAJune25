@@ -1,48 +1,100 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
-import { Trophy, Medal, Star, Award, Calendar, Target, Plus, Loader2, Crown, Info, Gift, Activity, Utensils, Pill, Heart, Repeat } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Slider } from "@/components/ui/slider";
-import { useProgressMilestones, ProgressMilestone } from "@/hooks/useProgressMilestones";
-import { useToast } from "@/hooks/use-toast";
-import { AchievementBadge, BadgeCollection, BadgeDetails, BadgeType, BadgeLevel, getBadgeFilter } from "@/components/achievement-badge";
+import { Loader2, Crown, Info, Gift, Trophy } from "lucide-react";
+import { useMilestones, EarnedBadge } from "@/hooks/useMilestones";
 
-// Define badge ring colors
-const badgeRingColors = {
-  bronze: "#CD7F32",   // Brown
-  silver: "#C0C0C0",   // Grey
-  gold: "#FFD700",     // Yellow
-  platinum: "#FFFFFF"  // White
+// A simplified badge component for display within the list.
+const AchievementBadge: React.FC<{ badge: EarnedBadge }> = ({ badge }) => {
+  const tierColors: Record<string, string> = {
+    bronze: 'bg-amber-700 text-white',
+    silver: 'bg-slate-400 text-white',
+    gold: 'bg-yellow-400 text-gray-900',
+    platinum: 'bg-white text-gray-900 border-2 border-blue-300',
+  };
+  return (
+    <div className="flex flex-col items-center text-center gap-2">
+      <div className={`w-20 h-20 rounded-full flex items-center justify-center shadow-md ${tierColors[badge.tier]}`}>
+        <Trophy className="w-10 h-10" />
+      </div>
+      <p className="text-sm font-semibold capitalize">{badge.tier} {badge.category}</p>
+      <p className="text-xs text-muted-foreground">{new Date(badge.earnedDate).toLocaleDateString()}</p>
+    </div>
+  );
 };
 
-// Icon mapping function
-const getIconComponent = (iconType?: string) => {
-  switch (iconType) {
-    case 'Medal':
-      return <Medal className="h-6 w-6 text-[#2E8BC0]" />;
-    case 'Star':
-      return <Star className="h-6 w-6 text-[#2E8BC0]" />;
-    case 'Award':
-      return <Award className="h-6 w-6 text-[#2E8BC0]" />;
-    case 'Target':
-      return <Target className="h-6 w-6 text-[#2E8BC0]" />;
-    case 'Calendar':
-      return <Calendar className="h-6 w-6 text-[#2E8BC0]" />;
-    case 'Trophy':
-    default:
-      return <Trophy className="h-6 w-6 text-[#2E8BC0]" />;
+const ProgressMilestonesPage: React.FC = () => {
+  const { data, isLoading, error } = useMilestones();
+  const [isRewardsInfoOpen, setIsRewardsInfoOpen] = useState(false);
+  const [isBadgeInfoOpen, setIsBadgeInfoOpen] = useState(false);
+
+  const renderBadgeContent = () => {
+    if (isLoading) {
+      return (
+        <div className="flex justify-center items-center py-8">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      );
+    }
+    if (error) {
+      return <p className="text-center text-destructive py-8">Could not load badges. Please try again later.</p>;
+    }
+    if (!data || data.earnedBadges.length === 0) {
+      return <p className="text-center text-muted-foreground py-8">No badges earned yet. Keep up the great work!</p>;
+    }
+    return (
+      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-4 py-4">
+        {data.earnedBadges.map((badge, index) => (
+          <AchievementBadge key={index} badge={badge} />
+        ))}
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-6 p-4 md:p-6">
+      {/* Page Header */}
+      <div className="flex flex-col items-center justify-center mb-6">
+        <h1 className="text-2xl font-bold text-[#2E8BC0] mb-4">Progress Milestones</h1>
+        <Button
+          onClick={() => setIsRewardsInfoOpen(true)}
+          size="lg"
+          className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold px-6 py-3 rounded-lg shadow-md w-full max-w-xs justify-center"
+        >
+          <span className="text-lg">Earn $100</span>
+          <Gift className="h-5 w-5" />
+        </Button>
+      </div>
+
+      {/* Achievement Badges Card */}
+      <Card className="bg-[#fdfdfd] border-[#2E8BC0]/20">
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <div>
+            <CardTitle className="text-[#676767] flex items-center">
+              <Crown className="w-6 h-6 text-[#2E8BC0] mr-2" />
+              <span>Achievement Badges</span>
+            </CardTitle>
+            <CardDescription className="text-[#a4a4a4]">
+              Badges earned for consistently maintaining good health habits
+            </CardDescription>
+          </div>
+          <Button variant="ghost" size="icon" className="rounded-full h-8 w-8" onClick={() => setIsBadgeInfoOpen(true)}>
+            <Info className="h-4 w-4" />
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {renderBadgeContent()}
+        </CardContent>
+      </Card>
+
+      {/* TODO: Add Progress to Next Badge Level Card */}
+
+      {/* TODO: Add Dialogs */}
+    </div>
+  );
+};
+
+export default ProgressMilestonesPage;
   }
 };
 
