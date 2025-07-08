@@ -1,36 +1,36 @@
 import React from 'react';
-import { useAuth } from '@/hooks/useAuth';
-import { Redirect } from 'wouter';
-import { Loader2 } from 'lucide-react';
-
-interface ProtectedRouteProps {
-  children: React.ReactNode;
-}
+import { useConnectivity } from '@/hooks/useConnectivity';
+import { Wifi, WifiOff } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 /**
- * A component that protects routes from unauthenticated access.
- * It checks the authentication state and redirects to the login page if the user is not logged in.
- * It also handles the initial loading state of the authentication context.
+ * A non-intrusive banner that displays the current network connectivity status.
+ * It only appears when the connection is limited or offline.
  */
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
-  const { isAuthenticated, isLoading } = useAuth();
+export const ConnectivityBanner: React.FC = () => {
+  const { isOffline, isMinimal } = useConnectivity();
 
-  // While the auth state is being determined (e.g., checking localStorage), show a loading spinner.
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-      </div>
-    );
+  // Don't render the banner if the connection is good (functional or full)
+  if (!isOffline && !isMinimal) {
+    return null;
   }
 
-  // If not authenticated, redirect to the login page.
-  if (!isAuthenticated) {
-    return <Redirect to="/login" />;
-  }
+  const message = isOffline
+    ? "You are currently offline. Some features may be unavailable."
+    : "Your connection is limited. Performance may be affected.";
 
-  // If authenticated, render the requested component.
-  return <>{children}</>;
+  const icon = isOffline ? <WifiOff size={16} /> : <Wifi size={16} />;
+
+  return (
+    <div
+      className={cn(
+        'w-full p-2 text-center text-sm text-white flex items-center justify-center gap-2',
+        isOffline ? 'bg-destructive' : 'bg-amber-500'
+      )}
+      role="alert"
+    >
+      {icon}
+      <span>{message}</span>
+    </div>
+  );
 };
-
-export default ProtectedRoute;

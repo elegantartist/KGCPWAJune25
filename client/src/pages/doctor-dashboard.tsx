@@ -1,520 +1,194 @@
-/**
- * KEEP GOING CARE - DOCTOR DASHBOARD
- * Refactored to use the centralized useAuth hook for authentication and user management.
- */
-
-import React, { useState, useEffect } from 'react';
-import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { ArrowLeft, LogOut, UserCircle, Clipboard, Calendar, MessageSquare, Activity } from 'lucide-react';
+import React, { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useToast } from '@/hooks/use-toast';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Loader2, UserPlus, LogOut, AlertTriangle, Bell, Link as LinkIcon } from 'lucide-react';
+import { Link } from 'wouter';
 
+// Define the shape of the patient data returned from the API
 interface Patient {
   id: number;
   name: string;
   email: string;
-  phoneNumber: string;
-  userId: number;
-  doctorId: number;
   isActive: boolean;
   createdAt: string;
-  uin: string | null;
+  alertStatus: 'ok' | 'inactive' | 'emergency';
 }
 
-interface HealthMetric {
-  id: number;
-  date: string;
-  medicationScore: number;
-  dietScore: number;
-  exerciseScore: number;
-}
+const DoctorDashboard: React.FC = () => {
+  const { user, logout } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-interface CarePlanDirective {
-  healthy_eating_plan: string;
-  exercise_wellness_routine: string;
-  prescribed_medication: string;
-}
+  const [isCreatePatientOpen, setIsCreatePatientOpen] = useState(false);
+  const [newPatient, setNewPatient] = useState({ name: '', email: '', phoneNumber: '' });
 
-export default function DoctorDashboard() {
-  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
-  const [healthData, setHealthData] = useState<any[]>([]);
-  const [patients, setPatients] = useState<Patient[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [showSuccess, setShowSuccess] = useState(false);
-  const [doctorRemarks, setDoctorRemarks] = useState<CarePlanDirective>({
-    healthy_eating_plan: "",
-    exercise_wellness_routine: "",
-    prescribed_medication: "",
-  });
-  const { user, token, logout } = useAuth();
-
-  // Use refs to store current values and avoid re-render issues
-  const healthyEatingRef = React.useRef<HTMLTextAreaElement>(null);
-  const exerciseWellnessRef = React.useRef<HTMLTextAreaElement>(null);
-  const prescribedMedicationRef = React.useRef<HTMLTextAreaElement>(null);
-
-  useEffect(() => {
-    fetchPatients();
-  }, []);
-
-  // Fetch doctor's patients (adapted from legacy API)
-  const fetchPatients = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
+  // Fetch doctor's patients using react-query
+  const { data: patients, isLoading, error } = useQuery<Patient[]>({
+    queryKey: ['doctor-patients'],
+    queryFn: async () => {
+      const token = localStorage.getItem('accessToken');
+      // This API endpoint will need to be created in the backend
       const response = await fetch('/api/doctor/patients', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+        headers: { 'Authorization': `Bearer ${token}` },
       });
-
-      if (response.status === 401) {
-        logout(); // Token is invalid or expired, log out.
-        return;
-      }
-
       if (!response.ok) {
-        throw new Error('Failed to fetch patients');
+        throw new Error('Failed to fetch patients.');
       }
+      return response.json();
+    },
+  });
 
-      const data = await response.json();
-      setPatients(data);
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Fetch patient health data (fixed to use doctor-specific endpoint)
-  const fetchPatientHealthData = async (patientId: number) => {
-    try {
-      const response = await fetch(`/api/doctor/patients/${patientId}/health-metrics`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.status === 401) {
-        logout();
-        return;
-      }
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch patient health data');
-      }
-
-      const data = await response.json();
-      
-      // Transform data for LineChart with hardened date handling
-      const transformedData = data.map((entry: any) => {
-        // HARDENED CODE: Check for valid date before creating Date object
-        const dateObj = entry.date ? new Date(entry.date) : null;
-        const formattedDate = dateObj && !isNaN(dateObj.getTime())
-          ? `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`
-          : 'No Date';
-          
-        return {
-          date: formattedDate,
-          medication: entry.medicationScore || 0,
-          diet: entry.dietScore || 0,
-          exercise: entry.exerciseScore || 0,
-        };
-      });
-
-      setHealthData(transformedData);
-      setSelectedPatient(prevPatient => ({ ...prevPatient!, healthData: transformedData }));
-    } catch (err: any) {
-      setError('Failed to fetch patient health data');
-    }
-  };
-
-  // Fetch care plan directives (adapted from legacy)
-  const fetchDoctorRemarks = async (patientId: number) => {
-    try {
-      const response = await fetch(`/api/doctor/patients/${patientId}/care-plan`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-      });
-
-      if (response.status === 401) {
-        logout();
-        return;
-      }
-
-      if (!response.ok) {
-        // If no care plan exists, use defaults
-        setDoctorRemarks({
-          healthy_eating_plan: "",
-          exercise_wellness_routine: "",
-          prescribed_medication: "",
-        });
-        return;
-      }
-
-      const data = await response.json();
-      if (data.status === 'success') {
-        setDoctorRemarks(data.remarks);
-      } else {
-        setDoctorRemarks({
-          healthy_eating_plan: "",
-          exercise_wellness_routine: "",
-          prescribed_medication: "",
-        });
-      }
-    } catch (err: any) {
-      setError('Failed to fetch doctor remarks');
-    }
-  };
-
-  // Handle patient selection
-  const handlePatientSelect = (patient: Patient) => {
-    setSelectedPatient(patient);
-    fetchPatientHealthData(patient.id);
-    fetchDoctorRemarks(patient.id);
-  };
-
-  // New handler function for cleaning up state before going back to the list
-  const handleReturnToList = () => {
-    setHealthData([]); // Clear the previous patient's health data
-    setDoctorRemarks({ // Reset the remarks to their initial state
-      healthy_eating_plan: "",
-      exercise_wellness_routine: "",
-      prescribed_medication: "",
-    });
-    setError(null); // Clear any previous errors
-    setSelectedPatient(null); // Go back to the list view
-  };
-
-  // Save care plan directives (adapted from legacy)
-  const handleSaveHealthPoints = async (event: React.FormEvent) => {
-    event.preventDefault();
-    
-    if (!selectedPatient) return;
-
-    const formData = new FormData(event.target as HTMLFormElement);
-    const data = Object.fromEntries(formData.entries());
-
-    try {
-      const response = await fetch(`/api/doctor/patients/${selectedPatient.id}/care-plan`, {
+  // Mutation for creating a new patient
+  const createPatientMutation = useMutation({
+    mutationFn: async () => {
+      const token = localStorage.getItem('accessToken');
+      // This API endpoint will need to be created in the backend
+      const response = await fetch('/api/doctor/create-patient', {
         method: 'POST',
         headers: {
+          'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
         },
-        body: JSON.stringify(data)
+        body: JSON.stringify(newPatient),
       });
-
-      if (response.status === 401) {
-        logout();
-        return;
-      }
-
+      const data = await response.json();
       if (!response.ok) {
-        throw new Error('Failed to save care plan directives');
+        throw new Error(data.error || 'Failed to create patient.');
       }
+      return data;
+    },
+    onSuccess: () => {
+      toast({ title: 'Success', description: 'Patient account created and welcome email sent.' });
+      queryClient.invalidateQueries({ queryKey: ['doctor-patients'] });
+      setIsCreatePatientOpen(false);
+      setNewPatient({ name: '', email: '', phoneNumber: '' });
+    },
+    onError: (err: any) => {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+    },
+  });
 
-      // Update the local state with the saved data
-      setDoctorRemarks({
-        healthy_eating_plan: data.healthy_eating_plan as string || "",
-        exercise_wellness_routine: data.exercise_wellness_routine as string || "",
-        prescribed_medication: data.prescribed_medication as string || "",
-      });
+  const handleCreatePatientSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    createPatientMutation.mutate();
+  };
 
-      setShowSuccess(true);
-      setTimeout(() => setShowSuccess(false), 3000);
-
-      // Refresh the care plan data from server to ensure consistency
-      fetchDoctorRemarks(selectedPatient.id);
-    } catch (err: any) {
-      setError('Failed to save care plan directives');
+  const getAlertIcon = (status: Patient['alertStatus']) => {
+    switch (status) {
+      case 'emergency':
+        return <Badge variant="destructive" className="flex items-center gap-1"><AlertTriangle className="h-4 w-4" /> Emergency</Badge>;
+      case 'inactive':
+        return <Badge variant="secondary" className="flex items-center gap-1"><Bell className="h-4 w-4" /> Inactive</Badge>;
+      default:
+        return <Badge variant="outline">OK</Badge>;
     }
   };
 
-  // Loading spinner component
-  const LoadingSpinner = () => (
-    <div className="flex justify-center items-center p-8">
-      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600"></div>
-    </div>
-  );
-
-  // Error message component
-  const ErrorMessage = () => (
-    <Alert className="mb-4">
-      <AlertDescription className="text-red-700">
-        {error}
-        <Button
-          variant="link"
-          onClick={() => error?.includes('authentication') ? logout() : fetchPatients()}
-          className="ml-2 text-red-600 hover:text-red-800 underline"
-        >
-          {error?.includes('authentication') ? 'Logout' : 'Try again'}
-        </Button>
-      </AlertDescription>
-    </Alert>
-  );
-
-  // Patient list view (adapted from legacy)
-  const PatientListView = () => (
-    <div className="p-6 space-y-6">
-      <Card>
-        {/* Header Section */}
-        <CardHeader className="bg-emerald-50 rounded-t-xl">
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-3xl font-extrabold text-emerald-800">
-                Welcome, {user?.name || 'Doctor'}
-              </CardTitle>
-              <CardDescription className="text-emerald-600 mt-1">Your dashboard overview</CardDescription>
-            </div>
-            <div className="flex flex-col items-end space-y-2">
-              <Button
-                onClick={logout}
-                className="bg-green-600 text-white hover:bg-green-700 w-36"
-              >
-                <LogOut size={18} className="mr-2" />
-                Logout
+  return (
+    <div className="p-8">
+      <header className="flex justify-between items-center mb-8">
+        <div>
+            <h1 className="text-3xl font-bold">Doctor Dashboard</h1>
+            <p className="text-muted-foreground">Welcome, Dr. {user?.name}</p>
+        </div>
+        <div className="flex items-center gap-4">
+          <Dialog open={isCreatePatientOpen} onOpenChange={setIsCreatePatientOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <UserPlus className="h-4 w-4 mr-2" />
+                Create New Patient
               </Button>
-              <div className="border-t border-gray-300 w-36 my-2"></div>
-              <Button
-                onClick={() => console.log('Add patient modal would open')}
-                className="bg-blue-600 text-white hover:bg-blue-700 w-36"
-              >
-                <UserCircle size={18} className="mr-2" />
-                Add Patient
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-
-        {/* Main Content Section */}
-        <CardContent className="p-6">
-          {error ? (
-            <ErrorMessage />
-          ) : loading ? (
-            <LoadingSpinner />
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {patients.map((patient) => (
-                <Card
-                  key={patient.id}
-                  className="cursor-pointer hover:shadow-md transition-all duration-200 hover:bg-emerald-50"
-                  onClick={() => handlePatientSelect(patient)}
-                >
-                  <CardContent className="p-4">
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-3">
-                        <UserCircle className="text-emerald-600" size={24} />
-                        <CardTitle className="text-lg text-emerald-800">{patient.name}</CardTitle>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-emerald-600">
-                        <Calendar size={16} />
-                        {/* HARDENED CODE: Check for valid createdAt before formatting */}
-                        <p>Joined: {patient.createdAt ? new Date(patient.createdAt).toLocaleDateString() : 'Date not available'}</p>
-                      </div>
-                      <p className="text-sm text-emerald-700">{patient.email}</p>
-                      <div className="flex justify-between mt-2 pt-2 border-t border-emerald-100">
-                        <span className="flex items-center gap-1 text-sm text-emerald-600">
-                          <Activity size={16} /> Active
-                        </span>
-                        <span className="flex items-center gap-1 text-sm text-emerald-600">
-                          <MessageSquare size={16} /> ID: {patient.id}
-                        </span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
-  );
-
-  // Patient detail view (adapted from legacy)
-  const PatientDetailView = () => (
-    <div className="p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <Button
-          variant="ghost"
-          onClick={handleReturnToList}
-          className="text-emerald-600 hover:text-emerald-800"
-        >
-          <ArrowLeft size={20} className="mr-2" />
-          Back to Patient List
-        </Button>
-
-        <div className="flex flex-col items-end space-y-2">
-          <Button
-            onClick={logout}
-            className="bg-green-600 text-white hover:bg-green-700"
-          >
-            <LogOut size={18} className="mr-2" />
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Create New Patient Account</DialogTitle>
+                <DialogDescription>Enter the patient's details. They will receive a welcome email to get started.</DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleCreatePatientSubmit} className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Full Name</Label>
+                  <Input id="name" value={newPatient.name} onChange={(e) => setNewPatient({ ...newPatient, name: e.target.value })} required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email Address</Label>
+                  <Input id="email" type="email" value={newPatient.email} onChange={(e) => setNewPatient({ ...newPatient, email: e.target.value })} required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Mobile Phone Number</Label>
+                  <Input id="phone" value={newPatient.phoneNumber} onChange={(e) => setNewPatient({ ...newPatient, phoneNumber: e.target.value })} required />
+                </div>
+                <DialogFooter>
+                  <Button type="submit" disabled={createPatientMutation.isPending}>
+                    {createPatientMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    Create Patient
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+          <Button onClick={logout} variant="outline">
+            <LogOut className="h-4 w-4 mr-2" />
             Logout
           </Button>
-          <hr className="w-full border-t border-gray-200 my-2" />
-          <Button
-            onClick={() => console.log('Progress report would open')}
-            className="bg-blue-600 text-white hover:bg-blue-700"
-          >
-            <Clipboard size={16} className="mr-2" />
-            Progress Report
-          </Button>
         </div>
-      </div>
+      </header>
 
-      {/* Patient Overview Card */}
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex items-start justify-between mb-6">
-            <div className="space-y-2">
-              <div className="flex items-center gap-3">
-                <UserCircle className="text-emerald-600" size={32} />
-                <CardTitle className="text-2xl text-emerald-800">{selectedPatient?.name}</CardTitle>
-              </div>
-              <p className="text-emerald-600">Patient ID: #{selectedPatient?.id}</p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
-            <div className="bg-emerald-50 rounded-lg p-4">
-              <p className="text-sm text-emerald-600 mb-1">Joined Date</p>
-              <p className="font-medium text-emerald-800">
-                {/* HARDENED CODE: Check for valid createdAt before formatting */}
-                {selectedPatient?.createdAt ? new Date(selectedPatient.createdAt).toLocaleDateString() : 'Date not available'}
-              </p>
-            </div>
-            <div className="bg-emerald-50 rounded-lg p-4">
-              <p className="text-sm text-emerald-600 mb-1">Email</p>
-              <p className="font-medium text-emerald-800">{selectedPatient?.email}</p>
-            </div>
-            <div className="bg-emerald-50 rounded-lg p-4">
-              <p className="text-sm text-emerald-600 mb-1">Phone</p>
-              <p className="font-medium text-emerald-800">{selectedPatient?.phoneNumber}</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Health Progress Graph */}
-      {healthData.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-xl text-emerald-800">Health Progress</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[400px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={healthData}>
-                  <XAxis dataKey="date" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Line type="monotone" dataKey="medication" stroke="#ff0000" name="Medication" />
-                  <Line type="monotone" dataKey="diet" stroke="#008080" name="Diet" />
-                  <Line type="monotone" dataKey="exercise" stroke="#0000ff" name="Exercise" />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Care Plan Directives Form */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-xl text-emerald-800">KGC Care Plan Directives</CardTitle>
+          <CardTitle>My Patients</CardTitle>
+          <CardDescription>View and manage all of your assigned patients.</CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSaveHealthPoints} className="space-y-4">
-            {/* Healthy Eating Plan */}
-            <div className="bg-emerald-50 rounded-lg p-4">
-              <Label className="text-sm font-medium text-emerald-700 mb-2">
-                Healthy Eating Plan
-              </Label>
-              <Textarea
-                ref={healthyEatingRef}
-                name="healthy_eating_plan"
-                placeholder="Enter details for Healthy Eating Plan..."
-                className="w-full mt-2"
-                rows={3}
-                defaultValue={doctorRemarks.healthy_eating_plan || ""}
-                key={`healthy_eating_${selectedPatient?.id}_${doctorRemarks.healthy_eating_plan}`}
-              />
-            </div>
-
-            {/* Exercise and Wellness Routine */}
-            <div className="bg-emerald-50 rounded-lg p-4">
-              <Label className="text-sm font-medium text-emerald-700 mb-2">
-                Exercise and Wellness Routine
-              </Label>
-              <Textarea
-                ref={exerciseWellnessRef}
-                name="exercise_wellness_routine"
-                placeholder="Enter details for Exercise and Wellness Routine..."
-                className="w-full mt-2"
-                rows={3}
-                defaultValue={doctorRemarks.exercise_wellness_routine || ""}
-                key={`exercise_wellness_${selectedPatient?.id}_${doctorRemarks.exercise_wellness_routine}`}
-              />
-            </div>
-
-            {/* Prescribed Medications */}
-            <div className="bg-emerald-50 rounded-lg p-4">
-              <Label className="text-sm font-medium text-emerald-700 mb-2">
-                Prescribed Medications
-              </Label>
-              <Textarea
-                ref={prescribedMedicationRef}
-                name="prescribed_medication"
-                placeholder="Enter details for Prescribed Medications..."
-                className="w-full mt-2"
-                rows={3}
-                defaultValue={doctorRemarks.prescribed_medication || ""}
-                key={`prescribed_medication_${selectedPatient?.id}_${doctorRemarks.prescribed_medication}`}
-              />
-            </div>
-
-            {/* Submit Button */}
-            <Button
-              type="submit"
-              className="w-full bg-emerald-600 text-white hover:bg-emerald-700"
-            >
-              Save Care Plan Directives
-            </Button>
-          </form>
-
-          {/* Success Message */}
-          {showSuccess && (
-            <Alert className="mt-4">
-              <AlertDescription className="text-emerald-800">
-                Care Plan Directives saved successfully!
-              </AlertDescription>
-            </Alert>
-          )}
+          {isLoading ? <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin" /></div> :
+           error ? <p className="text-destructive">Error loading patients.</p> :
+           <Table>
+             <TableHeader>
+               <TableRow>
+                 <TableHead>Name</TableHead>
+                 <TableHead>Email</TableHead>
+                 <TableHead>Status</TableHead>
+                 <TableHead>Joined On</TableHead>
+                 <TableHead>Alerts</TableHead>
+                 <TableHead className="text-right">Actions</TableHead>
+               </TableRow>
+             </TableHeader>
+             <TableBody>
+               {patients?.map((p) => (
+                 <TableRow key={p.id}>
+                   <TableCell className="font-medium">{p.name}</TableCell>
+                   <TableCell>{p.email}</TableCell>
+                   <TableCell>
+                     <Badge variant={p.isActive ? 'default' : 'secondary'} className={p.isActive ? 'bg-green-600' : ''}>
+                       {p.isActive ? 'Active' : 'Inactive'}
+                     </Badge>
+                   </TableCell>
+                   <TableCell>{new Date(p.createdAt).toLocaleDateString()}</TableCell>
+                   <TableCell>{getAlertIcon(p.alertStatus)}</TableCell>
+                   <TableCell className="text-right">
+                     <Link href={`/doctor/patient/${p.id}`}>
+                       <Button variant="ghost" size="sm">
+                         <LinkIcon className="h-4 w-4 mr-2" />
+                         View Profile
+                       </Button>
+                     </Link>
+                   </TableCell>
+                 </TableRow>
+               ))}
+             </TableBody>
+           </Table>
+          }
         </CardContent>
       </Card>
     </div>
   );
+};
 
-  return (
-    <div className="max-w-7xl mx-auto bg-emerald-50/30 min-h-screen">
-      {selectedPatient ? <PatientDetailView /> : <PatientListView />}
-    </div>
-  );
-}
+export default DoctorDashboard;
