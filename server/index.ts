@@ -1,11 +1,13 @@
 import express, { type Request, Response, NextFunction } from "express";
 import cors from "cors";
 import { registerRoutes } from "./routes.js";
-import { setupVite, serveStatic, log } from "./vite";
+import { setupVite, serveStatic } from "./vite";
 import { sessionTimeoutMiddleware } from "./sessionTimeout.js";
 import adminRoutes from './api/adminRoutes'; // Import the new admin routes
 import patientRouter from './api/patient'; // Import the new patient routes
 import authRoutes from './api/authRoutes'; // Import the new auth routes
+import { errorHandler } from './middleware/errorHandler'; // Import the new error handler
+import { logger } from './lib/logger'; // Import the new logger
 // Load environment variables at the very top
 import { config } from 'dotenv';
 config();
@@ -14,7 +16,7 @@ const app = express();
 
 // --- GLOBAL REQUEST LOGGER AT THE VERY TOP ---
 app.use((req, res, next) => {
-  console.log(`[GLOBAL_REQUEST_LOGGER] Received Request - Method: ${req.method}, URL: ${req.originalUrl}`);
+  logger.info(`Request Received`, { method: req.method, url: req.originalUrl });
   next();
 });
 // ---------------------------------------------
@@ -50,11 +52,7 @@ app.use((req, res, next) => {
         logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
       }
 
-      if (logLine.length > 80) {
-        logLine = logLine.slice(0, 79) + "…";
-      }
-
-      log(logLine);
+      logger.info('API Request Handled', { method: req.method, path, statusCode: res.statusCode, durationMs: duration });
     }
   });
 
@@ -73,21 +71,16 @@ app.use(sessionTimeoutMiddleware);
 
   await registerRoutes(app);
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-
-    res.status(status).json({ message });
-    throw err;
-  });
-
   // ALWAYS serve the app on port 5000
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = 5000;
   const server = app.listen(port, "0.0.0.0", () => {
-    log(`serving on port ${port}`);
+    logger.info(`Server listening on port ${port}`);
   });
+
+  // Centralized error handler - MUST be after all routes and other middleware
+  app.use(errorHandler);
 
   // importantly only setup vite in development and after
   // setting up all the other routes so the catch-all route

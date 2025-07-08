@@ -1,6 +1,7 @@
 import { db } from '../db';
 import * as schema from '@shared/schema';
 import { and, eq, sql } from 'drizzle-orm';
+import { logger } from '../lib/logger';
 
 // --- Types and Interfaces ---
 
@@ -31,13 +32,29 @@ const badgeLevels: BadgeLevel[] = ['bronze', 'silver', 'gold', 'platinum'];
 
 // --- Service Implementation ---
 
+interface MilestoneCacheEntry {
+  data: MilestoneStatus;
+  timestamp: number;
+}
+
 class MilestoneService {
+  private cache: Map<number, MilestoneCacheEntry> = new Map();
+  private readonly CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
   /**
    * Calculates the complete milestone and badge status for a given user.
    * @param userId The ID of the user.
    * @returns An object containing earned badges, progress, and any newly awarded badge.
    */
   public async getMilestoneStatus(userId: number): Promise<MilestoneStatus> {
+    // Check cache first
+    const cachedEntry = this.cache.get(userId);
+    if (cachedEntry && (Date.now() - cachedEntry.timestamp < this.CACHE_DURATION)) {
+      logger.info('Returning cached milestone status for user', { userId });
+      return cachedEntry.data;
+    }
+
+    logger.info('Calculating milestone status for user', { userId });
     const earnedBadges = await db.query.userBadges.findMany({
       where: eq(schema.userBadges.userId, userId),
     });
@@ -51,6 +68,7 @@ class MilestoneService {
       // Check if a new badge can be awarded
       const newBadge = await this.checkAndAwardNewBadge(userId, category, earnedBadges);
       if (newBadge) {
+        logger.info('New badge awarded', { userId, badgeType: newBadge.badgeType, badgeLevel: newBadge.badgeLevel });
         newlyAwardedBadge = newBadge;
         // Add the new badge to our in-memory list for progress calculation
         earnedBadges.push(newBadge);
@@ -61,7 +79,7 @@ class MilestoneService {
       const nextBadgeLevel = this.getNextBadgeLevel(currentBadge?.level);
 
       if (nextBadgeLevel) {
-        badgeProgress[category] = this.calculateProgress(
+        badgeProgress[category] = await this.calculateProgress(
           userId,
           category,
           currentBadge?.level || null,
@@ -70,11 +88,23 @@ class MilestoneService {
       }
     }
 
-    return {
+    const result: MilestoneStatus = {
       earnedBadges,
       badgeProgress,
       newlyAwardedBadge,
     };
+
+    // Store result in cache
+    this.cache.set(userId, { data: result, timestamp: Date.now() });
+    logger.info('Milestone status cached for user', { userId });
+
+    logger.info('Milestone status calculation complete', { userId, hasNewBadge: !!newlyAwardedBadge });
+    return result;
+  }
+
+  public clearCacheForUser(userId: number): void {
+    this.cache.delete(userId);
+    logger.info('Milestone cache cleared for user', { userId });
   }
 
   private getHighestEarnedBadge(badges: schema.UserBadge[], category: BadgeCategory): schema.UserBadge | undefined {
@@ -120,14 +150,14 @@ class MilestoneService {
     return null;
   }
 
-  private calculateProgress(
+  private async calculateProgress(
     userId: number,
     category: BadgeCategory,
     currentLevel: BadgeLevel | null,
     nextLevel: BadgeLevel
   ) {
     const rule = badgeRules[nextLevel];
-    const weeksCompleted = this._getLongestStreakFromDB(userId, category, rule.scoreThreshold);
+    const weeksCompleted = await this._getLongestStreakFromDB(userId, category, rule.scoreThreshold);
     const progress = Math.min(100, Math.floor((weeksCompleted / rule.weeksRequired) * 100));
 
     return {
@@ -190,9 +220,11 @@ class MilestoneService {
     const result = await db.execute(query);
     
     if (result.rows.length > 0 && result.rows[0].longest_streak) {
+      logger.debug('Longest streak calculated from DB', { userId, category, threshold, streak: result.rows[0].longest_streak });
       return Number(result.rows[0].longest_streak);
     }
 
+    logger.debug('No streak found for user', { userId, category, threshold });
     return 0;
   }
 }

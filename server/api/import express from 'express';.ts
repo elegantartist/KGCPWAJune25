@@ -5,6 +5,8 @@ import { db } from '../db';
 import * as schema from '@shared/schema';
 import { authMiddleware, AuthenticatedRequest } from '../auth';
 import { z } from 'zod';
+import { milestoneService } from '../services/milestoneService';
+import { logger } from '../lib/logger';
 
 const router = express.Router();
 
@@ -41,7 +43,7 @@ router.post('/chat', authMiddleware(), async (req: AuthenticatedRequest, res) =>
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Invalid request format.', details: error.errors });
     }
-    console.error('Error in /api/chat endpoint:', error);
+    logger.error('Error in /api/chat endpoint', { userId, error: error instanceof Error ? error.message : String(error) });
     res.status(500).json({
       response: "I'm sorry, an unexpected error occurred. Please try again later.",
       error: error instanceof Error ? error.message : 'Unknown server error',
@@ -82,12 +84,12 @@ router.post('/analyze-health-metrics', authMiddleware(), async (req: Authenticat
       const analysisResult: AnalysisResult = JSON.parse(analysisResponse.response);
       return res.json(analysisResult);
     } catch (parseError) {
-      console.error("Failed to parse JSON response from LLM:", analysisResponse.response, parseError);
+      logger.error('Failed to parse JSON response from LLM', { userId, response: analysisResponse.response, error: parseError instanceof Error ? parseError.message : String(parseError) });
       return res.status(500).json({ message: "Failed to process analysis result from AI." });
     }
 
   } catch (error) {
-    console.error("Error in /api/analyze-health-metrics:", error);
+    logger.error('Error in /api/analyze-health-metrics', { userId, error: error instanceof Error ? error.message : String(error) });
     return res.status(500).json({ message: "An internal error occurred while analyzing health metrics." });
   }
 });
@@ -124,12 +126,15 @@ router.post('/health-scores', authMiddleware(), async (req: AuthenticatedRequest
         set: { dietScore, exerciseScore, medicationScore, updatedAt: new Date() },
       });
 
+    // Invalidate the milestone cache for this user since their scores have changed.
+    milestoneService.clearCacheForUser(userId);
+
     res.status(201).json({ message: 'Health scores submitted successfully.' });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Invalid score format.', details: error.errors });
     }
-    console.error("Error in /api/health-scores:", error);
+    logger.error('Error in /api/health-scores', { userId, error: error instanceof Error ? error.message : String(error) });
     return res.status(500).json({ message: "An internal error occurred while submitting scores." });
   }
 });

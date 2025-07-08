@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, NextFunction } from 'express';
 import { db } from '../db';
 import * as schema from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
@@ -18,9 +18,9 @@ const loginSchema = z.object({
  * POST /api/auth/login
  * Handles user login.
  */
-authRouter.post('/login', async (req, res) => {
+authRouter.post('/login', async (req, res, next: NextFunction) => {
   try {
-    const { email, password } = loginSchema.parse(req.body);
+    const { email, password, role } = loginSchema.parse(req.body);
 
     // 1. Find the user by email
     const user = await db.query.users.findFirst({
@@ -66,9 +66,7 @@ authRouter.post('/login', async (req, res) => {
     res.json({ token, user: userResponse });
 
   } catch (error) {
-    if (error instanceof z.ZodError) return res.status(400).json({ error: 'Invalid email or password format.' });
-    console.error("Login error:", error);
-    res.status(500).json({ error: 'An internal error occurred.' });
+    next(error);
   }
 });
 

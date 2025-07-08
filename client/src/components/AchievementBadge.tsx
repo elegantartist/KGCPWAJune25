@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { cn } from '@/lib/utils';
 
 export type BadgeLevel = 'bronze' | 'silver' | 'gold' | 'platinum';
@@ -76,7 +76,7 @@ interface AchievementBadgeProps {
  * A reusable component to display a KGC Achievement Badge.
  * It renders the KGC logo with dynamic color filters and a tier ring based on the badge properties.
  */
-export const AchievementBadge: React.FC<AchievementBadgeProps> = ({ badge, size = 'md' }) => {
+export const AchievementBadge: React.FC<AchievementBadgeProps> = memo(({ badge, size = 'md' }) => {
   const sizeClasses = {
     sm: "w-12 h-12",
     md: "w-20 h-20",
@@ -106,6 +106,7 @@ export const AchievementBadge: React.FC<AchievementBadgeProps> = ({ badge, size 
         <img
           src="/assets/kgc-logo.jpg"
           alt={`${badge.type} - ${badge.level}`}
+          loading="lazy"
           className="w-full h-full object-cover"
           style={{ filter: getBadgeFilter(badge.type, badge.level) }}
         />
@@ -115,4 +116,6 @@ export const AchievementBadge: React.FC<AchievementBadgeProps> = ({ badge, size 
       </div>
     </div>
   );
-};
+});
+
+AchievementBadge.displayName = 'AchievementBadge';
