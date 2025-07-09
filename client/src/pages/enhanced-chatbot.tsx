@@ -188,7 +188,7 @@ const EnhancedChatbot: React.FC = () => {
               <DialogTitle className="flex items-center">
                 <MessageSquare className="h-5 w-5 mr-2" />
                 KGC Health Assistant
-              </Dialog-title>
+              </DialogTitle>
               <DialogDescription>
                 Your personal AI health assistant.
               </DialogDescription>
