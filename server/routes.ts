@@ -109,7 +109,6 @@ export function registerRoutes(app: Express) {
             res.json({ message: 'SMS sent successfully' });
         }
     });
-
     router.post('/auth/verify-sms', async (req, res) => {
         try {
             const { email, code } = req.body;
@@ -1727,7 +1726,7 @@ export function registerRoutes(app: Express) {
     router.use('/scores', scoresRouter);
     router.use('/milestones', milestonesRouter);
     router.use('/motivation', motivationRouter);
-
+router.use('/doctor/reports', doctorReportsRouter);
     // --- STRIPE & PAYMENT ENDPOINTS ---
 
     router.post('/stripe/create-subscription-session', authMiddleware(['patient']), async (req: AuthenticatedRequest, res) => {
