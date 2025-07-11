@@ -1,6 +1,6 @@
 // In server/routes.ts
 import express, { Router } from 'express';
-import type { Express } from 'express';
+import doctorReportsRouter from './routes/doctorReports';import type { Express } from 'express';
 import Stripe from 'stripe';
 import twilio from 'twilio';
 import { db } from './db';
