@@ -18,6 +18,7 @@ import { getMealInspiration, getWellnessInspiration, getWeeklyMealPlan, getWelln
 import scoresRouter from './routes/scores';
 import milestonesRouter from './routes/milestones';
 import motivationRouter from './routes/motivation';
+import activityLogsRouter from './routes/activityLogs'; // Import the new router
 import { analyzeHealthTrends, generatePredictiveAlerts, generateAnalyticsInsights } from './services/analyticsEngine';
 import { proactiveMonitoring } from './services/proactiveMonitoring';
 
@@ -49,10 +50,19 @@ export function registerRoutes(app: Express) {
         }
 
         const accessToken = createAccessToken({ userId: adminUser.id, role: adminUser.role, name: adminUser.name });
+
+        // Set user information in session
+        if (req.session) {
+            req.session.user = { userId: adminUser.id, role: adminUser.role, name: adminUser.name };
+            console.log('Admin session user set:', req.session.user);
+        } else {
+            console.error('Session middleware not properly configured for admin login.');
+        }
+
         res.json({
-            accessToken: accessToken, // Corrected from access_token to match frontend
+            accessToken: accessToken,
             user: { id: adminUser.id, name: adminUser.name, role: adminUser.role, status: 'active' },
-            paymentRequired: false // Admins never need to pay
+            paymentRequired: false
         });
     });
 
@@ -145,6 +155,15 @@ export function registerRoutes(app: Express) {
             (global as any).verificationCodes?.delete(email);
             
             const accessToken = createAccessToken({ userId: user.id, role: user.role, name: user.name });
+
+            // Set user information in session
+            if (req.session) {
+                req.session.user = { userId: user.id, role: user.role, name: user.name };
+                console.log('User session set after SMS verification:', req.session.user);
+            } else {
+                console.error('Session middleware not properly configured for SMS verification.');
+            }
+
             console.log(`SMS verification successful for ${email}, redirecting to ${user.role} dashboard`);
             res.json({ 
                 success: true,
@@ -165,18 +184,53 @@ export function registerRoutes(app: Express) {
     });
     
     router.post('/auth/logout', authMiddleware(), (req: AuthenticatedRequest, res) => {
-        // Clear session data for enhanced security
-        if (req.user) {
-            console.log(`User ${req.user.userId} (${req.user.role}) logged out`);
+        if (req.session) {
+            req.session.destroy(err => {
+                if (err) {
+                    console.error('Session destruction error:', err);
+                    return res.status(500).json({ message: 'Could not log out, please try again.' });
+                }
+                if (req.user) {
+                    console.log(`User ${req.user.userId} (${req.user.role}) logged out and session destroyed.`);
+                } else {
+                    console.log('User logged out and session destroyed.');
+                }
+                res.clearCookie('connect.sid'); // Default cookie name for express-session
+                return res.status(200).json({ message: 'Logout successful' });
+            });
+        } else {
+            if (req.user) {
+                console.log(`User ${req.user.userId} (${req.user.role}) logged out (no session to destroy).`);
+            } else {
+                console.log('User logged out (no session to destroy).');
+            }
+            res.status(200).json({ message: 'Logout successful' });
         }
-        res.status(200).json({ message: 'Logout successful' });
     });
     
     // Admin-specific logout endpoint for consistency with frontend
     router.post('/admin/logout', authMiddleware(['admin']), (req: AuthenticatedRequest, res) => {
-        // Clear session data for enhanced security
-        if (req.user) {
-            console.log(`Admin ${req.user.userId} logged out`);
+        if (req.session) {
+            req.session.destroy(err => {
+                if (err) {
+                    console.error('Admin session destruction error:', err);
+                    return res.status(500).json({ message: 'Could not log out admin, please try again.' });
+                }
+                if (req.user) {
+                    console.log(`Admin ${req.user.userId} logged out and session destroyed.`);
+                } else {
+                    console.log('Admin logged out and session destroyed.');
+                }
+                res.clearCookie('connect.sid');
+                return res.status(200).json({ message: 'Admin logout successful' });
+            });
+        } else {
+            if (req.user) {
+                console.log(`Admin ${req.user.userId} logged out (no session to destroy).`);
+            } else {
+                console.log('Admin logged out (no session to destroy).');
+            }
+            res.status(200).json({ message: 'Admin logout successful' });
         }
         res.status(200).json({ message: 'Admin logout successful' });
     });
@@ -572,14 +626,14 @@ export function registerRoutes(app: Express) {
             console.log(`Found doctor record:`, doctor);
 
             const patients = await db.select({
-                id: schema.patients.id,
+                id: schema.patients.id, // This is patients.id
+                userId: schema.users.id, // This is users.id, aliased as userId
                 name: schema.users.name,
                 email: schema.users.email,
                 phoneNumber: schema.users.phoneNumber,
-                userId: schema.patients.userId,
-                doctorId: schema.patients.doctorId,
+                // doctorId: schema.patients.doctorId, // Not needed by client here
                 isActive: schema.users.isActive,
-                createdAt: schema.users.createdAt,
+                createdAt: schema.users.createdAt, // This is users.createdAt
                 uin: schema.users.uin
             })
             .from(schema.patients)
@@ -1727,6 +1781,7 @@ export function registerRoutes(app: Express) {
     router.use('/scores', scoresRouter);
     router.use('/milestones', milestonesRouter);
     router.use('/motivation', motivationRouter);
+    router.use('/activity', activityLogsRouter); // Register the new router
 
     // --- STRIPE & PAYMENT ENDPOINTS ---
 

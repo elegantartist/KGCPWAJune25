@@ -23,6 +23,7 @@ const EWSupport = React.lazy(() => import('@/pages/ew-support'));
 const MBPWiz = React.lazy(() => import('@/pages/mbp-wiz'));
 const Motivation = React.lazy(() => import('@/pages/motivation'));
 const HealthSnapshots = React.lazy(() => import('@/pages/health-snapshots'));
+const DoctorPatientReportsPage = React.lazy(() => import('@/pages/DoctorPatientReportsPage')); // Added import
 
 const LoadingSpinner = () => (
   <div className="flex items-center justify-center h-screen">
@@ -73,10 +74,18 @@ export function AppRouter() {
           {user?.role === 'admin' && <Redirect to="/admin-dashboard" />}
         </Route>
         <Route path="/dashboard" component={PatientDashboard} />
+
+        {/* Doctor Routes */}
         <Route path="/doctor-dashboard" component={DoctorDashboard} />
+        {/* The :patientUserId param will contain the users.id of the patient */}
+        <Route path="/doctor/patient/:patientUserId/reports" component={DoctorPatientReportsPage} />
+        {/* <Route path="/doctor/setup" component={DoctorSetup} /> //This was in KGC_FRONTEND_ARCHITECTURE_GUIDE.md but seems to be public now */}
+
+
+        {/* Admin Routes */}
         <Route path="/admin-dashboard" component={AdminDashboard} />
 
-        {/* Feature routes */}
+        {/* Shared Feature routes for patients (and potentially doctors if they can view patient features) */}
         <Route path="/enhanced-chatbot" component={EnhancedChatbot} />
         <Route path="/profile" component={DailySelfScores} />
         <Route path="/progress-milestones" component={ProgressMilestones} />
@@ -88,6 +97,13 @@ export function AppRouter() {
         <Route path="/mbp-wiz" component={MBPWiz} />
         <Route path="/motivation" component={Motivation} />
         <Route path="/health-snapshots" component={HealthSnapshots} />
+
+        {/* Public Doctor Setup (already handled if not authenticated) */}
+        {/* If an authenticated user tries to go here, maybe redirect or show error */}
+        <Route path="/doctor-setup">
+            <Redirect to={user?.role === 'doctor' ? "/doctor-dashboard" : "/dashboard"} />
+        </Route>
+
 
         {/* Fallback 404 route */}
         <Route component={NotFound} />

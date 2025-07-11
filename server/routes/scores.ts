@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { authMiddleware, AuthenticatedRequest } from '../auth';
 import { db } from '../db';
-import { dailyScores } from '@shared/schema';
+import { patientScores } from '@shared/schema'; // Changed import from dailyScores to patientScores
 import { processMilestonesForUser } from '../services/milestoneService';
 import { generateScoreAnalysis } from '../services/analysisService';
 
@@ -23,15 +23,44 @@ scoresRouter.post('/', async (req: AuthenticatedRequest, res) => {
   }
 
   try {
-    await db.insert(dailyScores).values({
-      userId: user.userId,
-      dietScore: diet,
-      exerciseScore: exercise,
-      medicationScore: medication,
+    // Insert into patientScores table with correct column names
+    await db.insert(patientScores).values({
+      patientId: user.userId, // patientScores.patientId references users.id
+      // scoreDate will use defaultNow() from the schema definition
+      mealPlanSelfScore: diet, // Map from request body 'diet' to 'mealPlanSelfScore'
+      exerciseSelfScore: exercise, // Map from request body 'exercise' to 'exerciseSelfScore'
+      medicationSelfScore: medication, // Map from request body 'medication' to 'medicationSelfScore'
+      // notes: req.body.notes, // Optional: if client sends notes
     });
 
     const newlyEarnedBadges = await processMilestonesForUser(user.userId);
-    return res.json({ success: true, newlyEarnedBadges });
+
+    // Call Supervisor Agent for self-score analysis
+    let analysisReport = null;
+    try {
+      // Ensure supervisorAgent and its methods are imported if not already
+      const { supervisorAgent } = await import('../services/supervisorAgent');
+      const analysisResponse = await supervisorAgent.runSelfScoreAnalysis(user.userId, { diet, exercise, medication });
+      // The response from runSelfScoreAnalysis is an object like:
+      // { response: string (JSON), sessionId: string, modelUsed: string, ... }
+      // We need to parse the JSON string from analysisResponse.response
+      if (analysisResponse && typeof analysisResponse.response === 'string') {
+        analysisReport = JSON.parse(analysisResponse.response);
+      } else if (analysisResponse && typeof analysisResponse.response === 'object') {
+        // If it's already an object (e.g. if supervisorAgent was updated)
+        analysisReport = analysisResponse.response;
+      }
+       else {
+        console.error("Unexpected analysis response structure:", analysisResponse);
+        // analysisReport remains null, client should handle this
+      }
+    } catch (analysisError) {
+      console.error("Error running self-score analysis via supervisor:", analysisError);
+      // analysisReport remains null, client should handle this
+      // Optionally, you could send a specific error message or part of the response
+    }
+
+    return res.json({ success: true, newlyEarnedBadges, analysis: analysisReport });
   } catch (error) {
     console.error("Error processing scores:", error);
     return res.status(500).json({ error: "Internal server error while processing scores." });

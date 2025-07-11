@@ -32,6 +32,8 @@ const EnhancedChatbot: React.FC = () => {
   const [recommendedFeature, setRecommendedFeature] = useState<string | null>(null);
   const isOnline = useOnlineStatus();
   const [showScoresModal, setShowScoresModal] = useState(false);
+  const [scoreAnalysisData, setScoreAnalysisData] = useState<any>(null); // To store analysis from POST
+  const [showAnalysisViewInModal, setShowAnalysisViewInModal] = useState(false); // Controls if modal shows form or analysis
   const [initialMessage, setInitialMessage] = useState<string>('');
   const [showKeepGoing, setShowKeepGoing] = useState(false);
   const [showChatbot, setShowChatbot] = useState(false);
@@ -105,20 +107,58 @@ const EnhancedChatbot: React.FC = () => {
   
   const handleScoresSubmitted = async (scores: { diet: number; exercise: number; medication: number; }) => {
     try {
-      // Call the new backend endpoint to save scores and check for badges
-      const response = await apiRequest<any>('POST', '/api/scores', scores);
+      const response = await apiRequest<any>('POST', '/api/scores', scores); // response now includes analysis
 
-      // The toast with the analysis option is now handled inside DailySelfScores.
-      // This parent component just needs to handle the badge award.
       if (response && response.newlyEarnedBadges && response.newlyEarnedBadges.length > 0) {
         response.newlyEarnedBadges.forEach((badge: any) => {
-          showAward(badge); // Trigger the celebration modal for each new badge
+          showAward(badge);
         });
       }
+
+      if (response && response.analysis) {
+        setScoreAnalysisData(response.analysis);
+        localStorage.setItem('lastScoreAnalysis', JSON.stringify(response.analysis)); // For profile page if needed
+        // Show toast asking if user wants to see analysis
+        toast({
+          title: "Scores Submitted!",
+          description: "Thank you for your daily health update. Would you like to see your analysis?",
+          duration: 20000, // Keep duration long enough for user to click
+          action: (
+            <div className="flex gap-2">
+              <Button size="sm" onClick={() => {
+                setShowAnalysisViewInModal(true);
+                // setShowScoresModal(true); // Ensure modal is open if it was closed by toast auto-hide
+              }}>Yes</Button>
+            </div>
+          ),
+        });
+      } else {
+        setScoreAnalysisData(null); // Clear any old analysis
+        localStorage.removeItem('lastScoreAnalysis');
+        toast({ title: "Scores Submitted!", description: "Thank you for your daily health update." });
+      }
+
+      // Save raw scores for chatbot initial message
+      localStorage.setItem('lastHealthMetrics', JSON.stringify({
+        ...scores,
+        date: new Date().toISOString()
+      }));
+
     } catch (error) {
       console.error("Error submitting scores:", error);
+      setScoreAnalysisData(null);
+      localStorage.removeItem('lastScoreAnalysis');
       toast({ title: "Error", description: "Could not submit scores. Please try again.", variant: "destructive" });
     }
+    // The DailySelfScores modal will be closed by its own onClose or by the parent if user clicks "Yes" on toast.
+    // If user clicks "Yes", we need to ensure the modal either stays open or reopens in analysis view.
+    // For now, `setShowAnalysisViewInModal(true)` will tell DailySelfScores to render analysis if modal is reopened/kept open.
+  };
+
+  const handleCloseScoresModal = () => {
+    setShowScoresModal(false);
+    setShowAnalysisViewInModal(false); // Reset view when modal is closed
+    setScoreAnalysisData(null); // Clear analysis data
   };
 
   const handleLogout = () => {
@@ -171,12 +211,16 @@ const EnhancedChatbot: React.FC = () => {
           </div>
         </div>
 
-        <Dialog open={showScoresModal} onOpenChange={setShowScoresModal}>
+        <Dialog open={showScoresModal} onOpenChange={handleCloseScoresModal}>
           <DialogContent className="sm:max-w-[600px]">
             <DialogHeader>
               <DialogTitle>Your Daily Self-Scores</DialogTitle>
             </DialogHeader>
-            <DailySelfScores onSubmitted={handleScoresSubmitted} onClose={() => setShowScoresModal(false)} />
+            <DailySelfScores
+              onSubmitted={handleScoresSubmitted}
+              onClose={handleCloseScoresModal}
+              initialAnalysis={showAnalysisViewInModal ? scoreAnalysisData : null}
+            />
           </DialogContent>
         </Dialog>
 

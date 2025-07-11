@@ -22,13 +22,9 @@ import {
 } from './prompt_templates';
 import { AppError, LLMError, SecurityError, APIError } from './errors';
 
-// Authorized KGC features list for strict validation
-const AUTHORIZED_KGC_FEATURES = [
-  'Home', 'Daily Self-Scores', 'Motivational Image Processing', 'MIP',
-  'Inspiration Machine D', 'Diet Logistics', 'Inspiration Machine E&W',
-  'E&W Support', 'MBP Wiz', 'Journaling', 'Progress Milestones',
-  'Food Database', 'Chatbot', 'Health Snapshots'
-];
+// Use the canonical list from prompt_templates.ts
+const AUTHORIZED_KGC_FEATURES_NAMES = KGC_FEATURES.map(f => f.name);
+
 
 // Keywords that might indicate unauthorized feature mentions
 const UNAUTHORIZED_FEATURE_KEYWORDS = [
@@ -230,159 +226,140 @@ class SupervisorAgent {
     query: SupervisorQuery & { sessionId: string },
     startTime: number
   ): Promise<SupervisorResponse> {
-    const { message: { text: userQuery } } = query;
-
-    secureLog('Supervisor query processing started', { userId: query.userId, sessionId: query.sessionId, queryLength: userQuery.length });
-    const parsedQuery = await parseUserQuery(userQuery);
-    secureLog('Query parsed successfully', { sessionId: query.sessionId, intent: parsedQuery.intent });
-
-    if (this._isLocationQuery(parsedQuery)) {
-      return this._handleLocationQuery(parsedQuery, query, startTime);
-    } else {
-      return this._handleGeneralQuery(parsedQuery, query, startTime);
-    }
-  }
-
-  /**
-   * Checks if a message is stale (older than 15 minutes) and returns a re-engagement response if so.
-   * @returns A SupervisorResponse if the message is stale, otherwise null.
-   */
-  private async _handleStaleMessage(
-    query: SupervisorQuery & { sessionId: string },
-    startTime: number
-  ): Promise<SupervisorResponse | null> {
-    const { message, userId, sessionId } = query;
-    const timeSent = new Date(message.sentAt);
-    const timeProcessed = new Date();
-    const deltaInMinutes = (timeProcessed.getTime() - timeSent.getTime()) / 60000;
-
-    if (deltaInMinutes <= 15) {
-      return null; // Message is not stale
-    }
-
-    secureLog('Stale offline message received. Pivoting to re-engagement.', {
-      userId,
-      sessionId,
-      deltaInMinutes,
-    });
-
-    const reEngagementResponse: SupervisorResponse = {
-      response:
-        "Welcome back online! I've just received your message from earlier. I hope you were able to resolve what you needed. How can I help you right now?",
-      sessionId: sessionId,
-      modelUsed: 're-engagement',
-      processingTime: Date.now() - startTime,
-    };
-
-    // Run analytics as a non-critical side effect
-    this.logAnalytics(userId, 'staleMessageReEngagement', sessionId).catch(
-      (err: Error | unknown) => {
-        secureLog('Non-critical error in analytics logging for stale message', {
-          sessionId: sessionId,
-          error: err instanceof Error ? err.message : 'Unknown error',
-        });
-      }
-    );
-
-    return reEngagementResponse;
-  }
-
-  /**
-   * Determines if a parsed query is for finding a location.
-   */
-  private _isLocationQuery(parsedQuery: any): boolean {
-    return (
-      parsedQuery.intent === 'find_location_for_activity' &&
-      parsedQuery.entities.location &&
-      parsedQuery.isSafeForTooling &&
-      parsedQuery.confidence > 0.7
-    );
-  }
-
-  /**
-   * Handles location-specific queries by using search tools.
-   */
-  private async _handleLocationQuery(
-    parsedQuery: any,
-    query: SupervisorQuery & { sessionId: string },
-    startTime: number
-  ): Promise<SupervisorResponse> {
     const { message: { text: userQuery }, userId, sessionId } = query;
 
-    secureLog('Location intent detected. Using structured location search.', {
-      entities: parsedQuery.entities,
-      sessionId,
-    });
+    secureLog('Supervisor query processing started', { userId, sessionId, queryLength: userQuery.length });
 
-    const searchResponse = await this.performAdvancedLocationSearch(
-      parsedQuery,
-      userQuery,
-      userId,
-      sessionId
-    );
-
-    return {
-      response: searchResponse,
-      sessionId,
-      modelUsed: 'advanced-location-synthesis',
-      toolsUsed: ['nlu-parser', 'location-search', 'care-plan-synthesis'],
-      processingTime: Date.now() - startTime,
-    };
-  }
-
-  /**
-   * Handles general, non-location-based queries.
-   */
-  private async _handleGeneralQuery(
-    parsedQuery: any,
-    query: SupervisorQuery & { sessionId: string },
-    startTime: number
-  ): Promise<SupervisorResponse> {
-    const { message: { text: userQuery }, userId, sessionId, requiresValidation } = query;
-
+    // 1. Get Secure Context (includes CPDs, health metrics, etc.)
+    // For this step, we are only fetching and logging it. No LLM call yet.
     const contextData = await AIContextService.prepareSecureContext({
       userId,
       includeHealthMetrics: true,
-      includeChatHistory: true,
-      maxHistoryItems: 10,
+      includeChatHistory: true, // Set to true to test history retrieval if implemented
+      maxHistoryItems: 5,      // Limit history for now
     });
-    const mcpBundle = contextData.secureBundle;
 
+    const mcpBundle = contextData.secureBundle;
+    secureLog('MCP Bundle prepared for SupervisorAgent', {
+      sessionId,
+      userId,
+      hasCarePlanDirectives: !!mcpBundle.care_plan_directives,
+      hasHealthMetrics: !!mcpBundle.health_metrics,
+      chatHistoryLength: mcpBundle.redacted_chat_history?.length || 0,
+    });
+
+    // Log parts of the context to verify (BE CAREFUL NOT TO LOG ACTUAL PHI/PII even in tests)
+    console.log(`[SupervisorAgent DEBUG] User ID Pseudonym: ${mcpBundle.user_id_pseudonym}`);
+    console.log(`[SupervisorAgent DEBUG] CPDs: ${JSON.stringify(mcpBundle.care_plan_directives)}`); // Log anonymized/safe version
+    console.log(`[SupervisorAgent DEBUG] Health Metrics: ${JSON.stringify(mcpBundle.health_metrics)}`); // Log anonymized/safe version
+
+    // 2. Validate MCP Bundle Security - This is crucial.
     const securityValidation = validateMcpBundleSecurity(mcpBundle, userQuery);
     if (!securityValidation.isSecure) {
+      secureLog('Security validation failed for MCP Bundle or user query.', {
+        sessionId,
+        userId,
+        violations: securityValidation.violations,
+      });
+      // In a real scenario, you might want to return a specific error or a generic safe response.
+      // For now, we'll throw a SecurityError as per existing patterns.
       throw new SecurityError(
-        'For your privacy and security, my system blocked this request. Please try rephrasing your question without any personal information.'
+        'For your privacy and security, my system blocked this request. Please try rephrasing your question or contact support if this persists.'
       );
     }
+    secureLog('MCP Bundle and user query passed security validation.', { sessionId, userId });
 
-    const toolResponse = await this.checkForToolCalling(userQuery, mcpBundle, parsedQuery);
-    if (toolResponse) {
-      return {
-        response: toolResponse.response,
-        sessionId,
-        modelUsed: 'tool-based',
-        toolsUsed: toolResponse.tools,
-        processingTime: Date.now() - startTime,
-      };
-    }
+    const originalUserQuery = userQuery;
+    const redactedUserQuery = redactPiiFromText(originalUserQuery);
+    secureLog('User query redaction complete.', {
+      sessionId,
+      userId,
+      originalQueryPreview: originalUserQuery.substring(0, 50),
+      redactedQueryPreview: redactedUserQuery.substring(0,50)
+    });
 
-    const systemPrompt = this.buildSystemPrompt();
-    const userPrompt = this.buildUserPrompt(userQuery, mcpBundle);
-    const primaryResponse = await this.callPrimaryLLM(systemPrompt, userPrompt);
+    // The mcpBundle is already created with pseudonymized/redacted data by AIContextService.
 
+    // 3. Construct prompts and call the primary LLM
+    const systemPrompt = this.buildSystemPrompt(); // Already defined
+    // Ensure buildUserPrompt uses the mcpBundle and the redactedUserQuery
+    const userLLMPrompt = this.buildUserPrompt(redactedUserQuery, mcpBundle);
+
+    secureLog('Calling primary LLM.', { sessionId, userId });
+    const llmResponseText = await this.callPrimaryLLM(systemPrompt, userLLMPrompt);
+    secureLog('Primary LLM call complete.', { sessionId, userId, responseLength: llmResponseText.length });
+
+    // 4. Finalize Response (includes multi-model validation if needed, feature validation, PII scan)
+    // The _finalizeResponse method needs to be updated to handle potential JSON tool calls from the LLM
+    // For now, we assume it returns a string response.
+    // The `requiresValidation` flag would be determined by `this.requiresValidation(redactedUserQuery)`
     const { finalResponse, validationStatus } = await this._finalizeResponse(
-      primaryResponse,
-      { systemPrompt, userPrompt, requiresValidation: requiresValidation || this.requiresValidation(userQuery) },
-      sessionId
+      llmResponseText,
+      {
+        systemPrompt,
+        userPrompt: userLLMPrompt, // Pass the actual prompt sent to LLM
+        requiresValidation: requiresValidation || this.requiresValidation(redactedUserQuery)
+      },
+      sessionId!
     );
 
-    secureLog('General query processing completed successfully', { sessionId, processingTime: Date.now() - startTime });
+    let textualReply = finalResponse;
+    let recommendedFeatureForClient: string | undefined = undefined;
+    let toolsUsedForLogging: string[] = [];
 
+    // Attempt to parse for a JSON tool call
+    // The LLM might return: "Some text. {tool_call_json}" or just "{tool_call_json}"
+    const jsonMatch = finalResponse.match(/(\{[\s\S]*\})/);
+
+    if (jsonMatch && jsonMatch[0]) {
+      try {
+        const potentialJson = jsonMatch[0];
+        const parsedJson = JSON.parse(potentialJson);
+
+        if (parsedJson.tool_name && AUTHORIZED_KGC_FEATURES_NAMES.includes(parsedJson.tool_name)) {
+          recommendedFeatureForClient = parsedJson.tool_name;
+          toolsUsedForLogging.push(recommendedFeatureForClient);
+
+          // Extract text preceding the JSON, if any
+          const textBeforeJson = finalResponse.substring(0, jsonMatch.index).trim();
+          if (textBeforeJson) {
+            textualReply = textBeforeJson;
+          } else {
+            // If only JSON was returned, create a generic ack for the client.
+            textualReply = `Okay, let's use ${recommendedFeatureForClient}.`;
+          }
+          secureLog('LLM returned valid tool call JSON.', { sessionId, toolName: recommendedFeatureForClient, toolInput: parsedJson.tool_input });
+        } else if (parsedJson.tool_name) {
+          secureLog('LLM returned JSON for an unauthorized tool.', { sessionId, toolName: parsedJson.tool_name });
+          // textualReply remains finalResponse, which should have been corrected by validateFeatureRecommendations if it mentioned it.
+          // Or, we could force a generic reply here if an unauthorized tool JSON is explicitly returned.
+          // For now, rely on validateFeatureRecommendations to strip mentions, and this JSON won't be actioned.
+        }
+        // If it's some other JSON not matching tool_name structure, it's treated as part of the text.
+      } catch (e) {
+        // JSON parsing failed, so finalResponse is treated as natural language.
+        secureLog('JSON parsing failed for potential tool call, treating as natural language.', { sessionId });
+        textualReply = finalResponse; // Ensure it's set if parsing fails mid-string
+      }
+    } else {
+      textualReply = finalResponse; // No JSON object found
+    }
+
+    // The client expects an object with a 'reply' field for the text.
+    // And optionally 'recommendedFeature' for the frontend to act upon.
+    const responsePayload = {
+      reply: textualReply,
+      ...(recommendedFeatureForClient && { recommendedFeature: recommendedFeatureForClient })
+    };
+
+    // 5. Return the response object (which will be stringified by Express)
+    // The client's apiRequest will parse this JSON.
     return {
-      response: finalResponse,
-      sessionId,
+      response: responsePayload, // Send the structured payload
+      sessionId: sessionId!,
       modelUsed: 'gpt-4',
       validationStatus,
+      toolsUsed: toolsUsedForLogging,
       processingTime: Date.now() - startTime,
     };
   }
@@ -534,7 +511,7 @@ ${CHATBOT_ENGINEERING_GUIDELINES}`;
   /**
    * Build the user prompt with MCP context
    */
-  private buildUserPrompt(userQuery: string, mcpBundle: any): string {
+  private buildUserPrompt(redactedUserQuery: string, mcpBundle: SafeMCPBundle): string {
     return `PATIENT CONTEXT (anonymized and secure):
 Patient ID: ${mcpBundle.user_id_pseudonym}
 
@@ -545,9 +522,9 @@ RECENT HEALTH METRICS:
 ${JSON.stringify(mcpBundle.health_metrics, null, 2)}
 
 RECENT CONVERSATION HISTORY (PII-redacted):
-${mcpBundle.redacted_chat_history.map((msg: any) => `${msg.role}: ${msg.content}`).join('\n')}
+${mcpBundle.redacted_chat_history.map((msg: ChatMessage) => `${msg.role}: ${msg.content}`).join('\n')}
 
-CURRENT USER QUERY: "${userQuery}"
+CURRENT USER QUERY: "${redactedUserQuery}"
 
 YOUR TASK: Provide a caring, motivational, and educational response that:
 1. Addresses the user's specific query

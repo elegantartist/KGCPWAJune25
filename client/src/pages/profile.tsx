@@ -37,26 +37,46 @@ interface HealthMetric {
 }
 
 // Discussion Dialog Component
-function ScoreDiscussionDialog({ onYes, onNo }: { onYes: () => void; onNo: () => void }) {
+interface ScoreDiscussionDialogProps {
+  analysis: { summary?: string; recommendations?: string[] } | null;
+  onYes: () => void;
+  onNo: () => void;
+}
+
+function ScoreDiscussionDialog({ analysis, onYes, onNo }: ScoreDiscussionDialogProps) {
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
-      <div className="bg-white rounded p-6 w-80 text-center">
-        <p className="mb-6">Would you like to discuss your scores with the health assistant?</p>
-        <div className="flex gap-4 justify-center">
-          <button className="bg-blue-600 text-white px-6 py-2 rounded" onClick={onYes}>Yes</button>
-          <button className="bg-gray-300 px-6 py-2 rounded" onClick={onNo}>No</button>
-        </div>
-      </div>
+    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle>Scores Submitted!</CardTitle>
+        </CardHeader>
+        <CardContent className="text-center">
+          {analysis && analysis.summary && (
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md text-sm">
+              <h4 className="font-semibold mb-1 text-blue-700">Quick Summary:</h4>
+              <p className="text-gray-700">{analysis.summary}</p>
+            </div>
+          )}
+          <p className="mb-6 text-gray-800">
+            Would you like to discuss your scores and this analysis further with the KGC Health Assistant?
+          </p>
+          <div className="flex gap-4 justify-center">
+            <Button onClick={onYes} className="bg-blue-600 hover:bg-blue-700">Yes, Discuss</Button>
+            <Button onClick={onNo} variant="outline">No, Thanks</Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
 
 // Main Daily Self-Scores Component
-export default function DailySelfScores() {
+export default function DailySelfScoresPage() { // Renamed to avoid conflict if DailySelfScores component is imported
   const [, setLocation] = useLocation();
   const [scores, setScores] = useState<Scores>({ diet: 5, exercise: 5, medication: 5 });
   const [submitted, setSubmitted] = useState(false);
   const [showDiscuss, setShowDiscuss] = useState(false);
+  const [currentAnalysis, setCurrentAnalysis] = useState<any>(null); // Added state for analysis
   const { showAward } = useBadgeAward();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -81,25 +101,31 @@ export default function DailySelfScores() {
       dietScore: newScores.diet,
       exerciseScore: newScores.exercise
     }),
-    onSuccess: (result) => {
-      // Invalidate the query to refetch the chart data automatically
+    onSuccess: (result) => { // result now includes { success, newlyEarnedBadges, analysis }
       queryClient.invalidateQueries({ queryKey: ['healthMetricsHistory'] });
 
-      // Check for newly earned badges
       if (result && result.newlyEarnedBadges && result.newlyEarnedBadges.length > 0) {
         result.newlyEarnedBadges.forEach((badge: any) => {
           showAward(badge);
         });
       }
 
-      // Save scores to localStorage for the chatbot
       localStorage.setItem('lastHealthMetrics', JSON.stringify({
-        ...scores,
+        ...scores, // These are the raw scores { diet, exercise, medication }
         date: new Date().toISOString()
       }));
 
+      // Store the analysis for the dialog
+      if (result && result.analysis) {
+        setCurrentAnalysis(result.analysis); // Store analysis in state
+        localStorage.setItem('lastScoreAnalysis', JSON.stringify(result.analysis)); // Also in localStorage if needed elsewhere
+      } else {
+        setCurrentAnalysis(null);
+        localStorage.removeItem('lastScoreAnalysis'); // Clear if no analysis
+      }
+
       setSubmitted(true);
-      setTimeout(() => setShowDiscuss(true), 800);
+      setTimeout(() => setShowDiscuss(true), 800); // Trigger discussion dialog
     },
     onError: (error: any) => {
       toast({
@@ -121,15 +147,30 @@ export default function DailySelfScores() {
   };
 
   const handleScoresSubmitted = () => {
-    // Navigate to the correct chatbot page, which will read the scores from localStorage.
+    // Save the analysis to localStorage so enhanced-chatbot can pick it up if needed as part of its initialMessage logic
+    // The initialMessage logic in enhanced-chatbot.tsx uses 'lastHealthMetrics'
+    // We can add analysis to 'lastHealthMetrics' or keep it separate.
+    // For now, 'lastHealthMetrics' already stores raw scores and date.
+    // The chatbot will primarily use the raw scores to initiate discussion.
     setLocation('/enhanced-chatbot');
   };
+
+  // Removed useEffect for setting currentAnalysis from localStorage here,
+  // as it's directly set in the mutation's onSuccess.
+
   if (showDiscuss) {
     return (
       <Layout>
         <ScoreDiscussionDialog
-          onYes={() => handleScoresSubmitted()}
-          onNo={() => setLocation('/')}
+          analysis={currentAnalysis} // Pass currentAnalysis to the dialog
+          onYes={() => {
+            setShowDiscuss(false); // Close dialog
+            handleScoresSubmitted(); // Navigate
+          }}
+          onNo={() => {
+            setShowDiscuss(false); // Close dialog
+            setLocation('/'); // Navigate home
+          }}
         />
       </Layout>
     );
@@ -137,7 +178,7 @@ export default function DailySelfScores() {
 
   return (
     <Layout>
-      <div className="max-w-2xl mx-auto">
+      <div className="max-w-2xl mx-auto p-4 md:p-0"> {/* Added padding for mobile */}
         <h1 className="text-2xl font-bold mt-8 mb-4 text-center">Daily Self-Scores</h1>
         
         {/* Progress Chart */}

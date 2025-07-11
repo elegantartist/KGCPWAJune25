@@ -1,13 +1,15 @@
 import { db } from "../db";
 import { 
   users, 
-  healthMetrics, 
+  // healthMetrics, // No longer used directly for average scores
+  patientScores, // Use this for scores
   chatMemory, 
   featureUsage, 
   carePlanDirectives,
   patientProgressReports, 
   recommendations,
-  contentInteractions
+  contentInteractions,
+  keepGoingLogs
 } from "@shared/schema";
 import { eq, and, between, desc, avg, count, sum } from "drizzle-orm";
 import { 
@@ -71,37 +73,38 @@ export async function generatePatientProgressReport(patientId: number, doctorId:
       throw new Error("Patient not found");
     }
 
-    // Gather metrics for the period
+    // Gather metrics for the period using patientScores table
     const metricData = await db
       .select({
-        avgMedicationScore: avg(healthMetrics.medicationScore),
-        avgDietScore: avg(healthMetrics.dietScore),
-        avgExerciseScore: avg(healthMetrics.exerciseScore),
+        avgMedicationScore: avg(patientScores.medicationSelfScore),
+        avgDietScore: avg(patientScores.mealPlanSelfScore),
+        avgExerciseScore: avg(patientScores.exerciseSelfScore),
         count: count()
       })
-      .from(healthMetrics)
+      .from(patientScores)
       .where(
         and(
-          eq(healthMetrics.userId, patientId),
-          between(healthMetrics.date, startDate, endDate)
+          eq(patientScores.patientId, patientId), // patientScores.patientId refers to users.id
+          between(patientScores.scoreDate, startDate, endDate)
         )
       );
 
-    // Get Keep Going button usage
-    const keepGoingUsage = await db
-      .select({
-        usageCount: sum(featureUsage.usageCount)
-      })
-      .from(featureUsage)
+    // Get specific Keep Going sequence logs
+    const keepGoingSequenceLogs = await db
+      .select()
+      .from(keepGoingLogs)
       .where(
         and(
-          eq(featureUsage.userId, patientId),
-          eq(featureUsage.featureName, "keep_going_button"),
-          between(featureUsage.lastUsed, startDate, endDate)
+          eq(keepGoingLogs.userId, patientId), // Assuming patientId here is users.id
+          between(keepGoingLogs.timestamp, startDate, endDate)
         )
-      );
+      )
+      .orderBy(desc(keepGoingLogs.timestamp));
 
-    // Get feature usage summary
+    const keepGoingUsageCount = keepGoingSequenceLogs.length;
+
+
+    // Get feature usage summary (can still be useful for other features)
     const featureUsageSummary = await db
       .select({
         featureName: featureUsage.featureName,
@@ -164,10 +167,10 @@ export async function generatePatientProgressReport(patientId: number, doctorId:
 
     // Prepare data for MCP recommendations
     const patientData = {
-      metrics: {
-        medication: metricData[0]?.avgMedicationScore || 0,
-        diet: metricData[0]?.avgDietScore || 0,
-        exercise: metricData[0]?.avgExerciseScore || 0,
+      metrics: { // This is used for MCP recommendations context
+        medication: parseFloat(metricData[0]?.avgMedicationScore || "0"),
+        diet: parseFloat(metricData[0]?.avgDietScore || "0"),
+        exercise: parseFloat(metricData[0]?.avgExerciseScore || "0"),
       },
       chatMemories: chatMemories,
       featureUsage: Object.fromEntries(
@@ -231,11 +234,11 @@ export async function generatePatientProgressReport(patientId: number, doctorId:
       );
       
       // Prepare patient data for insights
-      const patientMetricsData = {
+      const patientMetricsData = { // This is for enhancedPprAnalysisService context
         metrics: {
-          medication: metricData[0]?.avgMedicationScore || 0,
-          diet: metricData[0]?.avgDietScore || 0,
-          exercise: metricData[0]?.avgExerciseScore || 0
+          medication: parseFloat(metricData[0]?.avgMedicationScore || "0"),
+          diet: parseFloat(metricData[0]?.avgDietScore || "0"),
+          exercise: parseFloat(metricData[0]?.avgExerciseScore || "0")
         },
         featureUsage: featureUsageSummary
       };
@@ -284,13 +287,13 @@ export async function generatePatientProgressReport(patientId: number, doctorId:
         createdById: doctorId,
         reportPeriodStartDate: startDate,
         reportPeriodEndDate: endDate,
-        avgMedicationScore: metricData[0]?.avgMedicationScore || null,
-        avgDietScore: metricData[0]?.avgDietScore || null,
-        avgExerciseScore: metricData[0]?.avgExerciseScore || null,
-        keepGoingButtonUsageCount: keepGoingUsage[0]?.usageCount || 0,
+        avgMedicationScore: metricData[0]?.avgMedicationScore ? parseFloat(metricData[0].avgMedicationScore) : null,
+        avgDietScore: metricData[0]?.avgDietScore ? parseFloat(metricData[0].avgDietScore) : null,
+        avgExerciseScore: metricData[0]?.avgExerciseScore ? parseFloat(metricData[0].avgExerciseScore) : null,
+        keepGoingButtonUsageCount: keepGoingUsageCount,
         chatSentimentScore: chatAnalysis.sentimentScore,
         chatSentimentAnalysis: chatAnalysis.sentimentAnalysis,
-        featureUsageSummary: featureUsageObject,
+        featureUsageSummary: featureUsageObject, // This can stay for general feature usage
         recommendationSuccess: calculateRecommendationSuccess(recommendationOutcomes),
         systemRecommendations: validatedRecommendations,
         newCpdSuggestions: newCpdSuggestions,
@@ -303,13 +306,18 @@ export async function generatePatientProgressReport(patientId: number, doctorId:
         improvementTrajectory,
         engagementScore,
         healthTrends,
-        progressBadges
+      progressBadges,
+      // Add detailed keepGoingLogs if needed for the report, or just the count
+      // For now, count is included. Details could be added to patientData for AI.
+      // keepGoingLogs: keepGoingSequenceLogs,
       })
       .returning();
 
     return {
       ...report,
-      patientName: patient.name
+    patientName: patient.name,
+    // Optionally, pass back keepGoingSequenceLogs if the doctor needs detailed view
+    // keepGoingSequenceLogs
     };
   } catch (error) {
     console.error("Error generating PPR:", error);

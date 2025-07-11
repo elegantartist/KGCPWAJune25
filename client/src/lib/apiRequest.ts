@@ -1,6 +1,6 @@
 // In client/src/lib/apiRequest.ts
 export async function apiRequest(url: string, method: string = 'GET', body?: any) {
-  const token = localStorage.getItem('auth_token');
+  const token = localStorage.getItem('accessToken'); // Updated to use 'accessToken'
   const headers: HeadersInit = { 'Content-Type': 'application/json' };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;

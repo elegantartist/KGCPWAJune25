@@ -104,11 +104,16 @@ export function createSafeMcpBundle(
 ): SafeMCPBundle {
   const safeUserId = pseudonymizeId(userId);
 
+  // Redact individual CPD fields before creating the summary
+  const redactedDietCpd = redactPiiFromText(doctorCpds.diet || 'Not specified');
+  const redactedExerciseCpd = redactPiiFromText(doctorCpds.exercise || 'Not specified');
+  const redactedMedicationCpd = redactPiiFromText(doctorCpds.medication || 'Not specified');
+
   const cpdSummary = 
     `Key Patient Directives:\n` +
-    `- Diet Guidance: ${doctorCpds.diet || 'Not specified'}\n` +
-    `- Exercise & Wellness Routine: ${doctorCpds.exercise || 'Not specified'}\n` +
-    `- Medication Plan: ${doctorCpds.medication || 'Not specified'}`;
+    `- Diet Guidance: ${redactedDietCpd}\n` +
+    `- Exercise & Wellness Routine: ${redactedExerciseCpd}\n` +
+    `- Medication Plan: ${redactedMedicationCpd}`;
 
   const safeChatHistory: ChatMessage[] = [];
   for (const message of chatHistory) {

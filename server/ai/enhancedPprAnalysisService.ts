@@ -1,5 +1,5 @@
 import { db } from "../db";
-import { healthMetrics, patientScores, patientBadges, featureUsage, chatMemory, progressMilestones } from "@shared/schema";
+import { patientScores, patientBadges, featureUsage, chatMemory, progressMilestones } from "@shared/schema"; // Removed healthMetrics
 import { eq, and, between, desc, gte, lte, avg, count, max, min } from "drizzle-orm";
 import { generateSystemRecommendations } from "./mcpService";
 import OpenAI from "openai";
@@ -546,12 +546,15 @@ export async function generateBehaviorInsights(
       };
     }
     
-    // Prepare contextual information for the AI
+    // Prepare contextual information for the AI, redacting chat memories
+    const { redactPiiFromText } = await import('../services/privacyMiddleware'); // Import redaction utility
+    const redactedChatMemories = memories.map(m => redactPiiFromText(m.content || "")).join("\n");
+
     const behaviorContext = {
       scorePatterns: await analyzeScorePatterns(patientId, startDate, endDate),
       adherenceRate: await calculateAdherenceRate(patientId, startDate, endDate),
       consistencyMetrics: await calculateConsistencyMetrics(patientId, startDate, endDate),
-      recentChatMemories: memories.map(m => m.content).join("\n"),
+      recentChatMemories: redactedChatMemories, // Use redacted memories
       patientMetrics: {
         avgMedicationScore: patientData.metrics.medication,
         avgDietScore: patientData.metrics.diet,
@@ -628,19 +631,19 @@ export async function projectImprovementTrajectory(
   endDate: Date
 ) {
   try {
-    // Get health metrics sorted by date
-    const metrics = await db
+    // Get patient scores sorted by date
+    const scoresData = await db
       .select()
-      .from(healthMetrics)
+      .from(patientScores) // Changed from healthMetrics to patientScores
       .where(
         and(
-          eq(healthMetrics.userId, patientId),
-          betweenDates(healthMetrics.date, startDate, endDate)
+          eq(patientScores.patientId, patientId), // Changed from healthMetrics.userId
+          betweenDates(patientScores.scoreDate, startDate, endDate) // Changed from healthMetrics.date
         )
       )
-      .orderBy(healthMetrics.date);
+      .orderBy(patientScores.scoreDate); // Changed from healthMetrics.date
     
-    if (metrics.length < 7) {
+    if (scoresData.length < 7) {
       return {
         projectionBasis: "insufficient_data",
         medicationProjection: null,
@@ -652,17 +655,17 @@ export async function projectImprovementTrajectory(
     
     // Calculate linear regression for each metric
     const medicationProjection = calculateMetricProjection(
-      metrics.map(m => ({ date: new Date(m.date), score: m.medicationScore })),
+      scoresData.map(s => ({ date: new Date(s.scoreDate), score: s.medicationSelfScore })), // Use patientScores fields
       30 // Project 30 days into the future
     );
     
     const dietProjection = calculateMetricProjection(
-      metrics.map(m => ({ date: new Date(m.date), score: m.dietScore })),
+      scoresData.map(s => ({ date: new Date(s.scoreDate), score: s.mealPlanSelfScore })), // Use patientScores fields
       30
     );
     
     const exerciseProjection = calculateMetricProjection(
-      metrics.map(m => ({ date: new Date(m.date), score: m.exerciseScore })),
+      scoresData.map(s => ({ date: new Date(s.scoreDate), score: s.exerciseSelfScore })), // Use patientScores fields
       30
     );
     
@@ -878,19 +881,7 @@ export async function generateHealthTrends(
   endDate: Date
 ) {
   try {
-    // Get all metrics for the period
-    const metrics = await db
-      .select()
-      .from(healthMetrics)
-      .where(
-        and(
-          eq(healthMetrics.userId, patientId),
-          betweenDates(healthMetrics.date, startDate, endDate)
-        )
-      )
-      .orderBy(healthMetrics.date);
-    
-    // Get all self-scores for the period
+    // Get all self-scores for the period (already using patientScores here, which is good)
     const scores = await db
       .select()
       .from(patientScores)

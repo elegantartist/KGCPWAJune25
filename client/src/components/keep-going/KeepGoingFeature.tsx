@@ -1,93 +1,56 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useContext } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ArrowRight } from 'lucide-react';
 import { createHapticFeedback } from "@/lib/hapticFeedback";
-import EnhancedImageStore from "@/lib/enhancedImageStore";
-import { useQuery } from "@tanstack/react-query";
-import { useIsMobile } from "@/hooks/use-mobile";
+// import EnhancedImageStore from "@/lib/enhancedImageStore"; // To be removed
+// import { useQuery } from "@tanstack/react-query"; // To be removed for image fetching
+import { useIsMobile } from "@/hooks/useIsMobile"; // Corrected import path
+import { MotivationalImageContext } from "@/context/MotivationalImageContext";
 
 // Define YouTube API types for TypeScript
 declare global {
   interface Window {
     YT: any;
-    __KGC_ENHANCED_IMAGE__: string | null;
+    // __KGC_ENHANCED_IMAGE__: string | null; // To be removed
   }
 }
 
 // Interface for the component props
 interface KeepGoingFeatureProps {
-  userId: number;
-  overlayImage?: string | null;
+  userId: number; // Still needed for recording feature usage
+  // overlayImage prop is removed, will use context
 }
 
 // YouTube video constants
-const DEFAULT_VIDEO_ID = "bKYqK1R19hM";
+const DEFAULT_VIDEO_ID = "bKYqK1R19hM"; // Physiological Sigh video
 
-export const KeepGoingFeature: React.FC<KeepGoingFeatureProps> = ({
-  userId,
-  overlayImage: propOverlayImage
-}) => {
+export const KeepGoingFeature: React.FC<KeepGoingFeatureProps> = ({ userId }) => {
   const isMobile = useIsMobile();
-  const [overlayImage, setOverlayImage] = useState<string | null>(propOverlayImage || null);
+  const { imageUrl } = useContext(MotivationalImageContext); // Use context for image
+  const overlayImage = imageUrl; // Directly use imageUrl from context
 
-  const { data: savedImage } = useQuery({
-    queryKey: ['/api/users', userId, 'motivational-image'],
-    queryFn: async () => {
-      try {
-        const response = await fetch(`/api/users/${userId}/motivational-image`);
-        if (!response.ok) {
-          if (response.status === 404) return null;
-          throw new Error('Failed to fetch motivational image');
-        }
-        return await response.json();
-      } catch (error) {
-        console.error('Error fetching motivational image:', error);
-        return null;
-      }
-    },
-    enabled: !!userId,
-    retry: false,
-    refetchOnWindowFocus: false,
-  });
-
-  useEffect(() => {
-    if (propOverlayImage) {
-      setOverlayImage(propOverlayImage);
-      return;
-    }
-    if (savedImage && savedImage.imageData) {
-      setOverlayImage(savedImage.imageData);
-      EnhancedImageStore.setImage(savedImage.imageData);
-      if (typeof window !== 'undefined') {
-        window.__KGC_ENHANCED_IMAGE__ = savedImage.imageData;
-      }
-      return;
-    }
-    if (typeof window !== 'undefined' && window.__KGC_ENHANCED_IMAGE__) {
-      setOverlayImage(window.__KGC_ENHANCED_IMAGE__);
-      return;
-    }
-    const storeImage = EnhancedImageStore.getImage();
-    if (storeImage) {
-      setOverlayImage(storeImage);
-    }
-  }, [propOverlayImage, savedImage, userId]);
+  // Removed useQuery for fetching image, and useEffect for setting overlayImage from various sources.
+  // This will now solely rely on MotivationalImageContext.
 
   const [isVibrating, setIsVibrating] = useState(false);
   const [showVideo, setShowVideo] = useState(false);
   const playerRef = useRef<any>(null);
   const videoContainerRef = useRef<HTMLDivElement | null>(null);
+  const { apiRequest } = useContext(MotivationalImageContext); // Get apiRequest from context
 
-  const recordFeatureUsage = async () => {
+  const recordKeepGoingUsage = async () => {
+    if (!userId) return; // Should not happen if component is rendered for a logged-in user
+
     try {
-      await fetch('/api/features/usage', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, featureName: 'KeepGoing' }),
+      // Use the apiRequest from context which should have auth token handling
+      await apiRequest('/api/activity/keep-going', 'POST', {
+        triggerContext: 'keep_going_button_clicked', // Example context
+        // notes: "Optional user notes here if UI is added"
       });
+      console.log('Keep Going usage logged.');
     } catch (error) {
-      console.error('Error recording feature usage:', error);
+      console.error('Error recording Keep Going usage:', error);
     }
   };
 
@@ -137,7 +100,7 @@ export const KeepGoingFeature: React.FC<KeepGoingFeatureProps> = ({
     createHapticFeedback(2000, true);
     setIsVibrating(true);
     setTimeout(() => setIsVibrating(false), 2000);
-    recordFeatureUsage();
+    recordKeepGoingUsage(); // Call the new logging function
     setShowVideo(true);
   };
 

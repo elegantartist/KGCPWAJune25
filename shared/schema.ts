@@ -76,3 +76,34 @@ export const adminAlerts = pgTable('admin_alerts', {
   isResolved: boolean('is_resolved').default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 });
+
+// For logging "Keep Going" sequence usage
+export const keepGoingLogs = pgTable("keep_going_logs", {
+  id: serial("id").primaryKey(),
+  patientId: integer("patient_id").notNull().references(() => users.id, { onDelete: 'cascade' }), // Changed from userId to patientId, references users.id
+  sessionId: text("session_id"),
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
+  motivationalImagePresent: boolean("motivational_image_present").default(false),
+  hapticFeedbackTriggered: boolean("haptic_feedback_triggered").default(false),
+  audioFeedbackTriggered: boolean("audio_feedback_triggered").default(false),
+  contextData: text("context_data"), // Changed from json to text, assuming JSON string for simplicity for now
+});
+
+// Used for: Daily self-score submissions and PPR generation
+export const patientScores = pgTable("patient_scores", {
+  id: serial("id").primaryKey(),
+  patientId: integer("patient_id").notNull().references(() => users.id, { onDelete: 'cascade' }), // Assuming patientId refers to users.id as per your example
+  scoreDate: timestamp("score_date").notNull().defaultNow(), // Changed from date to timestamp to match healthMetrics, can be just date too
+  exerciseSelfScore: integer("exercise_self_score"), // 1-10 scale
+  mealPlanSelfScore: integer("meal_plan_self_score"), // 1-10 scale
+  medicationSelfScore: integer("medication_self_score"), // 1-10 scale
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => {
+  return {
+    patientScoreDateUnique: uniqueIndex("patient_score_date_unique_idx").on(
+      table.patientId,
+      table.scoreDate
+    )
+  };
+});
