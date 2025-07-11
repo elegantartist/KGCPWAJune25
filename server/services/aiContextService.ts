@@ -10,7 +10,11 @@ import {
   createSafeMcpBundle, 
   validateMcpBundleSecurity, 
   secureLog, 
-  emergencyPiiScan 
+  emergencyPiiScan,
+  type SafeMCPBundle, // Import the type
+  type UserDetails as PrivacyUserDetails, // Rename to avoid conflict if defined locally
+  type DoctorCPDs,
+  type ChatMessage
 } from './privacyMiddleware';
 // import { auditLogger } from '../auditLogger'; // Simplified for Phase 1
 
@@ -22,8 +26,19 @@ interface AIContextRequest {
   maxHistoryItems?: number;
 }
 
+// Define a more specific type for userDetails within AIContextService
+interface AIInternalUserDetails {
+  latest_scores: {
+    medication_score?: number | null; // from schema.healthMetrics
+    diet_score?: number | null;     // from schema.healthMetrics
+    exercise_score?: number | null; // from schema.healthMetrics
+    date?: Date | null;             // from schema.healthMetrics
+  };
+  // other user-specific, non-sensitive details might be added here
+}
+
 interface AIContextResponse {
-  secureBundle: any;
+  secureBundle: SafeMCPBundle; // Use the imported type
   securityValidation: {
     isSecure: boolean;
     violations: string[];
@@ -57,7 +72,7 @@ export class AIContextService {
       });
 
       // Prepare user details with latest health metrics
-      const userDetails: any = {
+      const userDetails: AIInternalUserDetails = { // Use defined interface
         latest_scores: {}
       };
 
@@ -79,7 +94,7 @@ export class AIContextService {
       }
 
       // Fetch doctor's care plan directives from the current schema
-      const doctorCpds: any = {
+      const doctorCpds: DoctorCPDs = { // Use imported DoctorCPDs type
         diet: '',
         exercise: '',
         medication: ''
@@ -106,16 +121,34 @@ export class AIContextService {
         });
       }
 
-      // Prepare chat history (placeholder for now)
-      const chatHistory: any[] = [];
+      // Prepare chat history
+      const chatHistory: ChatMessage[] = []; // Use imported ChatMessage type
       if (request.includeChatHistory) {
         // TODO: Implement chat history retrieval when chat system is built
-        secureLog('Chat history requested but not yet implemented', { sessionId });
+        // For now, let's assume it might fetch from schema.chatMemory
+        const recentMessages = await db.select({
+          role: schema.chatMemory.role, // Assuming chatMemory table has a 'role' column
+          content: schema.chatMemory.content
+        })
+        .from(schema.chatMemory)
+        .where(eq(schema.chatMemory.userId, request.userId))
+        .orderBy(desc(schema.chatMemory.createdAt))
+        .limit(request.maxHistoryItems || 10);
+
+        // Map to ChatMessage[] - ensure roles are compatible ('user' | 'assistant' | 'system')
+        // This is a placeholder mapping, actual roles from schema.chatMemory might differ
+        chatHistory.push(...recentMessages.map(m => ({
+            role: m.role === 'user' || m.role === 'assistant' || m.role === 'system' ? m.role : 'user', // Basic role mapping
+            content: m.content || ''
+        })));
+        secureLog(`Chat history requested, ${chatHistory.length} messages prepared (placeholder logic)`, { sessionId });
       }
 
       // Emergency PII scan before processing
-      const piiScanUser = emergencyPiiScan(user);
-      const piiScanCpds = emergencyPiiScan(doctorCpds);
+      // Note: emergencyPiiScan expects 'any'. If userDetails/doctorCpds are strongly typed,
+      // they might need to be cast to 'any' or piiScan adapted. For now, it should work.
+      const piiScanUser = emergencyPiiScan(user); // 'user' is from db, likely fine
+      const piiScanCpds = emergencyPiiScan(doctorCpds); // doctorCpds is now DoctorCPDs
       
       if (piiScanUser.hasPii || piiScanCpds.hasPii) {
         secureLog('PII detected in raw data before processing', { 

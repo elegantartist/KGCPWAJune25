@@ -3,249 +3,146 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Sparkles, Save, Edit2 } from "lucide-react";
+import { Sparkles, Save, Edit2, Upload, Loader2 } from "lucide-react"; // Added Upload, Loader2
 import { createHapticFeedback } from "@/lib/soundEffects";
-import { enhanceWithStars } from "@/lib/imageEffects";
+// import { enhanceWithStars } from "@/lib/imageEffects"; // Enhancement is not a pre-save step
 import KeepGoingVideo from "@/components/motivation/KeepGoingVideo";
-import EnhancedImageStore from "@/lib/enhancedImageStore";
+// import EnhancedImageStore from "@/lib/enhancedImageStore"; // Removed
 import heartImage from "@assets/image_1744127067136.jpeg";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+// import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"; // Removed
+import { useMotivationalImage } from "@/context/MotivationalImageContext"; // Added
+
+// Helper function to convert Data URL to Blob - if not already in a shared util
+function dataURLtoBlob(dataurl: string): Blob {
+  const arr = dataurl.split(',');
+  const mimeMatch = arr[0].match(/:(.*?);/);
+  if (!mimeMatch) {
+    throw new Error('Invalid data URL');
+  }
+  const mime = mimeMatch[1];
+  const bstr = atob(arr[1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while (n--) {
+    u8arr[n] = bstr.charCodeAt(n);
+  }
+  return new Blob([u8arr], { type: mime });
+}
 
 interface KeepGoingWithMIPProps {
   onClose: () => void;
 }
 
 const KeepGoingWithMIP: React.FC<KeepGoingWithMIPProps> = ({ onClose }) => {
-  const [selectedImage, setSelectedImage] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [enhancedUrl, setEnhancedUrl] = useState<string | null>(null);
-  const [processingImage, setProcessingImage] = useState(false);
+  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
+  const [localPreviewUrl, setLocalPreviewUrl] = useState<string | null>(null); // For immediate preview of selected file
+  // const [enhancedUrl, setEnhancedUrl] = useState<string | null>(null); // Client-side enhancement before save removed
+  // const [processingImage, setProcessingImage] = useState(false); // For client-side enhancement
   const [showVideo, setShowVideo] = useState(false);
-  const [showEditor, setShowEditor] = useState(false);
+  const [showEditor, setShowEditor] = useState(true); // Default to editor
   const { toast } = useToast();
-  const queryClient = useQueryClient();
-  
-  // User ID for demo purposes (in a real app, this would be from auth)
-  // Get current authenticated user
-  const { data: currentUser } = useQuery({
-    queryKey: ['/api/user/current-context'],
-    retry: false
-  });
 
-  const userId = currentUser?.id;
-  
-  // Query for getting the saved motivational image from the database
-  const { data: savedImage, isLoading: isLoadingImage } = useQuery({
-    queryKey: ['/api/users', userId, 'motivational-image'],
-    queryFn: async () => {
-      try {
-        const response = await fetch(`/api/users/${userId}/motivational-image`);
-        if (!response.ok) {
-          if (response.status === 404) {
-            // No image found, but this is not an error
-            return null;
-          }
-          throw new Error('Failed to fetch motivational image');
-        }
-        return await response.json();
-      } catch (error) {
-        console.log('No saved image found in database, this is expected for new users');
-        return null;
-      }
-    },
-    retry: false,
-    refetchOnWindowFocus: false,
-  });
-  
-  // Mutation for saving a new motivational image
-  const saveImageMutation = useMutation({
-    mutationFn: async (imageData: string) => {
-      return await fetch(`/api/users/${userId}/motivational-image`, {
-        method: 'PUT',
-        body: JSON.stringify({ imageData }),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-    },
-    onSuccess: () => {
-      // Invalidate the motivational image query to refetch
-      queryClient.invalidateQueries({ queryKey: ['/api/users', userId, 'motivational-image'] });
-    },
-  });
+  const {
+    imageSrc: contextImageSrc,
+    isLoadingImage: isLoadingContextImage,
+    setImageBlob
+  } = useMotivationalImage();
 
-  // Check for existing image on mount, prioritizing database, then falling back to local
+  // Effect to initialize view based on context image
   useEffect(() => {
-    // First try to get image from database
-    if (savedImage && savedImage.imageData) {
-      console.log("KeepGoingWithMIP: Found image in database");
-      setEnhancedUrl(savedImage.imageData);
-      setPreviewUrl(savedImage.imageData);
-      
-      // Also update local stores for redundancy
-      if (typeof window !== 'undefined') {
-        window.__KGC_ENHANCED_IMAGE__ = savedImage.imageData;
-      }
-      EnhancedImageStore.setImage(savedImage.imageData);
-      
-      // If there's an image and we're not explicitly in editor mode, show the video
-      if (!showEditor) {
+    if (!isLoadingContextImage) {
+      if (contextImageSrc) {
+        setLocalPreviewUrl(contextImageSrc); // Set preview to existing image from context
+        setShowEditor(false); // If image exists, show video by default
         setShowVideo(true);
-      }
-    } 
-    // Fallback to window object (for immediate use)
-    else if (typeof window !== 'undefined' && window.__KGC_ENHANCED_IMAGE__) {
-      console.log("KeepGoingWithMIP: Found existing image in window object");
-      setEnhancedUrl(window.__KGC_ENHANCED_IMAGE__);
-      setPreviewUrl(window.__KGC_ENHANCED_IMAGE__);
-      
-      // If there's already an image, we can show the video immediately
-      // unless the user explicitly opens the editor
-      if (!showEditor) {
-        setShowVideo(true);
-      }
-    } 
-    // Fallback to local storage
-    else {
-      const imageUrl = EnhancedImageStore.getImage();
-      if (imageUrl) {
-        console.log("KeepGoingWithMIP: Found image in local storage");
-        setEnhancedUrl(imageUrl);
-        setPreviewUrl(imageUrl);
-        
-        // If there's already an image, we can show the video immediately
-        // unless the user explicitly opens the editor
-        if (!showEditor) {
-          setShowVideo(true);
-        }
       } else {
-        console.log("KeepGoingWithMIP: No existing image found, showing editor");
-        // If no image exists, show the editor by default
-        setShowEditor(true);
+        setShowEditor(true); // No image in context, open editor
+        setShowVideo(false);
       }
     }
-  }, [savedImage, showEditor]);
+  }, [contextImageSrc, isLoadingContextImage, showEditor]); // Added showEditor to dependencies
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      setSelectedImage(file);
+      setSelectedImageFile(file);
       
-      // Create a URL for the preview
       const reader = new FileReader();
       reader.onloadend = () => {
-        setPreviewUrl(reader.result as string);
+        setLocalPreviewUrl(reader.result as string);
       };
       reader.readAsDataURL(file);
+    } else {
+      // If file selection is cancelled, revert preview to context image or null
+      setLocalPreviewUrl(contextImageSrc);
+      setSelectedImageFile(null);
     }
   };
 
-  // Enhance the image with stars
-  const handleEnhance = async () => {
-    if (!previewUrl) {
-      toast({
-        title: "No image to enhance",
-        description: "Please upload an image first",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    // Create haptic feedback and sound effect
-    createHapticFeedback();
-    
-    // Show loading state
-    setProcessingImage(true);
-    
-    try {
-      // Enhance the image with stars
-      const enhanced = await enhanceWithStars(previewUrl);
-      setEnhancedUrl(enhanced);
-      
-      // Show success message
-      toast({
-        title: "Image enhanced!",
-        description: "Your image has been enhanced with motivational stars",
-        variant: "default",
-      });
-    } catch (error) {
-      console.error('Error enhancing image:', error);
-      toast({
-        title: "Enhancement failed",
-        description: "There was a problem enhancing your image",
-        variant: "destructive",
-      });
-    } finally {
-      setProcessingImage(false);
-    }
-  };
-  
-  // Save the enhanced image and show the video
+  // Enhancement step removed from save workflow based on clarification
+  // const handleEnhance = async () => { ... };
+
   const handleSave = async () => {
-    if (!enhancedUrl) {
+    if (!selectedImageFile && !contextImageSrc) { // Can't save if nothing selected and nothing in context (unless we re-save context)
       toast({
-        title: "Nothing to save",
-        description: "Please upload and enhance an image first",
+        title: "No Image Selected",
+        description: "Please select an image to save.",
         variant: "destructive",
       });
       return;
     }
     
-    // Create haptic feedback and sound effect
     createHapticFeedback();
     
+    let blobToSave: Blob | null = selectedImageFile;
+
+    // If no new file is selected, but there's a localPreviewUrl (could be from context or previous selection)
+    // and it's a data URL, convert it to blob. This case is less likely if flow is: select -> save.
+    if (!blobToSave && localPreviewUrl && localPreviewUrl.startsWith('data:')) {
+        try {
+            blobToSave = dataURLtoBlob(localPreviewUrl);
+        } catch (e) {
+            console.error("Error converting preview URL to blob:", e);
+            toast({ title: "Error", description: "Could not process image preview for saving.", variant: "destructive" });
+            return;
+        }
+    }
+
+    if (!blobToSave) {
+        toast({ title: "Error", description: "No image data to save.", variant: "destructive" });
+        return;
+    }
+    
     try {
-      // Save to database for permanent storage
-      await saveImageMutation.mutateAsync(enhancedUrl);
-      console.log("SAVED IMAGE TO DATABASE");
+      await setImageBlob(blobToSave); // Save to context (and IndexedDB)
       
-      // Also save directly to window object for immediate use
-      if (typeof window !== 'undefined') {
-        window.__KGC_ENHANCED_IMAGE__ = enhancedUrl;
-        console.log("SAVED IMAGE TO GLOBAL WINDOW OBJECT");
-      }
-      
-      // Also save via our local store for redundancy
-      EnhancedImageStore.setImage(enhancedUrl);
-      
-      // Success message
       toast({
         title: "Image saved!",
-        description: "Your image is now permanently saved and will appear in the Keep Going video",
+        description: "Your motivational image is now set.",
         variant: "default",
       });
       
-      // Hide the editor and show the video
       setShowEditor(false);
       setShowVideo(true);
     } catch (error) {
-      console.error("Error saving image to database:", error);
-      
-      // Still save to local storage as fallback
-      if (typeof window !== 'undefined') {
-        window.__KGC_ENHANCED_IMAGE__ = enhancedUrl;
-      }
-      EnhancedImageStore.setImage(enhancedUrl);
-      
+      console.error("Error saving image:", error);
       toast({
-        title: "Image saved locally",
-        description: "There was a problem saving your image permanently, but it's available for this session",
-        variant: "default",
+        title: "Save Failed",
+        description: "Could not save your image. Please try again.",
+        variant: "destructive",
       });
-      
-      // Still proceed with showing the video
-      setShowEditor(false);
-      setShowVideo(true);
     }
   };
   
-  // Handle editing the existing image
   const handleEdit = () => {
-    // Hide the video and show the editor
     setShowVideo(false);
     setShowEditor(true);
-    
-    // Create haptic feedback
+    // If there's an image in context, set it as the initial preview for editing
+    // This allows re-uploading/changing the existing image.
+    if (contextImageSrc) {
+        setLocalPreviewUrl(contextImageSrc);
+    }
+    setSelectedImageFile(null); // Clear any previously selected file if user wants to re-edit/re-select
     createHapticFeedback();
   };
   

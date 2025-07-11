@@ -2,6 +2,34 @@ import { useEffect, useState } from 'react';
 import { createHapticFeedback, createMenuFeedback } from '../lib/hapticFeedback';
 
 // Websocket connection for real-time feature usage tracking
+
+// Define interfaces for WebSocket messages and recommendations
+interface KeepGoingRecommendation {
+  id: string | number;
+  text: string;
+  // Add other relevant fields for a recommendation
+}
+
+interface KeepGoingWebSocketMessage {
+  type: 'keep_going_recommendation';
+  recommendation: KeepGoingRecommendation;
+  // Potentially other message types specific to this monitor
+}
+
+// Type guard for KeepGoingWebSocketMessage
+function isKeepGoingWebSocketMessage(data: any): data is KeepGoingWebSocketMessage {
+  return (
+    typeof data === 'object' &&
+    data !== null &&
+    data.type === 'keep_going_recommendation' &&
+    typeof data.recommendation === 'object' &&
+    data.recommendation !== null &&
+    (typeof data.recommendation.id === 'string' || typeof data.recommendation.id === 'number') &&
+    typeof data.recommendation.text === 'string'
+  );
+}
+
+
 let socket: WebSocket | null = null;
 let keepGoingSessionStartTime: number | null = null;
 let keepGoingActiveTimer: NodeJS.Timeout | null = null;
@@ -31,18 +59,22 @@ export function initializeKeepGoingMonitor(userId: number) {
   
   socket.onmessage = (event) => {
     try {
-      const data = JSON.parse(event.data);
+      const parsedData = JSON.parse(event.data);
       
-      // Handle specialized Keep Going recommendations
-      if (data.type === 'keep_going_recommendation') {
-        // Show recommendation in UI
-        const recommendationEvent = new CustomEvent('keepGoingRecommendation', {
-          detail: data.recommendation
-        });
-        window.dispatchEvent(recommendationEvent);
+      if (isKeepGoingWebSocketMessage(parsedData)) {
+        // Now parsedData is correctly typed as KeepGoingWebSocketMessage
+        if (parsedData.type === 'keep_going_recommendation') {
+          // Show recommendation in UI
+          const recommendationEvent = new CustomEvent<KeepGoingRecommendation>('keepGoingRecommendation', { // Specify CustomEvent detail type
+            detail: parsedData.recommendation
+          });
+          window.dispatchEvent(recommendationEvent);
+        }
+      } else {
+        console.warn('Received unhandled or malformed WebSocket message in KeepGoingMonitor:', parsedData);
       }
     } catch (error) {
-      console.error('Error processing WebSocket message:', error);
+      console.error('Error processing WebSocket message in KeepGoingMonitor:', error);
     }
   };
   
@@ -146,14 +178,14 @@ export function endKeepGoingSession(userId: number) {
  * React hook for Keep Going feature monitoring
  */
 export function useKeepGoingMonitor(userId: number) {
-  const [recommendations, setRecommendations] = useState<any[]>([]);
+  const [recommendations, setRecommendations] = useState<KeepGoingRecommendation[]>([]); // Typed state
   
   // Initialize WebSocket connection
   useEffect(() => {
     initializeKeepGoingMonitor(userId);
     
     // Listen for recommendation events
-    const handleRecommendation = (event: CustomEvent) => {
+    const handleRecommendation = (event: CustomEvent<KeepGoingRecommendation>) => { // Typed CustomEvent
       setRecommendations(prev => [event.detail, ...prev]);
     };
     

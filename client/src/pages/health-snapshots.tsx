@@ -17,11 +17,11 @@ import {
   Cell,
   Legend
 } from "recharts";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { useIsMobile } from "@/hooks/useIsMobile"; // Corrected import path
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useMCP } from "@/components/chatbot/ModelContextProtocol";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest } from "@/lib/apiRequest"; // Corrected import path
 import { useQuery } from "@tanstack/react-query";
 
 const HealthSnapshots: React.FC = () => {

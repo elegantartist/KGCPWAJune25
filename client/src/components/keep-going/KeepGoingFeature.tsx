@@ -3,22 +3,22 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ArrowRight } from 'lucide-react';
 import { createHapticFeedback } from "@/lib/hapticFeedback";
-import EnhancedImageStore from "@/lib/enhancedImageStore";
-import { useQuery } from "@tanstack/react-query";
-import { useIsMobile } from "@/hooks/use-mobile";
+// import EnhancedImageStore from "@/lib/enhancedImageStore"; // Removed
+// import { useQuery } from "@tanstack/react-query"; // Removed
+import { useIsMobile } from "@/hooks/useIsMobile"; // Corrected import path
 
-// Define YouTube API types for TypeScript
+// Define YouTube API types for TypeScript - Keep YT if used by YouTube player
 declare global {
   interface Window {
-    YT: any;
-    __KGC_ENHANCED_IMAGE__: string | null;
+    YT?: any; // Keep YT if YouTube player logic relies on it
+    // __KGC_ENHANCED_IMAGE__ was removed
   }
 }
 
 // Interface for the component props
 interface KeepGoingFeatureProps {
   userId: number;
-  overlayImage?: string | null;
+  overlayImage?: string | null; // This will now be directly from context via props
 }
 
 // YouTube video constants
@@ -26,53 +26,13 @@ const DEFAULT_VIDEO_ID = "bKYqK1R19hM";
 
 export const KeepGoingFeature: React.FC<KeepGoingFeatureProps> = ({
   userId,
-  overlayImage: propOverlayImage
+  overlayImage // Directly use the prop
 }) => {
   const isMobile = useIsMobile();
-  const [overlayImage, setOverlayImage] = useState<string | null>(propOverlayImage || null);
+  // const [overlayImage, setOverlayImage] = useState<string | null>(propOverlayImage || null); // Removed internal state for overlayImage
 
-  const { data: savedImage } = useQuery({
-    queryKey: ['/api/users', userId, 'motivational-image'],
-    queryFn: async () => {
-      try {
-        const response = await fetch(`/api/users/${userId}/motivational-image`);
-        if (!response.ok) {
-          if (response.status === 404) return null;
-          throw new Error('Failed to fetch motivational image');
-        }
-        return await response.json();
-      } catch (error) {
-        console.error('Error fetching motivational image:', error);
-        return null;
-      }
-    },
-    enabled: !!userId,
-    retry: false,
-    refetchOnWindowFocus: false,
-  });
-
-  useEffect(() => {
-    if (propOverlayImage) {
-      setOverlayImage(propOverlayImage);
-      return;
-    }
-    if (savedImage && savedImage.imageData) {
-      setOverlayImage(savedImage.imageData);
-      EnhancedImageStore.setImage(savedImage.imageData);
-      if (typeof window !== 'undefined') {
-        window.__KGC_ENHANCED_IMAGE__ = savedImage.imageData;
-      }
-      return;
-    }
-    if (typeof window !== 'undefined' && window.__KGC_ENHANCED_IMAGE__) {
-      setOverlayImage(window.__KGC_ENHANCED_IMAGE__);
-      return;
-    }
-    const storeImage = EnhancedImageStore.getImage();
-    if (storeImage) {
-      setOverlayImage(storeImage);
-    }
-  }, [propOverlayImage, savedImage, userId]);
+  // Removed useQuery for fetching image - it's passed as a prop now.
+  // Removed useEffect that was setting overlayImage from multiple sources.
 
   const [isVibrating, setIsVibrating] = useState(false);
   const [showVideo, setShowVideo] = useState(false);

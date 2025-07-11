@@ -2,7 +2,7 @@ import React from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { HealthMetric } from "@shared/schema";
 import { format } from "date-fns";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { useIsMobile } from "@/hooks/useIsMobile"; // Corrected import path
 import { cn } from "@/lib/utils";
 import {
   LineChart,

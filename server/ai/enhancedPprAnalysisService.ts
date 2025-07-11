@@ -4,6 +4,77 @@ import { eq, and, between, desc, gte, lte, avg, count, max, min } from "drizzle-
 import { generateSystemRecommendations } from "./mcpService";
 import OpenAI from "openai";
 
+// Import the select type for patientScores
+import { type patientScores as PatientScoresTable } from "@shared/schema";
+import { InferSelectModel } from "drizzle-orm";
+
+// Type for a single patient score entry from the database
+type PatientScoreFromDB = InferSelectModel<typeof PatientScoresTable>;
+
+// --- START OF INTERFACE DEFINITIONS ---
+
+interface DaySpecificScoreValues { medication: number; diet: number; exercise: number; }
+interface DayOfWeekScoreDetail {
+  count: number;
+  total: DaySpecificScoreValues;
+  avg: DaySpecificScoreValues;
+}
+type DayOfWeekAnalysis = Record<string, DayOfWeekScoreDetail>;
+
+interface WeekendWeekdayComparison {
+  weekend: DaySpecificScoreValues;
+  weekday: DaySpecificScoreValues;
+}
+
+type TrendStatus = "improving" | "declining" | "flat" | "insufficient_data";
+interface ScoreTrends {
+  medicationTrend: TrendStatus;
+  dietTrend: TrendStatus;
+  exerciseTrend: TrendStatus;
+  hasConsistentPattern: boolean;
+}
+
+interface BehaviorContextPatientDataMetrics {
+  medication: number | null;
+  diet: number | null;
+  exercise: number | null;
+}
+
+// Assuming featureUsage is imported from @shared/schema to get its inferred type
+// import { type featureUsage as FeatureUsageTableType } from "@shared/schema";
+// type FeatureUsageFromDB = InferSelectModel<typeof FeatureUsageTableType>;
+interface BehaviorContextPatientData {
+  metrics: BehaviorContextPatientDataMetrics;
+  featureUsage: (typeof featureUsage.$inferSelect)[];
+}
+
+interface BehaviorInsightsPayload {
+  keyBehaviorPatterns: string[];
+  adherenceFactors: {
+    facilitators: string[];
+    barriers: string[];
+  };
+  engagementInsights: string[];
+  recommendationsForDoctor: string[];
+}
+
+interface MetricTimePoint { date: Date; score: number | null; } // Used by calculateMetricProjection
+interface MetricProjection {
+  currentValue: number | null;
+  projectedValue: number | null;
+  trend: TrendStatus;
+  confidence: number;
+}
+
+interface AggregatedFeatureUsage {
+  featureName: string | null;
+  usageCount: string | null; // Drizzle's count often returns string
+  lastUsedDate: Date | string | null; // Drizzle's max on date can be string
+}
+
+// --- END OF INTERFACE DEFINITIONS ---
+
+
 // Initialize OpenAI API client
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -91,8 +162,8 @@ export async function analyzeScorePatterns(
 }
 
 // Calculate average scores by day of week
-function calculateDayOfWeekScores(scores: any[]) {
-  const dayScores: Record<string, { count: number, total: Record<string, number>, avg: Record<string, number> }> = {
+function calculateDayOfWeekScores(scores: PatientScoreFromDB[]): DayOfWeekAnalysis {
+  const dayScores: DayOfWeekAnalysis = {
     "Sunday": { count: 0, total: { medication: 0, diet: 0, exercise: 0 }, avg: { medication: 0, diet: 0, exercise: 0 } },
     "Monday": { count: 0, total: { medication: 0, diet: 0, exercise: 0 }, avg: { medication: 0, diet: 0, exercise: 0 } },
     "Tuesday": { count: 0, total: { medication: 0, diet: 0, exercise: 0 }, avg: { medication: 0, diet: 0, exercise: 0 } },
@@ -135,9 +206,9 @@ function calculateDayOfWeekScores(scores: any[]) {
 }
 
 // Compare weekend vs weekday scores
-function compareWeekendWeekdayScores(scores: any[]) {
-  const weekend = { count: 0, total: { medication: 0, diet: 0, exercise: 0 }, avg: { medication: 0, diet: 0, exercise: 0 } };
-  const weekday = { count: 0, total: { medication: 0, diet: 0, exercise: 0 }, avg: { medication: 0, diet: 0, exercise: 0 } };
+function compareWeekendWeekdayScores(scores: PatientScoreFromDB[]): WeekendWeekdayComparison {
+  const weekend: DayOfWeekScoreDetail = { count: 0, total: { medication: 0, diet: 0, exercise: 0 }, avg: { medication: 0, diet: 0, exercise: 0 } };
+  const weekday: DayOfWeekScoreDetail = { count: 0, total: { medication: 0, diet: 0, exercise: 0 }, avg: { medication: 0, diet: 0, exercise: 0 } };
   
   scores.forEach(score => {
     const date = new Date(score.scoreDate);
@@ -188,7 +259,7 @@ function calculateScoreVolatility(scores: number[]) {
 }
 
 // Calculate consistency of scoring (how regularly the patient records scores)
-function calculateConsistency(scores: any[]) {
+function calculateConsistency(scores: PatientScoreFromDB[]) {
   if (scores.length < 2) return 0;
   
   // Get date range
@@ -203,10 +274,10 @@ function calculateConsistency(scores: any[]) {
 }
 
 // Identify trends in scores over time
-function identifyScoreTrends(scores: any[]) {
+function identifyScoreTrends(scores: PatientScoreFromDB[]): ScoreTrends {
   if (scores.length < 7) {
     return {
-      medicationTrend: "insufficient_data",
+      medicationTrend: "insufficient_data" as TrendStatus,
       dietTrend: "insufficient_data", 
       exerciseTrend: "insufficient_data",
       hasConsistentPattern: false
@@ -214,14 +285,16 @@ function identifyScoreTrends(scores: any[]) {
   }
   
   // Simple linear regression for each score type
-  const medicationTrend = calculateScoreTrend(scores.map((s, i) => ({ index: i, score: s.medicationSelfScore })));
-  const dietTrend = calculateScoreTrend(scores.map((s, i) => ({ index: i, score: s.mealPlanSelfScore })));
-  const exerciseTrend = calculateScoreTrend(scores.map((s, i) => ({ index: i, score: s.exerciseSelfScore })));
+  const medicationTrend = calculateScoreTrend(scores.map((s, i) => ({ index: i, score: s.medicationSelfScore ?? null })));
+  const dietTrend = calculateScoreTrend(scores.map((s, i) => ({ index: i, score: s.mealPlanSelfScore ?? null })));
+  const exerciseTrend = calculateScoreTrend(scores.map((s, i) => ({ index: i, score: s.exerciseSelfScore ?? null })));
   
   // Check if there's a consistent pattern across all three categories
   const hasConsistentPattern = 
-    (medicationTrend === dietTrend && dietTrend === exerciseTrend) ||
-    (medicationTrend !== "flat" && dietTrend !== "flat" && exerciseTrend !== "flat");
+    (medicationTrend === dietTrend && dietTrend === exerciseTrend && medicationTrend !== "insufficient_data") || // All same and valid
+    (medicationTrend !== "flat" && medicationTrend !== "insufficient_data" &&
+     dietTrend !== "flat" && dietTrend !== "insufficient_data" &&
+     exerciseTrend !== "flat" && exerciseTrend !== "insufficient_data"); // All are trending (not flat or insufficient)
   
   return {
     medicationTrend,
@@ -232,9 +305,9 @@ function identifyScoreTrends(scores: any[]) {
 }
 
 // Calculate trend for a specific score type
-function calculateScoreTrend(data: { index: number, score: number | null }[]) {
+function calculateScoreTrend(data: { index: number, score: number | null }[]): TrendStatus {
   // Filter out null scores
-  const filteredData = data.filter(d => d.score !== null);
+  const filteredData = data.filter(d => d.score !== null && d.score !== undefined) as { index: number, score: number }[];
   
   if (filteredData.length < 5) return "insufficient_data";
   
@@ -263,12 +336,12 @@ function calculateScoreTrend(data: { index: number, score: number | null }[]) {
 
 // Generate a human-readable description of the patterns
 function generatePatternDescription(
-  trends: any, 
+  trends: ScoreTrends,
   volatility: number, 
   consistency: number, 
-  dayAnalysis: any, 
-  weekendComparison: any
-) {
+  dayAnalysis: DayOfWeekAnalysis,
+  weekendComparison: WeekendWeekdayComparison
+): string {
   let description = "";
   
   // Add trends info
@@ -303,9 +376,9 @@ function generatePatternDescription(
   }
   
   // Add day of week patterns if significant
-  const dayScores = Object.entries(dayAnalysis).map(([day, data]) => ({ 
-    day, 
-    avg: (data as any).avg 
+  const dayScores = Object.entries(dayAnalysis).map(([day, data]) => ({
+    day,
+    avg: data.avg // data is now DayOfWeekScoreDetail, so data.avg is DaySpecificScoreValues
   }));
   
   const bestDay = dayScores.reduce((best, current) => {
@@ -492,9 +565,11 @@ export async function generateBehaviorInsights(
   patientId: number, 
   startDate: Date, 
   endDate: Date,
-  patientData?: any
-) {
+  patientDataInput?: BehaviorContextPatientData // Changed name and type
+): Promise<BehaviorInsightsPayload> {
   try {
+    let patientData: BehaviorContextPatientData; // Internal variable with the full type
+
     // Get chat memories for the period
     const memories = await db
       .select()
@@ -508,10 +583,10 @@ export async function generateBehaviorInsights(
       .orderBy(desc(chatMemory.createdAt))
       .limit(50); // Limit to most recent memories
     
-    // If patientData is not provided, calculate it here
-    if (!patientData) {
+    // If patientDataInput is not provided, calculate it here
+    if (!patientDataInput) {
       // Calculate average scores from patient_scores table
-      const scores = await db
+      const scoresFromDB = await db // Renamed to avoid conflict
         .select()
         .from(patientScores)
         .where(
@@ -521,12 +596,12 @@ export async function generateBehaviorInsights(
           )
         );
         
-      const avgMedicationScore = scores.reduce((sum, s) => sum + (s.medicationSelfScore || 0), 0) / (scores.length || 1);
-      const avgDietScore = scores.reduce((sum, s) => sum + (s.mealPlanSelfScore || 0), 0) / (scores.length || 1);
-      const avgExerciseScore = scores.reduce((sum, s) => sum + (s.exerciseSelfScore || 0), 0) / (scores.length || 1);
+      const avgMedicationScore = scoresFromDB.reduce((sum, s) => sum + (s.medicationSelfScore || 0), 0) / (scoresFromDB.length || 1);
+      const avgDietScore = scoresFromDB.reduce((sum, s) => sum + (s.mealPlanSelfScore || 0), 0) / (scoresFromDB.length || 1);
+      const avgExerciseScore = scoresFromDB.reduce((sum, s) => sum + (s.exerciseSelfScore || 0), 0) / (scoresFromDB.length || 1);
       
       // Get feature usage data
-      const features = await db
+      const featuresFromDB = await db // Renamed to avoid conflict
         .select()
         .from(featureUsage)
         .where(
@@ -536,28 +611,31 @@ export async function generateBehaviorInsights(
           )
         );
         
-      patientData = {
+      patientData = { // Assign to the correctly typed internal variable
         metrics: {
           medication: avgMedicationScore,
           diet: avgDietScore,
           exercise: avgExerciseScore
         },
-        featureUsage: features
+        featureUsage: featuresFromDB // Drizzle's select() returns fully typed results
       };
+    } else {
+      patientData = patientDataInput; // Use the provided data
     }
     
     // Prepare contextual information for the AI
+    // Assuming analyzeScorePatterns etc. return suitably typed data or will be refactored
     const behaviorContext = {
       scorePatterns: await analyzeScorePatterns(patientId, startDate, endDate),
       adherenceRate: await calculateAdherenceRate(patientId, startDate, endDate),
       consistencyMetrics: await calculateConsistencyMetrics(patientId, startDate, endDate),
-      recentChatMemories: memories.map(m => m.content).join("\n"),
-      patientMetrics: {
+      recentChatMemories: memories.map(m => m.content ?? '').join("\n"), // Ensure content is not null
+      patientMetrics: { // These are now from the typed patientData
         avgMedicationScore: patientData.metrics.medication,
         avgDietScore: patientData.metrics.diet,
         avgExerciseScore: patientData.metrics.exercise
       },
-      featureUsage: patientData.featureUsage || []
+      featureUsage: patientData.featureUsage // Already typed
     };
     
     const systemPrompt = `
@@ -598,13 +676,32 @@ export async function generateBehaviorInsights(
       console.log("AI Response:", insightsText);
       
       // Remove any markdown code block syntax that OpenAI might be adding
-      let cleanedText = insightsText || "{}";
-      cleanedText = cleanedText.replace(/```json\n/g, '').replace(/```\n/g, '').replace(/```/g, '');
+      let cleanedText = insightsText || ""; // Default to empty string if null/undefined
+      cleanedText = cleanedText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
       
-      return JSON.parse(cleanedText);
+      if (!cleanedText) {
+          console.warn("AI response for behavior insights was empty after cleaning.");
+          // Return a valid default structure
+          return {
+            keyBehaviorPatterns: [],
+            adherenceFactors: { facilitators: [], barriers: [] },
+            engagementInsights: [],
+            recommendationsForDoctor: []
+          };
+      }
+
+      const parsed = JSON.parse(cleanedText);
+      // Basic structural validation
+      if (Array.isArray(parsed.keyBehaviorPatterns) && parsed.adherenceFactors && Array.isArray(parsed.recommendationsForDoctor)) {
+        return parsed as BehaviorInsightsPayload;
+      } else {
+        console.error("AI behavior insights JSON structure mismatch:", parsed);
+        throw new Error("Parsed JSON for behavior insights does not match expected structure.");
+      }
     } catch (e) {
-      console.error("Error parsing AI response:", e);
-      console.error("Raw response:", insightsText);
+      console.error("Error parsing AI response for behavior insights:", e);
+      console.error("Raw AI response for behavior insights:", insightsText);
+      // Return a valid default structure on error
       return {
         keyBehaviorPatterns: ["Error generating behavior insights"],
         adherenceFactors: {
@@ -687,15 +784,15 @@ export async function projectImprovementTrajectory(
 }
 
 // Calculate projection for a specific metric
-function calculateMetricProjection(data: { date: Date, score: number | null }[], daysAhead: number) {
+function calculateMetricProjection(data: MetricTimePoint[], daysAhead: number): MetricProjection {
   // Filter out null scores
-  const filteredData = data.filter(d => d.score !== null);
+  const filteredData = data.filter(d => d.score !== null && d.score !== undefined) as { date: Date, score: number }[];
   
   if (filteredData.length < 5) {
     return {
       currentValue: filteredData.length ? filteredData[filteredData.length - 1].score : null,
       projectedValue: null,
-      trend: "insufficient_data",
+      trend: "insufficient_data" as TrendStatus,
       confidence: 0
     };
   }
@@ -747,12 +844,12 @@ function calculateMetricProjection(data: { date: Date, score: number | null }[],
 
 // Determine overall trend from individual metric projections
 function determineOverallTrend(
-  medicationProjection: any,
-  dietProjection: any,
-  exerciseProjection: any
-) {
+  medicationProjection: MetricProjection,
+  dietProjection: MetricProjection,
+  exerciseProjection: MetricProjection
+): TrendStatus | "mixed" { // Return type can be TrendStatus or "mixed"
   // Count trends by category
-  const trends: Record<string, number> = {
+  const trends: Record<TrendStatus | "mixed", number> = { // Use TrendStatus for keys
     "strongly_improving": 0,
     "slightly_improving": 0,
     "stable": 0,
@@ -930,9 +1027,9 @@ export async function generateHealthTrends(
     const weeklyAverages = calculateWeeklyAverages(scores);
     
     // Prepare feature usage data
-    const featureUsageTrend = featureUsageData.map((usage: any) => ({
-      feature: usage.featureName,
-      count: Number(usage.usageCount),
+    const featureUsageTrend = (featureUsageData as AggregatedFeatureUsage[]).map(usage => ({
+      feature: usage.featureName || 'Unknown Feature',
+      count: usage.usageCount ? Number(usage.usageCount) : 0,
       lastUsed: usage.lastUsedDate ? new Date(usage.lastUsedDate).toISOString().split('T')[0] : ''
     }));
     
@@ -952,11 +1049,16 @@ export async function generateHealthTrends(
 }
 
 // Calculate weekly averages
-function calculateWeeklyAverages(scores: any[]) {
+function calculateWeeklyAverages(scores: PatientScoreFromDB[]): Array<{
+  weekStarting: string;
+  medication: number | null;
+  diet: number | null;
+  exercise: number | null;
+}> {
   if (!scores.length) return [];
   
   // Group scores by week
-  const weekMap = new Map<string, any[]>();
+  const weekMap = new Map<string, PatientScoreFromDB[]>();
   
   scores.forEach(score => {
     const date = new Date(score.scoreDate);
@@ -1008,7 +1110,11 @@ function calculateWeeklyAverages(scores: any[]) {
 }
 
 // Calculate score distributions
-function calculateScoreDistributions(scores: any[]) {
+function calculateScoreDistributions(scores: PatientScoreFromDB[]): {
+  medication: number[];
+  diet: number[];
+  exercise: number[];
+} {
   // Initialize distribution counters
   const medicationDistribution: number[] = Array(11).fill(0); // 0-10 scores
   const dietDistribution: number[] = Array(11).fill(0);

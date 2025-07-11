@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { apiRequest } from '@/lib/queryClient';
+import { apiRequest } from '@/lib/apiRequest'; // Corrected import path
 
 // Interface for Care Plan Directive
 export interface CarePlanDirective {
@@ -107,6 +107,30 @@ type WebSocketMessage =
   | { type: 'ppr_status_update', requestId: number, status: string, report?: PatientProgressReport }
   | { type: 'error', message: string };
 
+// Type guard for WebSocketMessage
+function isWebSocketMessage(data: any): data is WebSocketMessage {
+  if (typeof data !== 'object' || data === null || typeof data.type !== 'string') {
+    return false;
+  }
+  // Add more specific checks based on 'type' if needed for robustness
+  // For example, check for userId if type is 'record_feature_usage'
+  switch (data.type) {
+    case 'record_feature_usage':
+      return typeof data.userId === 'number' && typeof data.featureName === 'string';
+    case 'recommendation':
+      // Check if recommendation is present and has an id, or is null
+      return data.hasOwnProperty('recommendation') &&
+             (data.recommendation === null || (typeof data.recommendation === 'object' && data.recommendation && typeof data.recommendation.id === 'number'));
+    case 'error':
+      return typeof data.message === 'string';
+    // Add checks for other message types as necessary
+    default:
+      // For types not explicitly checked, assume valid if 'type' property exists.
+      // For a more robust system, all types should have some basic validation.
+      return true;
+  }
+}
+
 export class ModelContextProtocol {
   private static instance: ModelContextProtocol | null = null;
   private ws: WebSocket | null = null;
@@ -166,10 +190,16 @@ export class ModelContextProtocol {
     
     this.ws.onmessage = (event) => {
       try {
-        const message = JSON.parse(event.data) as WebSocketMessage;
-        
-        // Handle different message types
-        if (message.type === 'recommendation') {
+        const parsedData = JSON.parse(event.data);
+        if (isWebSocketMessage(parsedData)) {
+          const message = parsedData; // Now message is correctly typed
+
+          // Handle different message types
+          if (message.type === 'recommendation') {
+        } else {
+          console.warn('Received malformed WebSocket message:', parsedData);
+        }
+      } catch (error) {
           console.log('Received recommendation message:', message);
           console.log('Recommendation data:', message.recommendation);
           this.onRecommendationReceived(message.recommendation);

@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiRequest } from '@/lib/queryClient';
+import { apiRequest } from '@/lib/apiRequest'; // Corrected import path
 import { FoodItem, CpdAlignedResponse } from '../types';
 
 // Hook for fetching CPD-aligned foods
@@ -24,8 +24,9 @@ export const useToggleFavourite = () => {
   
   return useMutation({
     mutationFn: async (foodItemId: number) => {
-      const response = await apiRequest('POST', '/api/food-database/favourites/toggle', { foodItemId });
-      return response.json();
+      // Assuming the API returns the updated favourite status or the item
+      // Let's assume it returns { isFavourite: boolean } or the FoodItem
+      return apiRequest<{ isFavourite: boolean }>('POST', '/api/food-database/favourites/toggle', { foodItemId });
     },
     onSuccess: () => {
       // Invalidate favourites query to trigger refetch

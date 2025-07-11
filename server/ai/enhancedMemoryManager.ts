@@ -7,9 +7,10 @@
  */
 
 import { db } from '../db';
-import { ChatMemory, InsertChatMemory, chatMemory } from '@shared/schema';
+import { ChatMemory, InsertChatMemory, chatMemory, type HealthMetric } from '@shared/schema'; // Added HealthMetric
 import { eq, and, lt, desc, sql } from 'drizzle-orm';
-import type { QueryResult } from 'drizzle-orm';
+// QueryResult is not directly used, can be removed if not needed by other parts of the file.
+// import type { QueryResult } from 'drizzle-orm';
 import { OpenAI } from 'openai';
 import type { APIError } from 'openai';
 
@@ -61,6 +62,25 @@ export interface OfflineSyncOperation {
   type: 'create' | 'update' | 'delete';
   memory: Partial<ChatMemory>;
   timestamp: Date;
+}
+
+// Context Interfaces based on KGC_AI_INTEGRATION_GUIDE.md
+export interface SemanticContext {
+  relatedTopics?: string[];
+  sourceOfInfo?: string;
+  confidenceScore?: number;
+}
+
+export interface EpisodicContext {
+  sentiment?: number; // -1 to 1 scale
+  relatedMetrics?: Partial<HealthMetric>;
+  actionTaken?: string;
+}
+
+export interface ProceduralContext {
+  frequencyOfObservation: number;
+  lastObserved: Date; // Or string if stored as ISO string
+  confidenceInPattern: number;
 }
 
 /**
@@ -422,7 +442,7 @@ export class EnhancedMemoryManager {
     content: string,
     importance: number = ImportanceLevel.MEDIUM,
     type: MemoryType = MemoryType.LONG_TERM,
-    context: any = {},
+    context: Partial<SemanticContext> = {},
     expiresAt: Date | null = null
   ): Promise<ChatMemory> {
     const memory: InsertChatMemory = {
@@ -446,7 +466,7 @@ export class EnhancedMemoryManager {
     content: string,
     importance: number = ImportanceLevel.HIGH,
     type: MemoryType = MemoryType.LONG_TERM,
-    context: any = {},
+    context: Partial<ProceduralContext> = {},
     expiresAt: Date | null = null
   ): Promise<ChatMemory> {
     const memory: InsertChatMemory = {
@@ -470,7 +490,7 @@ export class EnhancedMemoryManager {
     content: string,
     importance: number = ImportanceLevel.MEDIUM,
     type: MemoryType = MemoryType.MEDIUM_TERM,
-    context: any = {},
+    context: Partial<EpisodicContext> = {},
     expiresAt: Date | null = null
   ): Promise<ChatMemory> {
     const memory: InsertChatMemory = {

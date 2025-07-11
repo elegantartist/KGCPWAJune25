@@ -83,14 +83,16 @@ class EncryptionService {
    */
   async encryptPHI(data: string): Promise<string> {
     try {
-      const key = await this.getEncryptionKey();
-      const iv = crypto.randomBytes(16);
-      const cipher = crypto.createCipher('aes-256-cbc', key);
+      const keyHex = await this.getEncryptionKey();
+      const key = Buffer.from(keyHex, 'hex'); // Ensure key is a Buffer for createCipheriv
+      const iv = crypto.randomBytes(16); // AES block size is 16 bytes
+
+      const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
       
       let encrypted = cipher.update(data, 'utf8', 'hex');
       encrypted += cipher.final('hex');
       
-      // Combine IV and encrypted data
+      // Combine IV and encrypted data, separated by a colon
       return iv.toString('hex') + ':' + encrypted;
     } catch (error) {
       console.error('PHI encryption failed:', error);
@@ -101,27 +103,36 @@ class EncryptionService {
   /**
    * Decrypt Personal Health Information (PHI)
    */
-  async decryptPHI(encryptedData: string): Promise<string> {
+  async decryptPHI(encryptedDataWithIv: string): Promise<string> {
     try {
-      const key = await this.getEncryptionKey();
-      const parts = encryptedData.split(':');
+      const keyHex = await this.getEncryptionKey();
+      const key = Buffer.from(keyHex, 'hex'); // Ensure key is a Buffer for createDecipheriv
       
+      const parts = encryptedDataWithIv.split(':');
       if (parts.length !== 2) {
-        throw new Error('Invalid encrypted data format');
+        throw new Error('Invalid encrypted data format: IV missing or incorrect format.');
       }
       
       const iv = Buffer.from(parts[0], 'hex');
-      const encrypted = parts[1];
+      const encryptedText = parts[1];
+
+      if (iv.length !== 16) {
+        throw new Error('Invalid IV length. IV must be 16 bytes for aes-256-cbc.');
+      }
       
-      const decipher = crypto.createDecipher('aes-256-cbc', key);
+      const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
       
-      let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+      let decrypted = decipher.update(encryptedText, 'hex', 'utf8');
       decrypted += decipher.final('utf8');
       
       return decrypted;
     } catch (error) {
       console.error('PHI decryption failed:', error);
-      throw new Error('Failed to decrypt sensitive data');
+      // Provide more context to the error if possible, but avoid leaking sensitive info
+      if (error instanceof Error && (error.message.includes('bad decrypt') || error.message.includes('wrong final block length'))) {
+        throw new Error('Decryption failed: Incorrect key, IV, or corrupted data.');
+      }
+      throw new Error('Failed to decrypt sensitive data.');
     }
   }
 

@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import cors from "cors";
 import { registerRoutes } from "./routes.js";
 import { setupVite, serveStatic } from "./vite";
+import session from 'express-session'; // Added for session management
 import { sessionTimeoutMiddleware } from "./sessionTimeout.js";
 import adminRoutes from './api/adminRoutes'; // Import the new admin routes
 import patientRouter from './api/patient'; // Import the new patient routes
@@ -59,12 +60,34 @@ app.use((req, res, next) => {
   next();
 });
 
-// Apply session timeout middleware globally (assuming it's defined elsewhere)
-app.use(sessionTimeoutMiddleware);
+// Session configuration
+const SESSION_SECRET = process.env.SESSION_SECRET || process.env.ENCRYPTION_KEY || 'kgc-insecure-dev-session-secret';
+if (SESSION_SECRET === 'kgc-insecure-dev-session-secret' && app.get('env') === 'production') {
+  logger.warn('CRITICAL SECURITY WARNING: Using default insecure session secret in production!');
+}
+
+app.use(session({
+  secret: SESSION_SECRET,
+  resave: false,
+  saveUninitialized: false, // Only save sessions if they are modified (e.g. user logs in)
+  cookie: {
+    secure: app.get('env') === 'production', // Use secure cookies in production
+    httpOnly: true, // Prevent client-side JS from accessing the cookie
+    sameSite: 'lax', // Mitigate CSRF attacks
+    maxAge: 2 * 60 * 60 * 1000 // Session duration: 2 hours (example, align with JWT or app needs)
+  },
+  rolling: true // Reset the cookie Max-Age on every response
+  // store: new MemoryStore(), // Default, not for production
+}));
+
+// Apply custom session timeout middleware AFTER express-session
+// if it's still needed for role-based timeouts.
+// For now, express-session's maxAge provides a global timeout.
+// app.use(sessionTimeoutMiddleware); // Custom session timeout middleware removed, express-session handles global timeout.
 
 (async () => {
   // Register the new, centralized API routes under the /api prefix
-  app.use('/api', apiRoutes);
+  // app.use('/api', apiRoutes); // Commented out as apiRoutes is not defined
   app.use('/api/admin', adminRoutes); // Register the admin routes
   app.use('/api/patient', patientRouter); // Register the patient routes
   app.use('/api/auth', authRoutes); // Register the auth routes

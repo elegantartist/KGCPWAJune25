@@ -1771,9 +1771,10 @@ export function registerRoutes(app: Express) {
 
             res.json({ url: session.url });
 
-        } catch (error: any) {
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'Unknown error creating Stripe session.';
             console.error('Stripe session creation error:', error);
-            res.status(500).json({ message: 'Failed to create payment session.', error: error.message });
+            res.status(500).json({ message: 'Failed to create payment session.', error: message });
         }
     });
 
@@ -1808,9 +1809,10 @@ export function registerRoutes(app: Express) {
 
             res.json({ url: session.url });
 
-        } catch (error: any) {
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'Unknown error creating credit purchase session.';
             console.error('Stripe credit purchase session creation error:', error);
-            res.status(500).json({ message: 'Failed to create payment session.', error: error.message });
+            res.status(500).json({ message: 'Failed to create payment session.', error: message });
         }
     });
 
@@ -1823,9 +1825,10 @@ export function registerRoutes(app: Express) {
         try {
             // Verify the event came from Stripe
             event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
-        } catch (err: any) {
-            console.error(`Webhook signature verification failed.`, err.message);
-            return res.status(400).send(`Webhook Error: ${err.message}`);
+        } catch (err: unknown) { // Changed to unknown
+            const message = err instanceof Error ? err.message : 'Unknown webhook signature verification error.';
+            console.error(`Webhook signature verification failed.`, message);
+            return res.status(400).send(`Webhook Error: ${message}`);
         }
 
         // Handle the event
@@ -1872,8 +1875,24 @@ export function registerRoutes(app: Express) {
     app.use('/api', router);
 }
 
+// --- Helper Function Types ---
+interface TrendData {
+  trend: string; // Consider 'improving' | 'declining' | 'stable' | 'concerning' if applicable
+}
+
+interface AlertLike {
+  severity: string; // Consider 'critical' | 'high' | 'medium' | 'low'
+  actionItems?: string[];
+}
+
+interface InsightLike {
+  priority: string; // Consider 'high' | 'medium' | 'low'
+  actionable: boolean;
+  recommendations: string[];
+}
+
 // Helper functions for analytics dashboard
-function calculateOverallHealthScore(trends: any[]): number {
+function calculateOverallHealthScore(trends: TrendData[]): number {
     if (trends.length === 0) return 75; // Default baseline
     
     const improvingCount = trends.filter(t => t.trend === 'improving').length;
@@ -1885,10 +1904,11 @@ function calculateOverallHealthScore(trends: any[]): number {
                       (trends.filter(t => t.trend === 'declining').length * 25) +
                       (trends.filter(t => t.trend === 'concerning').length * 10);
     
-    return Math.round(totalScore / trends.length);
+    // Avoid division by zero if trends array is empty after filtering (though initial check handles empty)
+    return trends.length > 0 ? Math.round(totalScore / trends.length) : 75;
 }
 
-function calculateRiskLevel(predictiveAlerts: any[], activeAlerts: any[]): string {
+function calculateRiskLevel(predictiveAlerts: AlertLike[], activeAlerts: AlertLike[]): string {
     const allAlerts = [...predictiveAlerts, ...activeAlerts];
     const criticalCount = allAlerts.filter(a => a.severity === 'critical').length;
     const highCount = allAlerts.filter(a => a.severity === 'high').length;
@@ -1899,7 +1919,7 @@ function calculateRiskLevel(predictiveAlerts: any[], activeAlerts: any[]): strin
     return 'low';
 }
 
-function getTopRecommendations(insights: any[], activeAlerts: any[]): string[] {
+function getTopRecommendations(insights: InsightLike[], activeAlerts: AlertLike[]): string[] {
     const recommendations = new Set<string>();
     
     // Add high-priority insight recommendations

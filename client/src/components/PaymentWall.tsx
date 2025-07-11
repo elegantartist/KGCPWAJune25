@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-// import { useAuth } from '@/hooks/useAuth'; // This will be used later
+import { useAuth } from '@/hooks/useAuth'; // Uncommented and path confirmed
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2 } from 'lucide-react';
 
 export function PaymentWall() {
-  // const { user } = useAuth(); // We will uncomment this when the auth context is updated
+  const { user } = useAuth(); // Uncommented
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

@@ -29,7 +29,7 @@ export interface Memory {
   memorySystem: MemorySystem;
   type: MemoryType;
   content: string;
-  context?: any;
+  context?: unknown; // Changed from any to unknown
   importance: number;
   embeddings?: string;
   lastAccessed?: Date;

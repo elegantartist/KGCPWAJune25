@@ -1,4 +1,4 @@
-import { apiRequest } from '../lib/queryClient';
+import { apiRequest } from '../lib/apiRequest'; // Corrected import path
 
 export interface ExerciseWellnessSearchFilters {
   userId?: number;
@@ -106,17 +106,13 @@ export async function searchExerciseWellnessVideos(
   } catch (error: unknown) {
     console.error('Exercise & Wellness video search error:', error);
 
-    // Extract more detailed error message if available
-    let errorMessage = 'Failed to search for videos';
-
+    let errorMessage = 'Failed to search for videos. Please try again.'; // Default user-friendly message
     if (error instanceof Error) {
+      // The apiRequest function already formats the error message well
       errorMessage = error.message;
-    } else if (typeof error === 'object' && error !== null) {
-      const errorObj = error as any;
-      if (errorObj.response?.data?.message) {
-        errorMessage = errorObj.response.data.message;
-      }
     }
+    // No need for the 'else if' checking for errorObj.response.data.message
+    // as apiRequest from @/lib/apiRequest.ts throws a standard Error.
 
     throw new Error(errorMessage);
   }

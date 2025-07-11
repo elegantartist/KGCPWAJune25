@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { ShoppingCart, UtensilsCrossed, Clock, ExternalLink, ArrowLeft, HomeIcon, Loader2,
   RefreshCw, ShoppingBag, X } from "lucide-react";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { useIsMobile } from "@/hooks/useIsMobile"; // Corrected import path
 import { useQuery } from "@tanstack/react-query";
 
 interface CarePlanDirective {

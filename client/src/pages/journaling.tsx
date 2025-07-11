@@ -5,8 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
-import { useIsMobile } from "@/hooks/use-mobile";
-import { cn } from "@/lib/utils";
+// import { useIsMobile } from "@/hooks/useIsMobile"; // Removed unused import
+// import { cn } from "@/lib/utils"; // Removed unused import
 import { Save, BookOpen, CalendarDays } from "lucide-react";
 import { createHapticFeedback } from "@/lib/soundEffects";
 
@@ -17,7 +17,7 @@ interface JournalEntry {
 }
 
 const Journaling: React.FC = () => {
-  const isMobile = useIsMobile();
+  // const isMobile = useIsMobile(); // Removed unused variable
   const [date, setDate] = useState<Date>(new Date());
   const [currentEntry, setCurrentEntry] = useState<string>("");
   const [entries, setEntries] = useState<JournalEntry[]>([

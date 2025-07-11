@@ -51,7 +51,11 @@ class SecurityManager {
    */
   createAuthMiddleware(allowedRoles: string[]) {
     return async (req: Request, res: Response, next: NextFunction) => {
-      const session = req.session as SessionData;
+      // Assuming req.user is populated by JWT authMiddleware from './auth.ts'
+      // And req.session is populated by express-session
+      // We'll store a simple flag or minimal user data in req.session upon login if needed,
+      // but primary user details for the request come from req.user (JWT).
+
       const ipAddress = this.getClientIP(req);
       const userAgent = req.get('User-Agent') || 'Unknown';
 
@@ -67,38 +71,42 @@ class SecurityManager {
         return res.status(429).json({ error: 'Too many failed attempts. Please try again later.' });
       }
 
-      if (!session?.userRole || !session?.userId) {
+      // Check if session exists (user has logged in and express-session created a session)
+      // and if req.user (from JWT) exists.
+      // The JWT middleware already handles token presence and validity.
+      // express-session handles session presence.
+      if (!req.session || !req.user) { // req.user should be populated by JWT auth if token is valid
         await auditLogger.logSecurityEvent({
           eventType: 'UNAUTHORIZED_ACCESS',
           severity: 'MEDIUM',
           ipAddress,
           userAgent,
-          details: { reason: 'No valid session' }
+          details: { reason: 'No valid session or user token' }
         });
         return res.status(401).json({ error: 'Authentication required' });
       }
 
-      // Update session activity
-      this.updateSessionActivity(req);
+      // User data from JWT token (already verified by JWT middleware if it's placed before this)
+      const jwtUser = req.user as any; // Cast from Express.User | undefined to any for now
+                                      // Or ideally use the TokenPayload type from auth.ts
 
       // Admin can access any resource for testing/compliance
-      if (session.userRole === 'admin') {
-        const targetUserId = req.params.userId ? parseInt(req.params.userId) : session.userId;
+      if (jwtUser.role === 'admin') {
+        const targetUserId = req.params.userId ? parseInt(req.params.userId) : jwtUser.userId;
         req.accessContext = {
           userId: targetUserId,
-          role: session.userRole,
-          isAdminAccess: !!req.params.userId && req.params.userId !== session.userId.toString(),
+          role: jwtUser.role,
+          isAdminAccess: !!req.params.userId && req.params.userId !== jwtUser.userId.toString(),
           ipAddress,
           userAgent
         };
 
-        // Log admin access for compliance
         if (req.accessContext.isAdminAccess) {
           await auditLogger.logSecurityEvent({
             eventType: 'ADMIN_ACCESS',
             severity: 'MEDIUM',
-            userId: session.userId,
-            targetUserId: targetUserId,
+            userId: jwtUser.userId, // Admin's ID
+            targetUserId: targetUserId, // ID of user being accessed
             ipAddress,
             userAgent,
             details: {
@@ -108,31 +116,30 @@ class SecurityManager {
             }
           });
         }
-
         return next();
       }
 
       // Role-based access control
-      if (!allowedRoles.includes(session.userRole)) {
+      if (!allowedRoles.includes(jwtUser.role)) {
         await auditLogger.logSecurityEvent({
           eventType: 'UNAUTHORIZED_ACCESS',
           severity: 'HIGH',
-          userId: session.userId,
+          userId: jwtUser.userId,
           ipAddress,
           userAgent,
           details: {
             requiredRoles: allowedRoles,
-            userRole: session.userRole,
+            userRole: jwtUser.role,
             endpoint: req.path
           }
         });
         return res.status(403).json({ error: 'Insufficient permissions' });
       }
 
-      // Users can only access their own data
+      // Populate accessContext for regular users
       req.accessContext = {
-        userId: session.userId,
-        role: session.userRole,
+        userId: jwtUser.userId,
+        role: jwtUser.role,
         isAdminAccess: false,
         ipAddress,
         userAgent
@@ -142,52 +149,9 @@ class SecurityManager {
     };
   }
 
-  /**
-   * Session timeout middleware with role-based timeout periods
-   */
-  createSessionTimeoutMiddleware() {
-    return (req: Request, res: Response, next: NextFunction) => {
-      const session = req.session as SessionData;
-      
-      if (session?.lastActivity) {
-        const now = Date.now();
-        const inactivityTime = now - session.lastActivity;
-        
-        // Different timeout periods by role
-        const timeoutLimits = {
-          patient: 30 * 60 * 1000,    // 30 minutes
-          doctor: 60 * 60 * 1000,     // 1 hour
-          admin: 120 * 60 * 1000      // 2 hours
-        };
-        
-        const timeoutLimit = timeoutLimits[session.userRole as keyof typeof timeoutLimits] || timeoutLimits.patient;
-        
-        if (inactivityTime > timeoutLimit) {
-          const userId = session.userId;
-          req.session.destroy(() => {});
-          
-          // Log session timeout
-          auditLogger.logAuthenticationEvent({
-            eventType: 'LOGOUT',
-            userId,
-            success: true,
-            ipAddress: this.getClientIP(req),
-            userAgent: req.get('User-Agent') || 'Unknown',
-            details: { reason: 'Session timeout due to inactivity' }
-          });
-          
-          return res.status(401).json({ 
-            error: 'Session expired due to inactivity',
-            requiresReauth: true 
-          });
-        }
-        
-        session.lastActivity = now;
-      }
-      
-      next();
-    };
-  }
+  // createSessionTimeoutMiddleware() is removed as express-session handles global timeout.
+  // If role-specific active timeouts are needed, a new, simpler middleware
+  // working with req.session.lastActivity (set upon login/activity) could be added.
 
   /**
    * Track and handle failed login attempts

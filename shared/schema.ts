@@ -32,6 +32,7 @@ export const carePlanDirectives = pgTable('care_plan_directives', {
   patientId: integer('patient_id').notNull().references(() => patients.id, { onDelete: 'cascade' }),
   directive: text('directive').notNull(),
   category: text('category').notNull(),
+  targetValue: text('target_value'), // Added nullable targetValue field
   active: boolean('active').default(true),
 });
 

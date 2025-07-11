@@ -3,7 +3,7 @@ import { format } from "date-fns";
 import { User } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { useIsMobile } from "@/hooks/useIsMobile"; // Corrected import path
 import { cn } from "@/lib/utils";
 import kgcLogo from "@/assets/KGC Logo2 Nov24_1744113864434.jpg";
 

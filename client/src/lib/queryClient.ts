@@ -7,38 +7,8 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
-export async function apiRequest<T = any>(
-  method: string,
-  url: string,
-  data?: unknown | undefined,
-  options?: RequestInit
-): Promise<T> {
-  try {
-    const token = localStorage.getItem('auth_token');
-    const headers: Record<string, string> = {};
-    
-    if (data) {
-      headers["Content-Type"] = "application/json";
-    }
-    
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
-    }
-
-    const res = await fetch(url, {
-      method,
-      headers,
-      body: data ? JSON.stringify(data) : undefined,
-      ...options
-    });
-
-    await throwIfResNotOk(res);
-    return await res.json() as T;
-  } catch (error) {
-    console.error(`API request failed for ${method} ${url}:`, error);
-    throw error;
-  }
-}
+// The apiRequest<T> function has been moved to client/src/lib/apiRequest.ts
+// It should be imported if needed by other parts of this file, but getQueryFn makes its own fetch.
 
 type UnauthorizedBehavior = "returnNull" | "throw";
 export const getQueryFn: <T>(options: {
@@ -46,7 +16,7 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const token = localStorage.getItem('auth_token');
+    const token = localStorage.getItem('accessToken'); // UPDATED to use accessToken
     const headers: Record<string, string> = {};
     
     if (token) {

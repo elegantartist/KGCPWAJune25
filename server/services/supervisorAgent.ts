@@ -6,9 +6,9 @@
 import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
 import { AIContextService } from './aiContextService';
-import { secureLog, validateMcpBundleSecurity, sanitizeFinalResponse } from './privacyMiddleware';
+import { secureLog, validateMcpBundleSecurity, sanitizeFinalResponse, type SafeMCPBundle } from './privacyMiddleware'; // Import SafeMCPBundle
 import { getMealInspiration, getWellnessInspiration, getWeeklyMealPlan, getWellnessProgram } from './inspirationMachines';
-import { parseUserQuery, performStructuredLocationSearch } from './queryParser';
+import { parseUserQuery, performStructuredLocationSearch } from './queryParser'; // Ensure parseUserQuery and performStructuredLocationSearch are correctly typed or handled
 import { db } from '../db';
 import * as schema from '@shared/schema';
 import { eq } from 'drizzle-orm';
@@ -22,13 +22,8 @@ import {
 } from './prompt_templates';
 import { AppError, LLMError, SecurityError, APIError } from './errors';
 
-// Authorized KGC features list for strict validation
-const AUTHORIZED_KGC_FEATURES = [
-  'Home', 'Daily Self-Scores', 'Motivational Image Processing', 'MIP',
-  'Inspiration Machine D', 'Diet Logistics', 'Inspiration Machine E&W',
-  'E&W Support', 'MBP Wiz', 'Journaling', 'Progress Milestones',
-  'Food Database', 'Chatbot', 'Health Snapshots'
-];
+// Authorized KGC features list derived from the single source of truth
+const AUTHORIZED_KGC_FEATURES = KGC_FEATURES.map(feature => feature.name);
 
 // Keywords that might indicate unauthorized feature mentions
 const UNAUTHORIZED_FEATURE_KEYWORDS = [
@@ -69,8 +64,32 @@ interface SupervisorResponse {
   processingTime: number;
 }
 
+// Placeholder types - these should be refined or imported once their actual structure is confirmed
+interface ParsedQuery {
+  intent: string | null;
+  entities: Record<string, any>;
+  isSafeForTooling?: boolean;
+  confidence?: number;
+  // Add other known fields from parseUserQuery output
+}
+
+interface TavilyLocationResultItem {
+  title: string;
+  url: string;
+  content: string;
+  score: number;
+}
+
+interface TavilyLocationResponse {
+  query: string;
+  answer?: string;
+  results: TavilyLocationResultItem[];
+  message?: string;
+}
+
+
 // Phase 3: Real Inspiration Machine Tools - Now using specialized sub-agents
-async function getMealInspirationTool(mcpBundle: any): Promise<string> {
+async function getMealInspirationTool(mcpBundle: SafeMCPBundle): Promise<string> {
   secureLog('Meal inspiration machine activated', { bundleId: mcpBundle.user_id_pseudonym });
   
   try {
@@ -89,7 +108,7 @@ async function getMealInspirationTool(mcpBundle: any): Promise<string> {
   }
 }
 
-async function getWellnessInspirationTool(mcpBundle: any): Promise<string> {
+async function getWellnessInspirationTool(mcpBundle: SafeMCPBundle): Promise<string> {
   secureLog('Wellness inspiration machine activated', { bundleId: mcpBundle.user_id_pseudonym });
   
   try {
@@ -109,7 +128,7 @@ async function getWellnessInspirationTool(mcpBundle: any): Promise<string> {
 }
 
 // Phase 3: Advanced Tool Functions
-async function getWeeklyMealPlanTool(mcpBundle: any): Promise<string> {
+async function getWeeklyMealPlanTool(mcpBundle: SafeMCPBundle): Promise<string> {
   secureLog('Weekly meal planning tool activated', { bundleId: mcpBundle.user_id_pseudonym });
   
   try {
@@ -124,7 +143,7 @@ async function getWeeklyMealPlanTool(mcpBundle: any): Promise<string> {
   }
 }
 
-async function getWellnessProgramTool(mcpBundle: any): Promise<string> {
+async function getWellnessProgramTool(mcpBundle: SafeMCPBundle): Promise<string> {
   secureLog('Wellness program tool activated', { bundleId: mcpBundle.user_id_pseudonym });
   
   try {
@@ -290,12 +309,12 @@ class SupervisorAgent {
   /**
    * Determines if a parsed query is for finding a location.
    */
-  private _isLocationQuery(parsedQuery: any): boolean {
+  private _isLocationQuery(parsedQuery: ParsedQuery): boolean {
     return (
       parsedQuery.intent === 'find_location_for_activity' &&
-      parsedQuery.entities.location &&
-      parsedQuery.isSafeForTooling &&
-      parsedQuery.confidence > 0.7
+      parsedQuery.entities.location && // Assuming entities will have a location property
+      parsedQuery.isSafeForTooling === true && // Explicitly check for true
+      (parsedQuery.confidence || 0) > 0.7 // Handle possible undefined confidence
     );
   }
 
@@ -303,7 +322,7 @@ class SupervisorAgent {
    * Handles location-specific queries by using search tools.
    */
   private async _handleLocationQuery(
-    parsedQuery: any,
+    parsedQuery: ParsedQuery,
     query: SupervisorQuery & { sessionId: string },
     startTime: number
   ): Promise<SupervisorResponse> {
@@ -334,7 +353,7 @@ class SupervisorAgent {
    * Handles general, non-location-based queries.
    */
   private async _handleGeneralQuery(
-    parsedQuery: any,
+    parsedQuery: ParsedQuery,
     query: SupervisorQuery & { sessionId: string },
     startTime: number
   ): Promise<SupervisorResponse> {
@@ -431,7 +450,7 @@ class SupervisorAgent {
    * Check if the query requires specific tool calling (Phase 3: Enhanced with async tools)
    * Enhanced with parsed query context for better intent understanding
    */
-  private async checkForToolCalling(userQuery: string, mcpBundle: any, parsedQuery?: any): Promise<{ response: string; tools: string[] } | null> {
+  private async checkForToolCalling(userQuery: string, mcpBundle: SafeMCPBundle, parsedQuery?: ParsedQuery): Promise<{ response: string; tools: string[] } | null> {
     const query = userQuery.toLowerCase();
 
     // Weekly meal planning tool
@@ -534,7 +553,7 @@ ${CHATBOT_ENGINEERING_GUIDELINES}`;
   /**
    * Build the user prompt with MCP context
    */
-  private buildUserPrompt(userQuery: string, mcpBundle: any): string {
+  private buildUserPrompt(userQuery: string, mcpBundle: SafeMCPBundle): string {
     return `PATIENT CONTEXT (anonymized and secure):
 Patient ID: ${mcpBundle.user_id_pseudonym}
 
@@ -629,7 +648,7 @@ YOUR TASK: Provide a caring, motivational, and educational response that:
   /**
    * Advanced location search with Care Plan Directive synthesis
    */
-  private async performAdvancedLocationSearch(parsedQuery: any, userQuery: string, userId: number, sessionId: string): Promise<string> {
+  private async performAdvancedLocationSearch(parsedQuery: ParsedQuery, userQuery: string, userId: number, sessionId: string): Promise<string> {
     // --- START OF MODIFICATIONS ---
 
     // Part 1: Proactive Prerequisite Check
@@ -677,7 +696,7 @@ YOUR TASK: Provide a caring, motivational, and educational response that:
   /**
    * Synthesize location recommendations with Care Plan Directives
    */
-  private async synthesizeLocationResponse(parsedQuery: any, tavilyResults: any, mcpBundle: any): Promise<string> {
+  private async synthesizeLocationResponse(parsedQuery: ParsedQuery, tavilyResults: TavilyLocationResponse, mcpBundle: SafeMCPBundle): Promise<string> {
     try {
       // Use centralized KGC features for recommendations
 
@@ -691,11 +710,12 @@ YOUR TASK: Provide a caring, motivational, and educational response that:
         ${mcpBundle.care_plan_directives}
 
         Tavily Search Results:
-        ${JSON.stringify(tavilyResults, null, 2)}
+        ${JSON.stringify(tavilyResults.results, null, 2)}
 
         KGC App Features available for recommendation:
         ${JSON.stringify(KGC_FEATURES.map(f => `${f.name} - ${f.longDescription}`))}
       `;
+      // Note: Changed tavilyResults to tavilyResults.results to only stringify the array of results for the prompt
 
       // Make the final API call to the LLM for synthesis
       const response = await openai.chat.completions.create({
@@ -724,7 +744,7 @@ YOUR TASK: Provide a caring, motivational, and educational response that:
   /**
    * Perform location search using Tavily API
    */
-  private async performTavilyLocationSearch(searchQuery: string): Promise<any> {
+  private async performTavilyLocationSearch(searchQuery: string): Promise<TavilyLocationResponse> {
     try {
       const axios = (await import('axios')).default;
       

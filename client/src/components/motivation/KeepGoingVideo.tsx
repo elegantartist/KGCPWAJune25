@@ -2,91 +2,25 @@ import React, { useEffect, useRef, useState } from "react";
 import { createHapticFeedback } from "@/lib/soundEffects";
 import { useLocation } from "wouter";
 import { Loader2 } from "lucide-react";
-import EnhancedImageStore from "@/lib/enhancedImageStore";
-import { useQuery } from "@tanstack/react-query";
-import { useIsMobile } from "@/hooks/use-mobile";
+// import EnhancedImageStore from "@/lib/enhancedImageStore"; // Removed
+// import { useQuery } from "@tanstack/react-query"; // Removed
+import { useIsMobile } from "@/hooks/useIsMobile"; // Corrected import path
 
 interface KeepGoingVideoProps {
   videoId: string;
   onClose: () => void;
-  enhancedImageOverlay?: boolean;
+  overlayImageUrl?: string | null; // Changed from enhancedImageOverlay and direct image state
 }
 
-const KeepGoingVideo: React.FC<KeepGoingVideoProps> = ({ videoId, onClose, enhancedImageOverlay = true }) => {
+const KeepGoingVideo: React.FC<KeepGoingVideoProps> = ({ videoId, onClose, overlayImageUrl }) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [_, setLocation] = useLocation();
   const [isLoading, setIsLoading] = useState(true);
-  const [storedImage, setStoredImage] = useState<string | null>(null);
-  // Check if we're on a mobile device
+  // const [storedImage, setStoredImage] = useState<string | null>(null); // Removed, use overlayImageUrl prop
   const isMobile = useIsMobile();
 
-  // User ID for demo purposes (in a real app, this would be from auth)
-  // Get current authenticated user
-  const { data: currentUser } = useQuery({
-    queryKey: ['/api/user/current-context'],
-    retry: false
-  });
-
-  const userId = currentUser?.id;
-  
-  // Query for getting the saved motivational image from the database
-  const { data: savedImage, isLoading: isLoadingImage } = useQuery({
-    queryKey: ['/api/users', userId, 'motivational-image'],
-    queryFn: async () => {
-      try {
-        const response = await fetch(`/api/users/${userId}/motivational-image`);
-        if (!response.ok) {
-          if (response.status === 404) {
-            // No image found, but this is not an error
-            return null;
-          }
-          throw new Error('Failed to fetch motivational image');
-        }
-        return await response.json();
-      } catch (error) {
-        console.log('No saved image found in database, this is expected for new users');
-        return null;
-      }
-    },
-    retry: false,
-    refetchOnWindowFocus: false,
-  });
-  
-  // Check for stored images from various sources, prioritizing database
-  useEffect(() => {
-    if (!enhancedImageOverlay) return;
-    
-    console.log("KeepGoingVideo: Checking for enhanced image overlay");
-    
-    // First, try to get the image from the database
-    if (savedImage && savedImage.imageData) {
-      console.log("KeepGoingVideo: Found image in database!");
-      setStoredImage(savedImage.imageData);
-      
-      // Also update local stores for redundancy
-      EnhancedImageStore.setImage(savedImage.imageData);
-      if (typeof window !== 'undefined') {
-        window.__KGC_ENHANCED_IMAGE__ = savedImage.imageData;
-      }
-      return;
-    }
-    
-    // Fallback 1: Check window object (for sessions where image was just saved)
-    if (typeof window !== 'undefined' && window.__KGC_ENHANCED_IMAGE__) {
-      console.log("KeepGoingVideo: Found image in window object!");
-      setStoredImage(window.__KGC_ENHANCED_IMAGE__);
-      return;
-    }
-    
-    // Fallback 2: Check local storage
-    const imageUrl = EnhancedImageStore.getImage();
-    if (imageUrl) {
-      console.log("KeepGoingVideo: Found image in local storage");
-      setStoredImage(imageUrl);
-    } else {
-      console.log("KeepGoingVideo: No enhanced image available in any storage location");
-    }
-  }, [enhancedImageOverlay, savedImage]);
+  // Removed useQuery for currentUser and savedImage as image URL is now a prop.
+  // Removed useEffect for setting storedImage.
 
   // Force audio playback function that can be called multiple times
   const [audioEnabled, setAudioEnabled] = useState(false);
@@ -293,14 +227,14 @@ const KeepGoingVideo: React.FC<KeepGoingVideoProps> = ({ videoId, onClose, enhan
             onLoad={() => setIsLoading(false)}
           ></iframe>
           
-          {/* Enhanced image overlay */}
-          {storedImage && (
+          {/* Enhanced image overlay using the overlayImageUrl prop */}
+          {overlayImageUrl && (
             <div className="absolute inset-0 z-10 pointer-events-none flex items-center justify-center">
               <div className={`relative mx-auto flex items-center justify-center ${
                 isMobile ? 'w-full h-full' : 'w-[95%] h-[95%]'
               }`}>
                 <img 
-                  src={storedImage} 
+                  src={overlayImageUrl}
                   alt="Your motivational image" 
                   className={`w-auto h-auto object-contain opacity-90 ${
                     isMobile ? 'min-w-[95%] min-h-[95%]' : 'min-w-[85%] min-h-[85%]'

@@ -10,6 +10,18 @@ export const xai = new OpenAI({
   apiKey: process.env.XAI_API_KEY,
 });
 
+// Import the centralized KGC features list
+import { KGC_FEATURES_FOR_RECOMMENDATION } from '../services/prompt_templates';
+
+// Interface for the evaluator's JSON payload
+interface XAIEvaluationPayload {
+  safe: boolean;
+  accurate: boolean;
+  nonHallucinating: boolean;
+  nonDiagnostic: boolean;
+  feedbackMessage: string;
+}
+
 /**
  * Generate a response using xAI's Grok
  */
@@ -18,6 +30,7 @@ export async function generateXAIResponse(
   systemPrompt: string = "You are a helpful health assistant. You provide non-diagnostic, supportive wellness advice."
 ): Promise<string> {
   // KGC feature directive to enhance the assistant's capabilities
+  const availableFeaturesString = KGC_FEATURES_FOR_RECOMMENDATION.map((feature, index) => `${index + 1}. ${feature}`).join('\n');
   const kcgFeatureDirective = `
 # KEEP GOING CARE COMPREHENSIVE ASSISTANT DIRECTIVE
 
@@ -80,23 +93,9 @@ When recommending features, always:
 5. Ask follow-up questions to ensure the recommendation resonates with them
 
 ## AVAILABLE KGC FEATURES
-1. Motivational Image Processing (MIP): Allows users to upload and enhance a personal motivational image, integrated with the "Keep Going" button and its offline functionality.
-2. Dietary Inspiration (Inspiration Machine D): Provides doctor-CPD-aligned meal inspiration through recipe videos, tailored to preferences.
-3. Grocery/Meal Delivery (Diet Logistics): Facilitates ordering ingredients from Woolworths/Coles or prepared meals from Lite n' Easy, Youfoodz, HelloFresh, and Marley Spoon.
-4. Exercise/Wellness Inspiration (Inspiration Machine E&W): Provides workout, yoga, meditation videos based on preferences and doctor's CPDs.
-5. Exercise/Wellness Support (E&W Support): Helps find local gyms, trainers, yoga/pilates studios to enhance social aspects of health.
-6. Medication Best Price Search (MBP Wiz): Finds best prices for non-PBS/insurance medications and other pharmacy products.
-7. Journaling: Records thoughts/feelings for reflection and self-awareness, tracking progress against CPDs.
-8. Quick Wins: Presents small, achievable tasks for positive reinforcement, tailored to daily goals.
-9. Health Snapshots: Summarizes progress and achievements, highlighting CPD adherence.
-10. Health Trivia: Provides engaging health quizzes reinforcing knowledge related to CPDs.
-11. Progress Milestones: Tracks and celebrates patient achievements aligned with CPD goals.
-12. Voice Interaction: Enables voice-based input through microphone in chat window.
-13. Social Check-ins: Facilitates social support and accountability.
-14. Food Database: Provides nutritional information supporting informed dietary choices.
-15. Medication Reminders: Ensures timely medication adherence linked to CPDs.
-16. Wearables Data Integration: Provides insights from activity trackers for tailored recommendations.
-// Mood Booster Audio feature has been removed
+${availableFeaturesString}
+// Note: The above list is now dynamically generated from the single source of truth.
+// It will contain the 13 authorized features.
 
 ## MEMORY UTILIZATION PROTOCOL
 - Always review health metrics from recent interactions when making recommendations
@@ -191,18 +190,35 @@ Format your response as a JSON object with the following structure:
         }
       ],
       temperature: 0.3,
-      // Using a type assertion to handle potential type issues with response_format
-      ...({"response_format": { "type": "json_object" }} as any),
+      response_format: { type: "json_object" }, // Removed 'as any'
     });
 
     const content = response.choices[0].message.content;
     if (!content) {
+      console.error("xAI evaluation error: Empty content response");
       throw new Error("Empty response from xAI evaluator");
     }
 
-    return JSON.parse(content);
+    try {
+      const parsed = JSON.parse(content);
+      // Basic validation of the parsed structure
+      if (typeof parsed.safe === 'boolean' &&
+          typeof parsed.accurate === 'boolean' &&
+          typeof parsed.nonHallucinating === 'boolean' &&
+          typeof parsed.nonDiagnostic === 'boolean' &&
+          typeof parsed.feedbackMessage === 'string') {
+        return parsed as XAIEvaluationPayload;
+      } else {
+        console.error("xAI evaluation JSON structure mismatch:", parsed);
+        throw new Error("Parsed JSON does not match expected structure for evaluation payload.");
+      }
+    } catch (e) {
+      console.error("Failed to parse xAI evaluation response as JSON:", content, e);
+      throw new Error("Evaluation response from xAI was not valid JSON.");
+    }
   } catch (error) {
     console.error("xAI evaluation error:", error);
+    // Ensure the fallback matches the return type
     return {
       safe: false,
       accurate: false,

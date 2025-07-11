@@ -1,27 +1,66 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Upload, Sparkles, Save } from 'lucide-react';
-import { useSimpleToast } from '@/hooks/simple-toast';
-import { saveMotivationalImage, getMotivationalImage } from '@/lib/imageStore';
+import { Upload, Sparkles, Save, Loader2 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast'; // Corrected import path
+import { useMotivationalImage } from '@/context/MotivationalImageContext';
+import { enhanceWithStars } from '@/lib/imageEffects'; // Import the enhancement function
+
+// Helper function to convert Data URL to Blob
+function dataURLtoBlob(dataurl: string): Blob {
+  const arr = dataurl.split(',');
+  const mimeMatch = arr[0].match(/:(.*?);/);
+  if (!mimeMatch) {
+    throw new Error('Invalid data URL');
+  }
+  const mime = mimeMatch[1];
+  const bstr = atob(arr[1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while (n--) {
+    u8arr[n] = bstr.charCodeAt(n);
+  }
+  return new Blob([u8arr], { type: mime });
+}
 
 const MotivationalImageProcessor: React.FC = () => {
-  const [selectedImage, setSelectedImage] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
+  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
+  const [originalPreviewUrl, setOriginalPreviewUrl] = useState<string | null>(null); // Preview of original selected image
+  const [enhancedPreviewUrl, setEnhancedPreviewUrl] = useState<string | null>(null); // Preview of enhanced image
+  const [isEnhancing, setIsEnhancing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useSimpleToast();
+  const { imageSrc: contextImageSrc, isLoadingImage, setImageBlob } = useMotivationalImage();
+
+  useEffect(() => {
+    // If an image exists in context and no new file is locally selected, display the context image.
+    // This also implies it might have been enhanced before.
+    if (contextImageSrc && !selectedImageFile) {
+      setOriginalPreviewUrl(null); // Clear original if we are showing context one
+      setEnhancedPreviewUrl(contextImageSrc); // Assume context image is the one to show (possibly enhanced)
+    } else if (!contextImageSrc && !selectedImageFile) {
+      // No image in context and nothing selected, clear previews
+      setOriginalPreviewUrl(null);
+      setEnhancedPreviewUrl(null);
+    }
+    // If selectedImageFile is present, local previews are handled by handleFileChange
+  }, [contextImageSrc, selectedImageFile]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      setSelectedImage(file);
+      setSelectedImageFile(file);
+      setEnhancedPreviewUrl(null); // Clear any previous enhancement when new file is chosen
       const reader = new FileReader();
       reader.onloadend = () => {
-        setPreviewUrl(reader.result as string);
+        setOriginalPreviewUrl(reader.result as string);
       };
       reader.readAsDataURL(file);
+    } else {
+      setSelectedImageFile(null);
+      setOriginalPreviewUrl(contextImageSrc); // Revert to context image or null
+      setEnhancedPreviewUrl(contextImageSrc); // Revert to context image or null
     }
   };
 
@@ -29,25 +68,49 @@ const MotivationalImageProcessor: React.FC = () => {
     fileInputRef.current?.click();
   };
 
+  const handleEnhanceImage = async () => {
+    if (!originalPreviewUrl && !contextImageSrc) { // Check if there's any base image to enhance
+      toast({ title: "No Image", description: "Please select an image first.", variant: "destructive" });
+      return;
+    }
+    const baseImageForEnhancement = originalPreviewUrl || contextImageSrc;
+    if (!baseImageForEnhancement) return;
+
+
+    setIsEnhancing(true);
+    try {
+      const enhancedDataUrl = await enhanceWithStars(baseImageForEnhancement);
+      setEnhancedPreviewUrl(enhancedDataUrl);
+      toast({ title: "Enhanced!", description: "Stars added. Save to keep changes." });
+    } catch (error) {
+      console.error("Failed to enhance image:", error);
+      toast({ title: "Error", description: "Could not enhance image.", variant: "destructive" });
+    } finally {
+      setIsEnhancing(false);
+    }
+  };
+
   const handleSaveImage = useCallback(async () => {
-    if (!selectedImage) {
-      toast({ title: "No Image Selected", description: "Please select an image first.", variant: "destructive" });
+    const urlToSave = enhancedPreviewUrl || originalPreviewUrl || contextImageSrc;
+
+    if (!urlToSave) {
+      toast({ title: "No Image", description: "Please select or enhance an image to save.", variant: "destructive" });
       return;
     }
 
-    setIsSaving(true);
     try {
-      // In a real implementation, we would first apply the canvas enhancement
-      // For now, we save the original image blob.
-      await saveMotivationalImage(selectedImage);
+      const blobToSave = dataURLtoBlob(urlToSave);
+      await setImageBlob(blobToSave);
       toast({ title: "Success!", description: "Your motivational image has been saved." });
+      setSelectedImageFile(null); // Clear local selection after save
+      // `enhancedPreviewUrl` will be updated by the context via useEffect if imageSrc changes
     } catch (error) {
       console.error("Failed to save image:", error);
       toast({ title: "Error", description: "Could not save your image. Please try again.", variant: "destructive" });
-    } finally {
-      setIsSaving(false);
     }
-  }, [selectedImage, toast]);
+  }, [enhancedPreviewUrl, originalPreviewUrl, contextImageSrc, setImageBlob, toast]);
+
+  const displayUrl = enhancedPreviewUrl || originalPreviewUrl || contextImageSrc;
 
   return (
     <Layout>
@@ -59,9 +122,13 @@ const MotivationalImageProcessor: React.FC = () => {
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="w-full aspect-video bg-muted rounded-lg flex items-center justify-center overflow-hidden">
-              {previewUrl ? (
-                <img src={previewUrl} alt="Motivational preview" className="w-full h-full object-contain" />
-              ) : (
+              {isLoadingImage && !displayUrl && (
+                <Loader2 className="h-12 w-12 text-gray-400 animate-spin" />
+              )}
+              {!isLoadingImage && displayUrl && (
+                <img src={displayUrl} alt="Motivational preview" className="w-full h-full object-contain" />
+              )}
+              {!isLoadingImage && !displayUrl && (
                 <p className="text-muted-foreground">Image preview will appear here</p>
               )}
             </div>
@@ -72,9 +139,18 @@ const MotivationalImageProcessor: React.FC = () => {
               accept="image/png, image/jpeg, image/webp"
               className="hidden"
             />
-            <div className="flex gap-4">
-              <Button onClick={handleUploadClick} variant="outline" className="w-full"><Upload className="mr-2 h-4 w-4" /> Select Image</Button>
-              <Button onClick={handleSaveImage} disabled={!selectedImage || isSaving} className="w-full"><Save className="mr-2 h-4 w-4" /> Save Image</Button>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Button onClick={handleUploadClick} variant="outline" className="w-full md:col-span-1" disabled={isLoadingImage || isEnhancing}>
+                <Upload className="mr-2 h-4 w-4" /> Select Image
+              </Button>
+              <Button onClick={handleEnhanceImage} className="w-full md:col-span-1" disabled={(!originalPreviewUrl && !contextImageSrc) || isEnhancing || isLoadingImage}>
+                {isEnhancing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                Enhance
+              </Button>
+              <Button onClick={handleSaveImage} disabled={!displayUrl || isLoadingImage || isEnhancing} className="w-full md:col-span-1">
+                {isLoadingImage && displayUrl ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                Save Image
+              </Button>
             </div>
           </CardContent>
         </Card>

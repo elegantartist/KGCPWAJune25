@@ -22,7 +22,7 @@ interface DoctorCPDs {
   medication?: string;
 }
 
-interface SafeMCPBundle {
+export interface SafeMCPBundle { // Added export
   user_id_pseudonym: string;
   care_plan_directives: string;
   redacted_chat_history: ChatMessage[];

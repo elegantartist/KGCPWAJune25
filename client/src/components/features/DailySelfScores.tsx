@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
 import { useSimpleToast } from '@/hooks/simple-toast';
-import { apiRequest } from '@/lib/queryClient';
+import { apiRequest } from '@/lib/apiRequest'; // Corrected import path
 import { ScoreAnalysisReport } from './ScoreAnalysisReport';
 
 interface DailySelfScoresProps {

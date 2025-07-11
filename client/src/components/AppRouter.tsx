@@ -1,6 +1,6 @@
 import React from 'react';
 import { Switch, Route, Redirect } from 'wouter';
-import { useAuth } from '@/context/auth-context'; // Assuming this is the path
+import { useAuth } from '@/hooks/useAuth'; // Corrected import path
 
 import UnifiedLoginPage from '@/pages/Login';
 import { PaymentWall } from '@/components/PaymentWall';

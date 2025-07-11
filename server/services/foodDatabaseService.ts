@@ -11,6 +11,25 @@ import OpenAI from "openai";
  * - Managing user preferences and history
  * - CPD-aligned food filtering
  */
+// Define interfaces for the AI-generated food item structure
+interface OpenAINutritionalInfo {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+}
+
+interface OpenAIGeneratedFoodItem {
+  id: number;
+  name: string;
+  description: string;
+  category: string;
+  nutritionalInfo: OpenAINutritionalInfo;
+  cpdRelevantTags: string[];
+  imageUrl: string;
+  source: "ai-generated";
+}
+
 export class FoodDatabaseService {
   
   /**
@@ -432,8 +451,8 @@ Ensure every field is included. Each recommendation should align closely with th
       }
       
       // Return the recommendations as FoodItem objects
-      return foodItems.map((item: any) => ({
-        id: item.id,
+      return (foodItems as OpenAIGeneratedFoodItem[]).map((item: OpenAIGeneratedFoodItem) => ({
+        id: item.id, // This ID is from AI, might conflict with DB auto-generated IDs if directly inserted
         name: item.name,
         description: item.description,
         category: item.category,

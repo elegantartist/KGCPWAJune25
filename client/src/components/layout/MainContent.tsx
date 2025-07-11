@@ -1,7 +1,7 @@
 import React from "react";
 import { useLocation, Link } from "wouter";
 import { ChevronLeft } from "lucide-react";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { useIsMobile } from "@/hooks/useIsMobile"; // Corrected import path
 import { cn } from "@/lib/utils";
 
 interface MainContentProps {

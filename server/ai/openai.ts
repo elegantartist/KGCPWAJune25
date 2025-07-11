@@ -9,6 +9,15 @@ export const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+// Interface for the evaluator's JSON payload
+interface OpenAIEvaluationPayload {
+  safe: boolean;
+  accurate: boolean;
+  nonHallucinating: boolean;
+  nonDiagnostic: boolean;
+  feedbackMessage: string;
+}
+
 /**
  * Generate a response using OpenAI
  */
@@ -100,18 +109,35 @@ Format your response as a JSON object with the following structure:
         }
       ],
       temperature: 0.3,
-      // Using a type assertion to handle potential type issues with response_format
-      ...({"response_format": { "type": "json_object" }} as any),
+      response_format: { type: "json_object" }, // Removed 'as any', rely on SDK types
     });
 
     const content = response.choices[0].message.content;
     if (!content) {
+      console.error("OpenAI evaluation error: Empty content response");
       throw new Error("Empty response from OpenAI evaluator");
     }
 
-    return JSON.parse(content);
+    try {
+      const parsed = JSON.parse(content);
+      // Basic validation of the parsed structure
+      if (typeof parsed.safe === 'boolean' &&
+          typeof parsed.accurate === 'boolean' &&
+          typeof parsed.nonHallucinating === 'boolean' &&
+          typeof parsed.nonDiagnostic === 'boolean' &&
+          typeof parsed.feedbackMessage === 'string') {
+        return parsed as OpenAIEvaluationPayload;
+      } else {
+        console.error("OpenAI evaluation JSON structure mismatch:", parsed);
+        throw new Error("Parsed JSON does not match expected structure for evaluation payload.");
+      }
+    } catch (e) {
+      console.error("Failed to parse OpenAI evaluation response as JSON:", content, e);
+      throw new Error("Evaluation response from OpenAI was not valid JSON.");
+    }
   } catch (error) {
     console.error("OpenAI evaluation error:", error);
+    // Ensure the fallback matches the return type
     return {
       safe: false,
       accurate: false,

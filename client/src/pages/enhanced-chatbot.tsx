@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
-import { useSimpleToast } from "@/hooks/simple-toast";
+import { useToast } from "@/hooks/use-toast"; // Corrected import path
 import { Brain, Heart, LogOut, Star, MessageSquare } from "lucide-react";
 import { EnhancedSupervisorAgent } from "@/components/chatbot/EnhancedSupervisorAgent";
 import Layout from "@/components/layout/Layout";
@@ -12,7 +12,27 @@ import { useBadgeAward } from "@/context/BadgeAwardContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import KeepGoingSequenceModal from "@/components/features/KeepGoingSequenceModal";
 import { ImageCarousel } from '@/components/ui/ImageCarousel';
-import { useAuth } from '@/context/auth-context';
+import { useAuth } from '@/hooks/useAuth';
+
+// Define types for health scores and API responses
+interface SimpleHealthScores {
+  diet: number;
+  exercise: number;
+  medication: number;
+  date: string; // ISO string
+}
+
+interface BadgeDetail { // Placeholder - ideally import from where BadgeDetails is defined
+  badgeType: string; // e.g., 'meal', 'exercise', 'medication'
+  badgeLevel: string; // e.g., 'bronze', 'silver'
+  // Add other properties if they exist
+}
+
+interface ScoreSubmissionResponse {
+  message?: string; // Assuming a message might be returned
+  metric?: any; // Type for the created metric if returned
+  newlyEarnedBadges?: BadgeDetail[];
+}
 
 const carouselImages = [
   '/assets/carousel-image-1.jpg', // Replace with your actual image file
@@ -28,7 +48,7 @@ const carouselImages = [
 const EnhancedChatbot: React.FC = () => {
   const { user } = useAuth();
   const userId = user?.id;
-  const [healthMetrics, setHealthMetrics] = useState<any>(null);
+  const [healthMetrics, setHealthMetrics] = useState<SimpleHealthScores | null>(null);
   const [recommendedFeature, setRecommendedFeature] = useState<string | null>(null);
   const isOnline = useOnlineStatus();
   const [showScoresModal, setShowScoresModal] = useState(false);
@@ -47,7 +67,7 @@ const EnhancedChatbot: React.FC = () => {
     
     if (lastHealthMetricsStr) {
       try {
-        const parsedMetrics = JSON.parse(lastHealthMetricsStr);
+        const parsedMetrics = JSON.parse(lastHealthMetricsStr) as SimpleHealthScores;
         const metricDate = new Date(parsedMetrics.date);
         const now = new Date();
         const diffMs = now.getTime() - metricDate.getTime();
@@ -106,18 +126,21 @@ const EnhancedChatbot: React.FC = () => {
   const handleScoresSubmitted = async (scores: { diet: number; exercise: number; medication: number; }) => {
     try {
       // Call the new backend endpoint to save scores and check for badges
-      const response = await apiRequest<any>('POST', '/api/scores', scores);
+      const response = await apiRequest<ScoreSubmissionResponse>('POST', '/api/scores', scores);
 
       // The toast with the analysis option is now handled inside DailySelfScores.
       // This parent component just needs to handle the badge award.
       if (response && response.newlyEarnedBadges && response.newlyEarnedBadges.length > 0) {
-        response.newlyEarnedBadges.forEach((badge: any) => {
-          showAward(badge); // Trigger the celebration modal for each new badge
+        response.newlyEarnedBadges.forEach((badge) => { // badge is now BadgeDetail
+          // Assuming showAward expects a structure compatible with BadgeDetail
+          // If BadgeDetails from BadgeAwardContext is different, a mapping might be needed
+          showAward(badge as any); // Using 'as any' temporarily if BadgeDetail and expected type for showAward mismatch
         });
       }
-    } catch (error) {
+    } catch (error: unknown) { // Changed error to unknown
+      const message = error instanceof Error ? error.message : "Could not submit scores. Please try again.";
       console.error("Error submitting scores:", error);
-      toast({ title: "Error", description: "Could not submit scores. Please try again.", variant: "destructive" });
+      toast({ title: "Error", description: message, variant: "destructive" });
     }
   };
 

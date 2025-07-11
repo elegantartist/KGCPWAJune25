@@ -1,6 +1,6 @@
 // In client/src/pages/Login.tsx
 import React, { useState } from 'react';
-import { useAuth } from '@/context/auth-context';
+import { useAuth } from '@/hooks/useAuth';
 import { apiRequest } from '@/lib/apiRequest';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

@@ -7,28 +7,22 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { MessageCircle, BarChart, ArrowRight, ArrowLeft, Gem, PlusCircle } from 'lucide-react';
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { LogoutButton } from "@/components/ui/LogoutButton";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { useIsMobile } from "@/hooks/useIsMobile"; // Corrected import path
 import { cn } from "@/lib/utils";
 import { useNotificationStore } from '../stores/notificationStore';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { createHapticFeedback } from "@/lib/hapticFeedback";
-import EnhancedImageStore from "@/lib/enhancedImageStore";
+// import EnhancedImageStore from "@/lib/enhancedImageStore"; // Removed
 import HealthImageCarousel from "@/components/health/HealthImageCarousel";
 import { KeepGoingFeature } from "@/components/keep-going/KeepGoingFeature";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/context/auth-context";
+import { useAuth } from "@/hooks/useAuth"; // Corrected auth import
 import { apiRequest } from "../lib/apiRequest";
 import { BuyCredits } from "@/components/BuyCredits";
 import Layout from "@/components/layout/Layout";
-// Removed unused User import
+import { useMotivationalImage } from "@/context/MotivationalImageContext"; // Added import
 
-// Define global window types for TypeScript
-declare global {
-  interface Window {
-    __KGC_ENHANCED_IMAGE__: string | null;
-  }
-}
-
+// Removed global window type for __KGC_ENHANCED_IMAGE__
 
 
 const Dashboard: React.FC = () => {
@@ -36,7 +30,7 @@ const Dashboard: React.FC = () => {
   const [chatVibrating, setChatVibrating] = useState(false);
   const [keepGoingVibrating, setKeepGoingVibrating] = useState(false);
   const [scoresVibrating, setScoresVibrating] = useState(false);
-  const [motivationalImage, setMotivationalImage] = useState<string | null>(null);
+  // const [motivationalImage, setMotivationalImage] = useState<string | null>(null); // Removed, will use context
   const [showBuyCredits, setShowBuyCredits] = useState(false);
   
   // Get responsive layout information
@@ -52,6 +46,7 @@ const Dashboard: React.FC = () => {
 
   // --- START: NEW DATA-FETCHING LOGIC ---
   const { user } = useAuth();
+  const { imageSrc: motivationalImage, isLoadingImage } = useMotivationalImage(); // Use new context
   const { data: patientData, isLoading, error } = useQuery({
       queryKey: ['patientDashboardData', user?.id],
       queryFn: () => apiRequest('/api/patients/me/dashboard'),
@@ -84,64 +79,8 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  // Fetch the motivational image from the database
-  const { data: savedImage } = useQuery({
-    queryKey: ['/api/users', user?.id, 'motivational-image'],
-    queryFn: async () => {
-      try {
-        if (!user?.id) return null;
-        const response = await fetch(`/api/users/${user.id}/motivational-image`);
-        if (!response.ok) {
-          if (response.status === 404) {
-            return null;
-          }
-          throw new Error('Failed to fetch motivational image');
-        }
-        return await response.json();
-      } catch (error) {
-        console.error('Error fetching motivational image:', error);
-        return null;
-      }
-    },
-    enabled: !!user,
-    retry: false,
-    refetchOnWindowFocus: false,
-  });
-
-  // Set the motivational image when data is available
-  useEffect(() => {
-    if (savedImage && savedImage.imageData) {
-      console.log("Dashboard: Found saved image in database");
-      setMotivationalImage(savedImage.imageData);
-
-      // Update window variable for cross-component compatibility
-      if (typeof window !== 'undefined') {
-        window.__KGC_ENHANCED_IMAGE__ = savedImage.imageData;
-      }
-
-      // Also update EnhancedImageStore
-      EnhancedImageStore.setImage(savedImage.imageData);
-    } else {
-      // Fallback to window variable or EnhancedImageStore
-      console.log("Dashboard: Checking local storage");
-      try {
-        const windowImage = typeof window !== 'undefined' ? window.__KGC_ENHANCED_IMAGE__ : null;
-        const storeImage = EnhancedImageStore.getImage();
-
-        if (windowImage) {
-          console.log("Dashboard: Found image in window variable");
-          setMotivationalImage(windowImage);
-        } else if (storeImage) {
-          console.log("Dashboard: Found image in enhanced image store");
-          setMotivationalImage(storeImage);
-        } else {
-          console.log("Dashboard: No motivational image found");
-        }
-      } catch (error) {
-        console.error('Error accessing motivational image:', error);
-      }
-    }
-  }, [savedImage]);
+  // Removed old useQuery for motivational image and the useEffect that used EnhancedImageStore / window variable.
+  // The `motivationalImage` state is now directly from `useMotivationalImage()` context, which handles fetching from IndexedDB.
 
   // Function to trigger vibration with iOS compatibility and sound for main buttons
   const triggerVibration = (buttonType: 'chat' | 'keepGoing' | 'scores') => {
