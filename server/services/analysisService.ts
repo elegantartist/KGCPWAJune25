@@ -1,12 +1,12 @@
 import { db } from '../db';
-import { dailyScores, carePlanDirectives as cpdSchema, patients } from '@shared/schema';
+// Changed import path for @shared/schema
+import { patientScores, carePlanDirectives as cpdSchema, patients } from '../src/shared/schema';
 import { eq, and, gte, desc, sql } from 'drizzle-orm';
-import { AIContextService } from './aiContextService'; // For secure context
-import { SELF_SCORE_ANALYSIS_PROMPT } from './prompt_templates'; // Standardized prompt
-import OpenAI from 'openai'; // Direct OpenAI client
-import { secureLog, redactPiiFromText } from './privacyMiddleware'; // For secure logging and redaction
+import { AIContextService } from './aiContextService';
+import { SELF_SCORE_ANALYSIS_PROMPT } from './prompt_templates';
+import OpenAI from 'openai';
+import { secureLog, redactPiiFromText } from './privacyMiddleware';
 
-// Initialize OpenAI client if not already available globally or via a dedicated service
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
@@ -15,27 +15,20 @@ export async function generateScoreAnalysis(userId: number) {
   const functionName = "generateScoreAnalysis";
   secureLog(`[${functionName}] Starting for user`, { userId });
 
-  // 1. Fetch last 7-14 days of scores for trend analysis (adjust as needed)
   const N_DAYS_AGO = 14;
   const nDaysAgoDate = new Date();
   nDaysAgoDate.setDate(nDaysAgoDate.getDate() - N_DAYS_AGO);
 
-  const patientRecord = await db.query.patients.findFirst({ where: eq(patients.userId, userId) });
-  if (!patientRecord) {
-    secureLog(`[${functionName}] Patient record not found for user.`, { userId });
-    return { summary: "Patient record not found.", recommendations: [] };
-  }
-
   const recentScores = await db
     .select({
-      date: dailyScores.scoreDate, // Assuming scoreDate is the correct column name
-      dietScore: dailyScores.dietScore,
-      exerciseScore: dailyScores.exerciseScore,
-      medicationScore: dailyScores.medicationScore,
+      date: patientScores.scoreDate,
+      dietScore: patientScores.mealPlanSelfScore,
+      exerciseScore: patientScores.exerciseSelfScore,
+      medicationScore: patientScores.medicationSelfScore,
     })
-    .from(dailyScores)
-    .where(and(eq(dailyScores.userId, userId), gte(dailyScores.scoreDate, nDaysAgoDate.toISOString().split('T')[0])))
-    .orderBy(desc(dailyScores.scoreDate))
+    .from(patientScores)
+    .where(and(eq(patientScores.patientId, userId), gte(patientScores.scoreDate, nDaysAgoDate.toISOString().split('T')[0])))
+    .orderBy(desc(patientScores.scoreDate))
     .limit(N_DAYS_AGO);
 
   if (recentScores.length < 1) {
@@ -43,14 +36,11 @@ export async function generateScoreAnalysis(userId: number) {
     return { summary: "Not enough recent data for an analysis. Keep logging your scores daily!", recommendations: [] };
   }
 
-  // 2. Get Secure Context (includes redacted CPDs, pseudonymized ID)
-  // We don't need chat history for this specific analysis, but health metrics from context might be useful
-  // The `AIContextService.prepareSecureContext` will provide pseudonymized user ID and redacted CPDs.
   let mcpBundle;
   try {
     const contextResponse = await AIContextService.prepareSecureContext({
       userId,
-      includeHealthMetrics: true, // true, as latest_scores are part of the bundle
+      includeHealthMetrics: true,
       includeChatHistory: false,
     });
     mcpBundle = contextResponse.secureBundle;
@@ -63,18 +53,11 @@ export async function generateScoreAnalysis(userId: number) {
     return { summary: "There was an issue preparing your data for analysis.", recommendations: [] };
   }
 
-  // 3. Format recent scores data for the prompt (example)
-  // The SELF_SCORE_ANALYSIS_PROMPT expects CURRENT_SELF_SCORES.
-  // For a historical analysis, we might need to adapt the prompt or how we present this data.
-  // For now, let's use the most recent score as "current" and provide historical as context.
   const latestScoresForPrompt = recentScores[0];
   const historicalScoresText = recentScores.map(s =>
     `Date: ${s.date}, Diet: ${s.dietScore}, Exercise: ${s.exerciseScore}, Meds: ${s.medicationScore}`
   ).join('\n');
 
-  // 4. Construct the user part of the prompt using data from mcpBundle and recentScores
-  // SELF_SCORE_ANALYSIS_PROMPT already defines the AI's role and desired JSON output.
-  // We primarily need to fill in the patient-specific parts.
   const userPromptForLLM = `
 PATIENT CONTEXT (anonymized and secure):
 Patient ID: ${mcpBundle.user_id_pseudonym}
@@ -97,17 +80,16 @@ YOUR TASK: Analyze these self-scores (focusing on the MOST RECENT but considerin
 Ensure recommendations are actionable and reference KGC features if applicable.
 `;
 
-  // 5. Call the AI model (OpenAI) directly with the standardized system prompt
   try {
     secureLog(`[${functionName}] Calling OpenAI for user.`, { userId });
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o', // Using a capable model
+      model: 'gpt-4o',
       messages: [
         { role: 'system', content: SELF_SCORE_ANALYSIS_PROMPT },
         { role: 'user', content: userPromptForLLM }
       ],
       response_format: { type: "json_object" },
-      temperature: 0.5, // Slightly lower temp for more factual analysis
+      temperature: 0.5,
     });
 
     const llmResponse = completion.choices[0]?.message?.content;
@@ -116,8 +98,7 @@ Ensure recommendations are actionable and reference KGC features if applicable.
       throw new Error("LLM returned empty response.");
     }
 
-    // Validate AI response for PII before parsing/returning (final check)
-    const validatedResponse = await AIContextService.validateAIResponse(llmResponse, "score-analysis-session"); // Placeholder session ID
+    const validatedResponse = await AIContextService.validateAIResponse(llmResponse, "score-analysis-session");
     if (!validatedResponse.isSecure) {
         secureLog(`[${functionName}] PII found in LLM response for user, returning sanitized.`, { userId, violations: validatedResponse.violations });
     }
@@ -128,7 +109,7 @@ Ensure recommendations are actionable and reference KGC features if applicable.
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
     secureLog(`[${functionName}] Error generating or parsing score analysis for user.`, { userId, error: errorMessage });
-    console.error("Error generating or parsing score analysis:", error); // Keep console.error for dev visibility
+    console.error("Error generating or parsing score analysis:", error);
     return {
       summary: "I was unable to generate a detailed analysis at this time. Your scores have been recorded.",
       recommendations: ["Please try again later or discuss your scores with me in the chat."],

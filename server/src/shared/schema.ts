@@ -1,5 +1,5 @@
 // In shared/schema.ts
-import { pgTable, serial, text, varchar, integer, timestamp, boolean } from 'drizzle-orm/pg-core';
+import { pgTable, serial, text, varchar, integer, timestamp, boolean, uniqueIndex } from 'drizzle-orm/pg-core';
 
 export const users = pgTable('users', {
   id: serial('id').primaryKey(),
