@@ -1,6 +1,6 @@
 // In server/routes.ts
 import express, { Router } from 'express';
-import type { Express } from 'express';
+import doctorReportsRouter from './routes/doctorReports';import type { Express } from 'express';
 import Stripe from 'stripe';
 import twilio from 'twilio';
 import { db } from './db';
@@ -115,7 +115,6 @@ export async function registerRoutes(app: Express) {
             res.json({ message: 'SMS sent successfully' });
         }
     });
-
     router.post('/auth/verify-sms', async (req, res) => {
         try {
             const { email, code } = req.body;
