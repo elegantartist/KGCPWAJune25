@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertCircle, WifiOff, Wifi } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { WifiOff, Wifi } from 'lucide-react';
 import { ConnectivityLevel } from '@shared/types';
 import { X } from 'lucide-react';
 
@@ -102,7 +102,7 @@ const ConnectivityBanner: React.FC<ConnectivityBannerProps> = ({ level }) => {
       ) : (
         <Wifi className="h-4 w-4 text-green-500" />
       )}
-      <AlertTitle>{message.title}</AlertTitle>
+      <div className="font-medium">{message.title}</div>
       <AlertDescription>
         {message.description}
       </AlertDescription>

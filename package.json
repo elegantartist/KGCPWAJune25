@@ -1,0 +1,9 @@
+{
+  "devDependencies": {
+    "@types/node": "^24.0.12",
+    "vite": "^7.0.3"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.44.2"
+  }
+}

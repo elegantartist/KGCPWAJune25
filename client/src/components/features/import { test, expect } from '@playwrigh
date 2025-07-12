@@ -1,0 +1,75 @@
+import { test, expect } from '@playwright/test';
+
+test.describe('Admin Dashboard Flow', () => {
+
+  // Before each test, log in as an admin by setting localStorage.
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      const mockAdmin = {
+        id: 99,
+        name: 'Admin User',
+        email: 'admin@kgc.com',
+        role: 'admin',
+      };
+      const mockToken = 'mock-admin-jwt-token';
+
+      window.localStorage.setItem('user', JSON.stringify(mockAdmin));
+      window.localStorage.setItem('accessToken', mockToken);
+    });
+  });
+
+  test('should allow an admin to create a new doctor', async ({ page }) => {
+    const newDoctor = {
+      id: 101,
+      name: 'Dr. Ada Lovelace',
+      email: 'ada.lovelace@kgc.com',
+      phoneNumber: '0411222333',
+      isActive: true,
+      createdAt: new Date().toISOString(),
+    };
+
+    // Mock the initial fetch for the doctors list (return an empty array)
+    await page.route('**/api/admin/doctors', async route => {
+      // After the creation, the page will refetch. We'll return the new doctor then.
+      if (route.request().method() === 'GET') {
+        const doctorList = page.locator(`text=${newDoctor.name}`).isVisible() ? [newDoctor] : [];
+        await route.fulfill({ json: doctorList });
+      }
+    });
+
+    // Mock the API response for creating a new doctor
+    await page.route('**/api/admin/create-doctor', async route => {
+      const requestBody = route.request().postDataJSON();
+      // Verify the data sent to the backend is correct
+      expect(requestBody.name).toBe(newDoctor.name);
+      expect(requestBody.email).toBe(newDoctor.email);
+      expect(requestBody.phoneNumber).toBe(newDoctor.phoneNumber);
+
+      await route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({ message: 'Doctor created successfully', doctor: newDoctor }),
+      });
+    });
+
+    // 1. Navigate to the Admin Dashboard
+    await page.goto('/admin-dashboard');
+    await expect(page.getByRole('heading', { name: 'Admin Dashboard' })).toBeVisible();
+
+    // 2. Click the "Create New Doctor" button to open the dialog
+    await page.getByRole('button', { name: 'Create New Doctor' }).click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+
+    // 3. Fill in the new doctor's details
+    await page.getByLabel('Full Name').fill(newDoctor.name);
+    await page.getByLabel('Email Address').fill(newDoctor.email);
+    await page.getByLabel('Phone Number').fill(newDoctor.phoneNumber);
+
+    // 4. Submit the form
+    await page.getByRole('button', { name: 'Create Doctor' }).click();
+
+    // 5. Verify the new doctor appears in the table
+    await expect(page.getByText(newDoctor.name)).toBeVisible();
+    await expect(page.getByText(newDoctor.email)).toBeVisible();
+  });
+});

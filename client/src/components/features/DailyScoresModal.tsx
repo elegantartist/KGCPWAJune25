@@ -150,6 +150,7 @@ const DailyScoresModal: React.FC<DailyScoresModalProps> = ({ isOpen, onClose }) 
         isOpen={showDiscussion}
         onClose={() => { setShowDiscussion(false); onClose(); }} // Close both dialogs
         onConfirm={handleConfirmDiscussion}
+        scores={scores}
         analysis={analysis}
       />
     </>

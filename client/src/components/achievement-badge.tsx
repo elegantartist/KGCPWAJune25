@@ -111,22 +111,9 @@ export const getBadgeFilter = (type: BadgeType, level: BadgeLevel) => {
 };
 
 // Sound effect for badge celebrations - disabled for testing
-const playCelebrationSound = () => {
-  console.log("Celebration sound effect would play here");
-  // In production, uncomment the below code and add the audio file
-  /*
-  const audio = new Audio("/assets/crowd-cheer.mp3");
-  audio.play().catch(error => {
-    console.error("Error playing celebration sound:", error);
-  });
-  
-  // Auto-stop after 3 seconds
-  setTimeout(() => {
-    audio.pause();
-    audio.currentTime = 0;
-  }, 3000);
-  */
-};
+// const playCelebrationSound = () => {
+//   console.log("Celebration sound effect would play here");
+// };
 
 // Component for displaying badges with animations
 export const AchievementBadge: React.FC<{

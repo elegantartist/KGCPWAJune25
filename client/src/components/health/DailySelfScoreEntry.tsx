@@ -12,7 +12,7 @@ import { createHapticFeedback } from "@/lib/hapticFeedback";
 import { BarChart } from "lucide-react";
 
 const DailySelfScoreEntry: React.FC = () => {
-  const isMobile = useIsMobile();
+  const {} = useIsMobile();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
@@ -22,7 +22,7 @@ const DailySelfScoreEntry: React.FC = () => {
     retry: false
   });
 
-  const userId = currentUser?.patientId || currentUser?.id;
+  const userId = (currentUser as any)?.patientId || (currentUser as any)?.id;
   
   // State for slider values
   const [medicationScore, setMedicationScore] = useState<number[]>([5]);
@@ -54,13 +54,7 @@ const DailySelfScoreEntry: React.FC = () => {
       medicationSelfScore: number;
       notes?: string;
     }) => {
-      return apiRequest('/api/patient-scores', {
-        method: 'POST',
-        body: JSON.stringify(scoreData),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      return apiRequest('POST', '/api/patient-scores', scoreData);
     },
     onSuccess: () => {
       toast({
@@ -99,7 +93,7 @@ const DailySelfScoreEntry: React.FC = () => {
     }
 
     // Create haptic feedback
-    createHapticFeedback('light');
+    createHapticFeedback(200, false);
     
     const today = new Date().toISOString().split('T')[0];
     

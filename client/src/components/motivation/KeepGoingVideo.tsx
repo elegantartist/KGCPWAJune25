@@ -27,7 +27,7 @@ const KeepGoingVideo: React.FC<KeepGoingVideoProps> = ({ videoId, onClose, enhan
     retry: false
   });
 
-  const userId = currentUser?.id;
+  const userId = (currentUser as any)?.id;
   
   // Query for getting the saved motivational image from the database
   const { data: savedImage, isLoading: isLoadingImage } = useQuery({

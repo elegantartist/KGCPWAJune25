@@ -3,7 +3,7 @@ import { Switch, Route, Redirect } from 'wouter';
 import { useAuth } from '@/context/auth-context'; // Assuming this is the path
 
 import UnifiedLoginPage from '@/pages/Login';
-import { PaymentWall } from '@/components/PaymentWall';
+// import { PaymentWall } from '@/components/PaymentWall'; // Component removed
 import { RestrictedAccessWall } from '@/components/RestrictedAccessWall';
 import NotFound from '@/pages/not-found';
 
@@ -52,9 +52,9 @@ export function AppRouter() {
     );
   }
 
-  // If authenticated but payment is required, show the payment wall
+  // If authenticated but payment is required, show the restricted wall
   if (paymentRequired) {
-    return <PaymentWall />;
+    return <RestrictedAccessWall />;
   }
 
   // If authenticated but access is restricted, show the restricted wall

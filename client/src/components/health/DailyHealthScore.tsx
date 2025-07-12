@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { HealthMetric } from "@shared/schema";
+import { healthMetrics } from "@shared/schema";
+
+type HealthMetric = typeof healthMetrics.$inferSelect;
 import { Card, CardContent } from "@/components/ui/card";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
@@ -19,14 +21,14 @@ interface DailyHealthScoreProps {
 const DailyHealthScore: React.FC<DailyHealthScoreProps> = ({ metric }) => {
   const isMobile = useIsMobile();
   const { toast } = useToast();
-  const [, setLocation] = useLocation();
+  const [,] = useLocation();
   
   // Provide default values if metric is undefined or properties are missing
   const defaultMetric = {
     medicationScore: metric?.medicationScore || 5,
     dietScore: metric?.dietScore || 5,
     exerciseScore: metric?.exerciseScore || 5,
-    userId: metric?.userId || 0,
+    userId: metric?.patientId || 0,
     id: metric?.id || 0,
     date: metric?.date || new Date()
   };
@@ -283,7 +285,7 @@ const DailyHealthScore: React.FC<DailyHealthScoreProps> = ({ metric }) => {
         dietScore={dietScore}
         exerciseScore={exerciseScore}
         medicationScore={medicationScore}
-        userId={metric.userId}
+        userId={metric?.patientId || 0}
       />
     </>
   );

@@ -280,7 +280,7 @@ export class ModelContextProtocol {
   ): Promise<ValidatedAIResponse> {
     console.log('Generating validated response with prompt:', prompt);
     try {
-      const response = await apiRequest<ValidatedAIResponse>('POST', '/api/mcp/generate', {
+      const response = await apiRequest('POST', '/api/mcp/generate', {
         prompt,
         systemPrompt,
         healthCategory
@@ -447,12 +447,12 @@ export function useMCP(userId: number) {
 
 // Function to fetch care plan directives
 export async function fetchCarePlanDirectives(userId: number): Promise<CarePlanDirective[]> {
-  return apiRequest<CarePlanDirective[]>('GET', `/api/users/${userId}/care-plan-directives`);
+  return apiRequest('GET', `/api/users/${userId}/care-plan-directives`);
 }
 
 // Function to fetch active care plan directives 
 export async function fetchActiveCarePlanDirectives(userId: number): Promise<CarePlanDirective[]> {
-  return apiRequest<CarePlanDirective[]>('GET', `/api/users/${userId}/care-plan-directives/active`);
+  return apiRequest('GET', `/api/users/${userId}/care-plan-directives/active`);
 }
 
 // Function to fetch feature usage
@@ -461,12 +461,12 @@ export async function fetchFeatureUsage(userId: number, featureName?: string): P
     ? `/api/users/${userId}/feature-usage?feature=${encodeURIComponent(featureName)}`
     : `/api/users/${userId}/feature-usage`;
     
-  return apiRequest<FeatureUsage[]>('GET', url);
+  return apiRequest('GET', url);
 }
 
 // Function to fetch most used features
 export async function fetchMostUsedFeatures(userId: number, limit: number = 5): Promise<FeatureUsage[]> {
-  return apiRequest<FeatureUsage[]>('GET', `/api/users/${userId}/feature-usage/most-used?limit=${limit}`);
+  return apiRequest('GET', `/api/users/${userId}/feature-usage/most-used?limit=${limit}`);
 }
 
 // Function to fetch chat memories
@@ -475,32 +475,32 @@ export async function fetchChatMemories(userId: number, type?: string): Promise<
     ? `/api/users/${userId}/chat-memories?type=${encodeURIComponent(type)}`
     : `/api/users/${userId}/chat-memories`;
     
-  return apiRequest<ChatMemory[]>('GET', url);
+  return apiRequest('GET', url);
 }
 
 // Function to fetch recommendations
 export async function fetchRecommendations(userId: number): Promise<Recommendation[]> {
-  return apiRequest<Recommendation[]>('GET', `/api/users/${userId}/recommendations`);
+  return apiRequest('GET', `/api/users/${userId}/recommendations`);
 }
 
 // Function to fetch recent recommendations
 export async function fetchRecentRecommendations(userId: number, limit: number = 5): Promise<Recommendation[]> {
-  return apiRequest<Recommendation[]>('GET', `/api/users/${userId}/recommendations/recent?limit=${limit}`);
+  return apiRequest('GET', `/api/users/${userId}/recommendations/recent?limit=${limit}`);
 }
 
 // Function to fetch successful recommendations
 export async function fetchSuccessfulRecommendations(userId: number): Promise<Recommendation[]> {
-  return apiRequest<Recommendation[]>('GET', `/api/users/${userId}/recommendations/successful`);
+  return apiRequest('GET', `/api/users/${userId}/recommendations/successful`);
 }
 
 // Function to fetch patient progress reports
 export async function fetchPatientProgressReports(userId: number): Promise<PatientProgressReport[]> {
-  return apiRequest<PatientProgressReport[]>('GET', `/api/users/${userId}/progress-reports`);
+  return apiRequest('GET', `/api/users/${userId}/progress-reports`);
 }
 
 // Function to fetch a specific patient progress report
 export async function fetchPatientProgressReport(reportId: number): Promise<PatientProgressReport> {
-  return apiRequest<PatientProgressReport>('GET', `/api/progress-reports/${reportId}`);
+  return apiRequest('GET', `/api/progress-reports/${reportId}`);
 }
 
 // Function to check if there are any pending PPR requests from doctors
@@ -508,8 +508,5 @@ export async function checkPendingPPRRequests(userId: number): Promise<{
   hasPendingRequests: boolean;
   requests: { id: number; doctorId: number; requestDate: Date }[];
 }> {
-  return apiRequest<{
-    hasPendingRequests: boolean;
-    requests: { id: number; doctorId: number; requestDate: Date }[];
-  }>('GET', `/api/users/${userId}/progress-reports/pending`);
+  return apiRequest('GET', `/api/users/${userId}/progress-reports/pending`);
 }

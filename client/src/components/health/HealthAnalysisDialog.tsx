@@ -11,7 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
-import { generateHealthScoreAnalysis } from "@/lib/healthScoreAnalysis";
+// import { generateHealthScoreAnalysis } from "@/lib/healthScoreAnalysis"; // TODO: Implement this function
 import { ModelContextProtocol } from "@/components/chatbot/ModelContextProtocol";
 
 interface HealthAnalysisDialogProps {
@@ -54,13 +54,15 @@ const HealthAnalysisDialog: React.FC<HealthAnalysisDialogProps> = ({
       // Generate the analysis (with a slight delay to show loading state)
       setTimeout(() => {
         try {
-          // Use Australian English by default
-          const analysisText = generateHealthScoreAnalysis(
-            dietScore,
-            exerciseScore,
-            medicationScore,
-            true // Use Australian English
-          );
+          // Generate simple analysis text
+          const analysisText = `## Health Score Analysis
+
+**Diet Score:** ${dietScore}/10
+**Exercise Score:** ${exerciseScore}/10
+**Medication Score:** ${medicationScore}/10
+
+### Overall Assessment
+Your health scores show ${(dietScore + exerciseScore + medicationScore) / 3 > 7 ? 'excellent' : (dietScore + exerciseScore + medicationScore) / 3 > 5 ? 'good' : 'room for improvement'} progress in your health journey.`;
           
           setAnalysis(analysisText);
           setLoading(false);

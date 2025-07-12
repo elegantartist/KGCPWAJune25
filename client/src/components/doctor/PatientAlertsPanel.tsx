@@ -25,7 +25,7 @@ const PatientAlertsPanel: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   
   // Fetch alert count
-  const { data: alertCount = 0, isLoading: isCountLoading } = useQuery<{count: number}>({
+  const { data: alertCount = 0 } = useQuery<{count: number}>({
     queryKey: ['/api/doctor/alerts/count'],
     refetchInterval: 60000, // Refetch every minute
   });

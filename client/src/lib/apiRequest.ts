@@ -1,22 +1,28 @@
-// In client/src/lib/apiRequest.ts
-export async function apiRequest(url: string, method: string = 'GET', body?: any) {
-  const token = localStorage.getItem('auth_token');
-  const headers: HeadersInit = { 'Content-Type': 'application/json' };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
+export async function apiRequest(
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH',
+  url: string,
+  data?: any
+) {
+  const token = localStorage.getItem('accessToken');
+  
+  const config: RequestInit = {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token && { Authorization: `Bearer ${token}` }),
+    },
+  };
+
+  if (data && method !== 'GET') {
+    config.body = JSON.stringify(data);
   }
-  const config: RequestInit = { method, headers };
-  if (body) {
-    config.body = JSON.stringify(body);
-  }
-  const response = await fetch(url, config);
+
+  const response = await fetch(`http://localhost:8080${url}`, config);
+  
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({ message: 'An API error occurred.' }));
-    throw new Error(errorData.message);
+    const error = await response.json().catch(() => ({ message: 'Request failed' }));
+    throw new Error(error.message || `HTTP ${response.status}`);
   }
-  const contentType = response.headers.get("content-type");
-  if (contentType?.includes("application/json")) {
-    return response.json();
-  }
-  return { success: true };
+
+  return response.json();
 }

@@ -1,5 +1,5 @@
 import React from "react";
-import { Link, useLocation } from "wouter";
+import { useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { createHapticFeedback } from "@/lib/hapticFeedback";
 import { getMenuItems, filterMenuItems } from "../menu/MenuData";

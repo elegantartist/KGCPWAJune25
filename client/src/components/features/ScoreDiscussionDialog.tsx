@@ -12,6 +12,11 @@ interface ScoreDiscussionDialogProps {
     exerciseScore: number;
     medicationScore: number;
   };
+  analysis?: {
+    isLoading: boolean;
+    message: string;
+    error: boolean;
+  };
 }
 
 const ScoreSummaryItem = ({ label, score, color, Icon }: { label: string; score: number; color: string; Icon: React.ElementType }) => (

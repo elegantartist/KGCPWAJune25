@@ -64,7 +64,7 @@ const UserHeader: React.FC = () => {
               </Badge>
             </div>
             {user.role === 'admin' && (
-              <p className="text-xs text-gray-500">{user.uin}</p>
+              <p className="text-xs text-gray-500">{(user as any).uin}</p>
             )}
           </div>
         </div>

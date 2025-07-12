@@ -1,7 +1,8 @@
 // In client/src/pages/Login.tsx
 import React, { useState } from 'react';
-import { useAuth } from '@/context/auth-context';
+import { useAuth } from '@/hooks/useAuth';
 import { apiRequest } from '@/lib/apiRequest';
+import { useLocation } from 'wouter';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -95,14 +96,29 @@ const AdminLogin: React.FC = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
     const { login } = useAuth();
+    const [, navigate] = useLocation();
 
     const handleAdminLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
         setError('');
         try {
-            const data = await apiRequest('/api/auth/admin-login', 'POST', { username, password });
-            login(data);
+            const response = await fetch('http://localhost:8080/api/auth/admin-login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Login failed');
+            }
+            
+            const data = await response.json();
+            login(data.token, data.user);
+            
+            // Navigate to admin dashboard
+            navigate('/admin-dashboard');
         } catch (err: any) {
             setError(err.message);
         } finally {
@@ -133,10 +149,25 @@ const AdminLogin: React.FC = () => {
 
 export default function UnifiedLoginPage() {
     return (
-        <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-            <Card className="w-full max-w-md">
+        <div className="min-h-screen relative flex items-center justify-center p-4">
+            {/* Background Video */}
+            <video
+                autoPlay
+                muted
+                loop
+                className="absolute inset-0 w-full h-full object-cover z-0"
+            >
+                <source src="/assets/login-bg.mp4" type="video/mp4" />
+                Your browser does not support the video tag.
+            </video>
+            
+            {/* Overlay for better text readability */}
+            <div className="absolute inset-0 bg-black bg-opacity-40 z-10"></div>
+            
+            {/* Login Card */}
+            <Card className="w-full max-w-md relative z-20 bg-white/95 backdrop-blur-sm">
                 <CardHeader className="text-center">
-                    <CardTitle className="text-2xl font-bold">Keep Going Care</CardTitle>
+                    <CardTitle className="text-2xl font-bold text-[#2E8BC0]">Keep Going Care</CardTitle>
                     <CardDescription>Sign in to your account</CardDescription>
                 </CardHeader>
                 <CardContent>

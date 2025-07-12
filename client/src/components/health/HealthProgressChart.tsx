@@ -1,6 +1,14 @@
 import React from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { HealthMetric } from "@shared/schema";
+// Using a local interface instead of shared schema
+interface HealthMetric {
+  id: number;
+  date: Date;
+  dietScore: number | null;
+  exerciseScore: number | null;
+  medicationScore: number | null;
+  patientId: number | null;
+}
 import { format } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";

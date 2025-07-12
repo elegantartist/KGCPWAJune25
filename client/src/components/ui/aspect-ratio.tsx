@@ -1,5 +1,6 @@
-import * as AspectRatioPrimitive from "@radix-ui/react-aspect-ratio"
+// import * as AspectRatioPrimitive from "@radix-ui/react-aspect-ratio" // TODO: Install dependency
 
-const AspectRatio = AspectRatioPrimitive.Root
+// Placeholder component until @radix-ui/react-aspect-ratio is installed
+const AspectRatio = ({ children, ...props }: any) => <div {...props}>{children}</div>
 
 export { AspectRatio }

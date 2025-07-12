@@ -21,7 +21,7 @@ export function generateScoreAnalysisMessage(
   }
 
   // Identify areas for support
-  const lowAreas = [];
+  const lowAreas: string[] = [];
   if (diet < 7) lowAreas.push("nutrition");
   if (exercise < 7) lowAreas.push("exercise");
   if (medication < 7) lowAreas.push("medication adherence");

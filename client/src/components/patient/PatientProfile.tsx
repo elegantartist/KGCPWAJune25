@@ -1,6 +1,12 @@
 import React from "react";
 import { format } from "date-fns";
-import { User } from "@shared/schema";
+// Local interface instead of shared schema
+interface User {
+  id: number;
+  name: string;
+  email: string;
+  joinedDate: string;
+}
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useIsMobile } from "@/hooks/use-mobile";

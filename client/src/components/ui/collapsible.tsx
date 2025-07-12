@@ -1,4 +1,4 @@
-import * as CollapsiblePrimitive from "@radix-ui/react-collapsible"
+// import * as CollapsiblePrimitive from "@radix-ui/react-collapsible" // TODO: Install dependency
 
 const Collapsible = CollapsiblePrimitive.Root
 

@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Calendar } from 'lucide-react';
-import { AchievementBadge, BadgeDetails, BadgeType, BadgeLevel, getBadgeFilter } from '@/components/AchievementBadge';
+import { AchievementBadge, BadgeDetails, BadgeType, BadgeLevel } from '@/components/AchievementBadge';
 
 interface BadgeProgressCardProps {
   type: BadgeType;

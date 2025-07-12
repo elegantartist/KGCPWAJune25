@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
@@ -33,7 +33,7 @@ const DailySelfScores: React.FC<DailySelfScoresProps> = ({ onSubmitted, onClose 
     setAnalysisError(null);
     setView('analysis');
     try {
-      const data = await apiRequest<AnalysisData>('GET', '/api/scores/analysis');
+      const data = await apiRequest('GET', '/api/scores/analysis');
       setAnalysisData(data);
     } catch (error) {
       console.error("Failed to fetch score analysis:", error);

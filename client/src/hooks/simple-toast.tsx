@@ -6,6 +6,7 @@ interface ToastMessage {
   description: React.ReactNode;
   variant?: 'default' | 'destructive' | 'warning';
   duration?: number;
+  action?: React.ReactNode;
 }
 
 interface ToastContextType {
@@ -73,9 +74,10 @@ const ToastContainer: React.FC = () => {
           } transition-all duration-300 transform`}
         >
           <div className="flex justify-between items-start">
-            <div>
+            <div className="flex-1">
               <h4 className="font-semibold">{toast.title}</h4>
               <div className="mt-1 text-sm">{toast.description}</div>
+              {toast.action && <div className="mt-2">{toast.action}</div>}
             </div>
             <button 
               onClick={() => dismiss(toast.id)}
