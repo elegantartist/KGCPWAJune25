@@ -3,7 +3,7 @@ import { Link } from 'wouter';
 import { ArrowLeft, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import UserHeader from '@/components/layout/UserHeader';
@@ -64,7 +64,7 @@ const FoodDatabasePage: React.FC = () => {
       {/* CPD-aligned foods explanation */}
       <Alert className="mb-6">
         <Info className="h-4 w-4" />
-        <AlertTitle>Care Plan Aligned Food Recommendations</AlertTitle>
+        <div className="font-medium">Care Plan Aligned Food Recommendations</div>
         <AlertDescription>
           These food suggestions align with your doctor's Care Plan Directives. For specific food questions or broader dietary advice, please use the KGC Chatbot.
         </AlertDescription>

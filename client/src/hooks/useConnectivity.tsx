@@ -359,7 +359,7 @@ export function useConnectivity() {
     offlineSupported: boolean = false
   ): { available: boolean; message: string } => {
     // Healthcare features are always available when online
-    if (connectivityLevel === ConnectivityLevel.ONLINE || offlineSupported) {
+    if (connectivityLevel === ConnectivityLevel.FULL || offlineSupported) {
       return { available: true, message: '' };
     }
     

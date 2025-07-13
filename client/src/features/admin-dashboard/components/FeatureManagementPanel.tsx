@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 import { useFeatureManagement } from '../hooks/useFeatureManagement';
 import { getAllFeatures, FeatureConfig as AppFeatureConfig } from '@/features/featureRegistry';
-import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 
@@ -126,7 +126,7 @@ const FeatureManagementPanel: React.FC = () => {
         <CardContent>
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Failed to load feature configurations</AlertTitle>
+            <div className="font-medium">Failed to load feature configurations</div>
             <AlertDescription>
               There was an error loading the feature management panel. Please try refreshing the page.
             </AlertDescription>
