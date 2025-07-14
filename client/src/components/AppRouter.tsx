@@ -13,7 +13,7 @@ const DoctorDashboard = React.lazy(() => import('@/pages/doctor-dashboard'));
 const AdminDashboard = React.lazy(() => import('@/pages/admin-dashboard'));
 const DoctorSetup = React.lazy(() => import('@/pages/DoctorSetup'));
 const EnhancedChatbot = React.lazy(() => import('@/pages/enhanced-chatbot'));
-const DailySelfScores = React.lazy(() => import('@/pages/profile'));
+const DailySelfScores = React.lazy(() => import('@/pages/daily-self-scores'));
 const ProgressMilestones = React.lazy(() => import('@/pages/progress-milestones'));
 const Journaling = React.lazy(() => import('@/pages/journaling'));
 const InspirationD = React.lazy(() => import('@/pages/inspiration-d'));
@@ -78,7 +78,7 @@ export function AppRouter() {
 
         {/* Feature routes */}
         <Route path="/enhanced-chatbot" component={EnhancedChatbot} />
-        <Route path="/profile" component={DailySelfScores} />
+        <Route path="/daily-self-scores" component={DailySelfScores} />
         <Route path="/progress-milestones" component={ProgressMilestones} />
         <Route path="/journaling" component={Journaling} />
         <Route path="/inspiration-d" component={InspirationD} />
