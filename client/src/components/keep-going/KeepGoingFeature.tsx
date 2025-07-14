@@ -3,76 +3,27 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ArrowRight } from 'lucide-react';
 import { createHapticFeedback } from "@/lib/hapticFeedback";
-import EnhancedImageStore from "@/lib/enhancedImageStore";
-import { useQuery } from "@tanstack/react-query";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useMotivationalImage } from "@/context/MotivationalImageContext"; // Import the context hook
 
 // Define YouTube API types for TypeScript
 declare global {
   interface Window {
     YT: any;
-    __KGC_ENHANCED_IMAGE__: string | null;
   }
 }
 
 // Interface for the component props
 interface KeepGoingFeatureProps {
   userId: number;
-  overlayImage?: string | null;
 }
 
 // YouTube video constants
 const DEFAULT_VIDEO_ID = "bKYqK1R19hM";
 
-export const KeepGoingFeature: React.FC<KeepGoingFeatureProps> = ({
-  userId,
-  overlayImage: propOverlayImage
-}) => {
+export const KeepGoingFeature: React.FC<KeepGoingFeatureProps> = ({ userId }) => {
   const isMobile = useIsMobile();
-  const [overlayImage, setOverlayImage] = useState<string | null>(propOverlayImage || null);
-
-  const { data: savedImage } = useQuery({
-    queryKey: ['/api/users', userId, 'motivational-image'],
-    queryFn: async () => {
-      try {
-        const response = await fetch(`/api/users/${userId}/motivational-image`);
-        if (!response.ok) {
-          if (response.status === 404) return null;
-          throw new Error('Failed to fetch motivational image');
-        }
-        return await response.json();
-      } catch (error) {
-        console.error('Error fetching motivational image:', error);
-        return null;
-      }
-    },
-    enabled: !!userId,
-    retry: false,
-    refetchOnWindowFocus: false,
-  });
-
-  useEffect(() => {
-    if (propOverlayImage) {
-      setOverlayImage(propOverlayImage);
-      return;
-    }
-    if (savedImage && savedImage.imageData) {
-      setOverlayImage(savedImage.imageData);
-      EnhancedImageStore.setImage(savedImage.imageData);
-      if (typeof window !== 'undefined') {
-        window.__KGC_ENHANCED_IMAGE__ = savedImage.imageData;
-      }
-      return;
-    }
-    if (typeof window !== 'undefined' && window.__KGC_ENHANCED_IMAGE__) {
-      setOverlayImage(window.__KGC_ENHANCED_IMAGE__);
-      return;
-    }
-    const storeImage = EnhancedImageStore.getImage();
-    if (storeImage) {
-      setOverlayImage(storeImage);
-    }
-  }, [propOverlayImage, savedImage, userId]);
+  const { imageUrl: overlayImage, isLoading: isImageLoading } = useMotivationalImage(); // Use the context
 
   const [isVibrating, setIsVibrating] = useState(false);
   const [showVideo, setShowVideo] = useState(false);
@@ -175,7 +126,7 @@ export const KeepGoingFeature: React.FC<KeepGoingFeatureProps> = ({
                 <div className="animate-spin h-10 w-10 sm:h-12 sm:w-12 border-4 border-white border-opacity-20 rounded-full border-t-[#2E8BC0]"></div>
               </div>
             </div>
-            {overlayImage && (
+            {overlayImage && !isImageLoading && (
               <div className="absolute inset-0 z-10 pointer-events-none flex items-center justify-center">
                 <div className={`relative mx-auto flex items-center justify-center ${isMobile ? 'w-full h-full' : 'w-[95%] h-[95%]'}`}>
                   <img
