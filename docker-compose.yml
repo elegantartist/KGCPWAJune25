@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:14-alpine
+    container_name: kgc_db
+    restart: always
+    environment:
+      - POSTGRES_USER=kgc_user
+      - POSTGRES_PASSWORD=kgc_password
+      - POSTGRES_DB=kgc_db
+    ports:
+      - '5432:5432'
+    volumes:
+      - kgc_data:/var/lib/postgresql/data
+
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: kgc_server
+    restart: on-failure
+    ports:
+      - '3000:3000'
+    depends_on:
+      - db
+    environment:
+      - DATABASE_URL=postgresql://kgc_user:kgc_password@db:5432/kgc_db
+      - NODE_ENV=development
+      # Add other required server environment variables here
+      # Example:
+      # - JWT_SECRET=your_jwt_secret
+      # - OPENAI_API_KEY=your_openai_key
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: kgc_client
+    restart: on-failure
+    ports:
+      - '5173:5173'
+    depends_on:
+      - server
+    environment:
+      - VITE_API_BASE_URL=http://localhost:3000/api
+      - NODE_ENV=development
+
+volumes:
+  kgc_data:
