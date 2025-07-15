@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX IF NOT EXISTS "health_scores_user_date_unique_idx" ON "health_scores" ("user_id", "date");

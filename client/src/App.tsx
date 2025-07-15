@@ -3,6 +3,7 @@ import AppRouter from './components/AppRouter';
 import { AuthProvider } from './hooks/useAuth';
 import { MotivationalImageProvider } from './contexts/MotivationalImageContext';
 import './styles/globals.css';
+import './styles/FoodDatabase.css';
 
 function App() {
   return (

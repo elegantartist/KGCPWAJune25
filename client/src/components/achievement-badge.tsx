@@ -2,9 +2,12 @@ import React from 'react';
 import { cn } from '@/lib/utils';
 import { Trophy } from 'lucide-react';
 
+export type BadgeType = 'exercise' | 'meal' | 'medication';
+export type BadgeLevel = 'bronze' | 'silver' | 'gold' | 'platinum';
+
 export interface BadgeDetails {
-  type: 'exercise' | 'meal' | 'medication';
-  level: 'bronze' | 'silver' | 'gold' | 'platinum';
+  type: BadgeType;
+  level: BadgeLevel;
 }
 
 interface AchievementBadgeProps {

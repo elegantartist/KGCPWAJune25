@@ -26,7 +26,6 @@ import {
   emergencyPiiScan,
   secureLog
 } from './mock-services';
-import inspirationRouter from './routes/inspiration';
 
 // Initialize Stripe
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -1883,7 +1882,6 @@ export async function registerRoutes(app: Express) {
         res.json({ received: true });
     });
 
-    router.use('/inspiration', inspirationRouter);
     app.use('/api', router);
 }
 
