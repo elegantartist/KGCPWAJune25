@@ -8,7 +8,8 @@ import { Badge } from "../components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "../components/ui/accordion";
 import { useToast } from "../hooks/use-toast";
-import { Search, ExternalLink, Loader2, Library, Clock, Heart, Award, ChefHat } from "lucide-react";
+import { Search, ExternalLink, Loader2, Library, Clock, Heart, Award, ChefHat, ShoppingBag, X, RefreshCw, Database } from "lucide-react";
+import { Textarea } from "../components/ui/textarea";
 import { 
   searchCookingVideos,
   saveFavoriteVideo,
@@ -80,12 +81,19 @@ const InspirationD: React.FC = () => {
     shellfish: false,
     soy: false
   });
-  const [activeTab, setActiveTab] = useState<string>("preferences");
+  const [activeTab, setActiveTab] = useState<string>("search");
   const [analyzedRecipes, setAnalyzedRecipes] = useState<EnhancedRecipe[]>([]);
   const [isLoadingRecipes, setIsLoadingRecipes] = useState<boolean>(false);
   const [searchPerformed, setSearchPerformed] = useState<boolean>(false);
   const [carePlanDirective, setCarePlanDirective] = useState<string>('');
   const [loadingCPD, setLoadingCPD] = useState<boolean>(true);
+  
+  // Shopping list state
+  const [showShoppingList, setShowShoppingList] = useState<boolean>(false);
+  const [shoppingListItems, setShoppingListItems] = useState<string>(() => {
+    const savedList = localStorage.getItem(`user_${userId}_shopping_list`);
+    return savedList || '';
+  });
   
   const { toast } = useToast();
   
@@ -262,49 +270,152 @@ const InspirationD: React.FC = () => {
     }
   };
 
+  // Shopping list functions
+  const handleShoppingListChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newList = e.target.value;
+    setShoppingListItems(newList);
+  };
+  
+  const clearShoppingList = () => {
+    setShoppingListItems('');
+    if (userId) {
+      localStorage.removeItem(`user_${userId}_shopping_list`);
+    }
+    toast({
+      title: 'Shopping List Cleared',
+      description: 'Your shopping list has been cleared.',
+    });
+  };
+  
+  const toggleShoppingList = () => {
+    setShowShoppingList(prev => !prev);
+  };
+
+  // Auto-save shopping list to localStorage
+  useEffect(() => {
+    if (userId && shoppingListItems !== undefined) {
+      localStorage.setItem(`user_${userId}_shopping_list`, shoppingListItems);
+    }
+  }, [shoppingListItems, userId]);
+
   return (
     <Layout>
-      <div className="container mx-auto p-4">
-        <h1 className="text-2xl font-bold mb-6">Recipes that Match My CPDs</h1>
+      <div className="container mx-auto p-4 max-w-7xl">
+        <div className="flex items-start justify-between gap-4 flex-col md:flex-row mb-6">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-[#2E8BC0]">Inspiration Machine D</h1>
+            <p className="text-[#676767]">Find Delicious Meals to Prepare Yourself or Use Your Diet Logistics Feature to have Ingredients or Similar Meals Delivered</p>
+          </div>
+          <div>
+            <Button
+              onClick={toggleShoppingList}
+              variant="outline"
+              className="flex items-center gap-2"
+            >
+              <ShoppingBag className="h-4 w-4" />
+              {showShoppingList ? 'Hide' : 'Show'} Shopping List
+            </Button>
+          </div>
+        </div>
+        {/* Shopping List Card */}
+        {showShoppingList && (
+          <Card className="mb-6 border-green-100">
+            <CardHeader className="pb-2 bg-gradient-to-r from-green-50 to-blue-50">
+              <div className="flex justify-between items-center">
+                <CardTitle className="text-lg flex items-center">
+                  <ShoppingBag className="h-5 w-5 mr-2 text-green-600" />
+                  Healthy Ingredients Shopping List
+                </CardTitle>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={toggleShoppingList}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              <CardDescription>
+                Note down ingredients you need for your healthy meals
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pt-4">
+              <Textarea
+                placeholder="Write your shopping list here... 
+Example:
+- 2 cups spinach
+- 1 avocado
+- 250g lean chicken breast
+- 1 bunch fresh herbs"
+                className="min-h-[150px] font-mono text-sm"
+                value={shoppingListItems}
+                onChange={handleShoppingListChange}
+              />
+              <div className="flex justify-between mt-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => window.open('/food-database', '_blank')}
+                  className="border-blue-600 text-blue-600 hover:bg-blue-100"
+                >
+                  <Database className="h-3.5 w-3.5 mr-1" />
+                  Food Database
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2"
+                  onClick={clearShoppingList}
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  Clear List
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle>Find Recipes for Your Doctor's Plan</CardTitle>
+          <CardTitle className="text-xl flex items-center gap-3 text-[#2E8BC0]">
+            <Library className="h-6 w-6" />
+            Doctor's Healthy Meal Plan Directive
+          </CardTitle>
           <CardDescription>
-            Search for recipes that align with your doctor's dietary recommendations
+            Your doctor's exact dietary recommendations
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {/* Doctor's CPD for Diet */}
+            {/* Doctor's CPD Display */}
             {loadingCPD ? (
-              <Card className="mb-6">
-                <CardContent className="p-4">
-                  <div className="flex items-center">
-                    <Loader2 className="h-5 w-5 animate-spin text-primary mr-2" />
-                    <p>Loading doctor's recommendations...</p>
-                  </div>
-                </CardContent>
-              </Card>
+              <div className="flex items-center gap-2 mb-4">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Loading doctor's recommendations...</span>
+              </div>
             ) : (
-              <Card className="mb-6 border-primary/30 bg-primary/5">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Library className="h-5 w-5 text-primary" />
-                    Doctor's Diet Recommendation
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm italic">"{carePlanDirective}"</p>
-                </CardContent>
-              </Card>
+              <div className="bg-[#2E8BC0]/5 border-l-4 border-[#2E8BC0] p-4 rounded-md mb-4">
+                <p className="text-[#676767] italic text-base leading-relaxed">
+                  "{carePlanDirective}"
+                </p>
+              </div>
             )}
             
-            {/* Preferences Tabs */}
+            {/* Main Navigation Tabs */}
             <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value)}>
-              <TabsList className="mb-4">
-                <TabsTrigger value="preferences">Your Preferences</TabsTrigger>
-                <TabsTrigger value="cpds">Doctor's Plan</TabsTrigger>
+              <TabsList className="grid w-full grid-cols-3 mb-4">
+                <TabsTrigger value="search" className="flex items-center gap-2">
+                  <Search className="h-4 w-4" />
+                  Recipe Search
+                </TabsTrigger>
+                <TabsTrigger value="favorites" className="flex items-center gap-2">
+                  <Heart className="h-4 w-4" />
+                  My Favorites
+                </TabsTrigger>
+                <TabsTrigger value="preferences" className="flex items-center gap-2">
+                  <Library className="h-4 w-4" />
+                  Preferences
+                </TabsTrigger>
               </TabsList>
               
               <TabsContent value="preferences" className="space-y-4">
@@ -358,11 +469,45 @@ const InspirationD: React.FC = () => {
                 </div>
               </TabsContent>
               
-              <TabsContent value="cpds" className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  Your search will automatically incorporate your doctor's dietary recommendations shown above.
+              <TabsContent value="search" className="space-y-4">
+                <p className="text-sm text-[#a4a4a4] mb-4">
+                  Search for cooking videos that match your doctor's dietary recommendations and your preferences.
                 </p>
               </TabsContent>
+              
+              <TabsContent value="favorites" className="space-y-4">
+                <div className="text-center py-8">
+                  <Heart className="h-16 w-16 mx-auto text-gray-300 mb-4" />
+                  <h3 className="text-lg font-medium text-[#676767] mb-2">My Favorite Recipes</h3>
+                  <p className="text-[#a4a4a4] mb-4">
+                    Your saved recipes will appear here
+                  </p>
+                  {savedRecipes.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+                      {savedRecipes.map((recipe: any, index: number) => (
+                        <Card key={index} className="text-left">
+                          <CardContent className="p-4">
+                            <h4 className="font-medium mb-2">{recipe.title}</h4>
+                            <p className="text-sm text-gray-600 mb-3">{recipe.description}</p>
+                            <div className="flex justify-between">
+                              <Button variant="outline" size="sm" onClick={() => window.open(recipe.url, '_blank')}>
+                                <ExternalLink className="h-4 w-4 mr-1" />
+                                View
+                              </Button>
+                              <Button variant="ghost" size="sm" className="text-red-600">
+                                <Heart className="h-4 w-4 fill-current" />
+                              </Button>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500">No saved recipes yet. Start searching to save your favorites!</p>
+                  )}
+                </div>
+              </TabsContent>
+
             </Tabs>
             
             <Button 

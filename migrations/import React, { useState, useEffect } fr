@@ -1,0 +1,199 @@
+import React, { useState, useEffect } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useMutation } from '@tanstack/react-query';
+import { apiRequest } from '@/lib/apiRequest';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { useToast } from '@/components/ui/use-toast';
+
+// --- API Mutation Hooks ---
+
+const useValidateToken = () => {
+  return useMutation({
+    mutationFn: (token: string) => apiRequest('/api/doctor/setup/validate-token', 'POST', { token }),
+  });
+};
+
+const useSendVerification = () => {
+    return useMutation({
+      mutationFn: (token: string) => apiRequest('/api/doctor/setup/send-verification', 'POST', { token }),
+    });
+};
+
+const useVerifyPhone = () => {
+    return useMutation({
+        mutationFn: (data: { token: string; code: string }) => apiRequest('/api/doctor/setup/verify-phone', 'POST', data),
+    });
+};
+
+const useCompleteSetup = () => {
+    return useMutation({
+        mutationFn: (data: { token: string; password: string }) => apiRequest('/api/doctor/setup/complete', 'POST', data),
+    });
+};
+
+
+// --- UI Components for each step ---
+
+const TokenValidationStep = ({ token, onValidated }: { token: string, onValidated: () => void }) => {
+    const { mutate: validateToken, isPending, isError, error } = useValidateToken();
+
+    useEffect(() => {
+        validateToken(token, {
+            onSuccess: () => {
+                onValidated();
+            }
+        });
+    }, [token, validateToken, onValidated]);
+
+    if (isPending) return <p>Validating your setup link...</p>;
+    if (isError) return <p className="text-red-500">Error: {(error as Error).message}. This link may be invalid or expired.</p>;
+
+    return null;
+};
+
+const PhoneVerificationStep = ({ token, onVerified }: { token: string, onVerified: () => void }) => {
+    const { toast } = useToast();
+    const [code, setCode] = useState('');
+    const sendVerificationMutation = useSendVerification();
+    const verifyPhoneMutation = useVerifyPhone();
+
+    useEffect(() => {
+        sendVerificationMutation.mutate(token, {
+            onSuccess: () => toast({ title: "Verification Code Sent", description: "A 6-digit code has been sent to your phone." }),
+            onError: (err) => toast({ title: "Error", description: (err as Error).message, variant: "destructive" }),
+        });
+    }, [token, sendVerificationMutation, toast]);
+
+    const handleVerify = (e: React.FormEvent) => {
+        e.preventDefault();
+        verifyPhoneMutation.mutate({ token, code }, {
+            onSuccess: () => onVerified(),
+            onError: (err) => toast({ title: "Verification Failed", description: (err as Error).message, variant: "destructive" }),
+        });
+    };
+
+    return (
+        <form onSubmit={handleVerify}>
+            <CardDescription>We've sent a 6-digit verification code to your registered phone number. Please enter it below.</CardDescription>
+            <Input
+                type="text"
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                placeholder="123456"
+                maxLength={6}
+                className="my-4"
+                disabled={verifyPhoneMutation.isPending}
+            />
+            <Button type="submit" disabled={verifyPhoneMutation.isPending || code.length !== 6}>
+                {verifyPhoneMutation.isPending ? 'Verifying...' : 'Verify Phone'}
+            </Button>
+        </form>
+    );
+};
+
+const PasswordSetupStep = ({ token, onCompleted }: { token: string, onCompleted: () => void }) => {
+    const { toast } = useToast();
+    const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const completeSetupMutation = useCompleteSetup();
+
+    const handleComplete = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (password !== confirmPassword) {
+            toast({ title: "Passwords do not match", variant: "destructive" });
+            return;
+        }
+        completeSetupMutation.mutate({ token, password }, {
+            onSuccess: () => onCompleted(),
+            onError: (err) => toast({ title: "Setup Failed", description: (err as Error).message, variant: "destructive" }),
+        });
+    };
+
+    return (
+        <form onSubmit={handleComplete}>
+            <CardDescription>Your account is almost ready. Create a secure password to complete the setup.</CardDescription>
+            <Input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="New Password"
+                className="my-4"
+                disabled={completeSetupMutation.isPending}
+            />
+            <Input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Confirm New Password"
+                className="mb-4"
+                disabled={completeSetupMutation.isPending}
+            />
+            <Button type="submit" disabled={completeSetupMutation.isPending || password.length < 8}>
+                {completeSetupMutation.isPending ? 'Completing Setup...' : 'Complete Account Setup'}
+            </Button>
+        </form>
+    );
+};
+
+const CompletionStep = () => {
+    const navigate = useNavigate();
+    return (
+        <div>
+            <CardDescription>Your account has been successfully activated. You can now log in to your Doctor Dashboard.</CardDescription>
+            <Button onClick={() => navigate('/login')} className="mt-4">
+                Go to Login
+            </Button>
+        </div>
+    );
+};
+
+
+// --- Main Page Component ---
+
+export const DoctorSetupPage = () => {
+    const [searchParams] = useSearchParams();
+    const token = searchParams.get('token');
+    const [step, setStep] = useState<'validating' | 'phone' | 'password' | 'complete'>('validating');
+
+    if (!token) {
+        return (
+            <div className="flex items-center justify-center h-screen">
+                <Card className="w-full max-w-md">
+                    <CardHeader>
+                        <CardTitle>Invalid Setup Link</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <p>No setup token was found. Please check the link you received in your email and try again.</p>
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
+
+    const stepTitles: Record<typeof step, string> = {
+        validating: 'Validating Account',
+        phone: 'Step 1: Verify Your Phone',
+        password: 'Step 2: Set Your Password',
+        complete: 'Setup Complete!',
+    };
+
+    return (
+        <div className="flex items-center justify-center h-screen bg-gray-100">
+            <Card className="w-full max-w-md p-4">
+                <CardHeader>
+                    <CardTitle>{stepTitles[step]}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    {step === 'validating' && <TokenValidationStep token={token} onValidated={() => setStep('phone')} />}
+                    {step === 'phone' && <PhoneVerificationStep token={token} onVerified={() => setStep('password')} />}
+                    {step === 'password' && <PasswordSetupStep token={token} onCompleted={() => setStep('complete')} />}
+                    {step === 'complete' && <CompletionStep />}
+                </CardContent>
+            </Card>
+        </div>
+    );
+};
+
+export default DoctorSetupPage;

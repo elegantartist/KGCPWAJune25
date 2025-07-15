@@ -1,263 +1,281 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { 
+  Users, FileText, TrendingUp, AlertCircle, 
+  Plus, Search, Filter, Calendar, Trash2, RotateCcw,
+  UserPlus, Stethoscope, LogOut, ArrowLeft
+} from 'lucide-react';
+import Layout from '@/components/layout/Layout';
 import { useAuth } from '@/hooks/useAuth';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Loader2, UserPlus, LogOut, AlertTriangle, Bell, Link as LinkIcon, Award, ExternalLink, Clock } from 'lucide-react';
-import { Link } from 'wouter';
+import { useLocation } from 'wouter';
 
-// Define the shape of the patient data returned from the API
 interface Patient {
   id: number;
   name: string;
   email: string;
-  isActive: boolean;
-  createdAt: string;
-  alertStatus: 'ok' | 'inactive' | 'emergency';
+  lastActive: string;
+  complianceScore: number;
+  riskLevel: 'low' | 'medium' | 'high';
+  activeCPDs: number;
 }
 
-const DoctorDashboard: React.FC = () => {
-  const { user, logout } = useAuth();
+interface CPD {
+  id: number;
+  patientName: string;
+  category: string;
+  directive: string;
+  createdAt: string;
+  compliance: number;
+}
+
+export default function DoctorDashboard() {
+  const { user } = useAuth();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
+  const [activeTab, setActiveTab] = useState('patients');
+  const [showCreatePatient, setShowCreatePatient] = useState(false);
   const queryClient = useQueryClient();
 
-  const [isCreatePatientOpen, setIsCreatePatientOpen] = useState(false);
-  const [newPatient, setNewPatient] = useState({ name: '', email: '', phoneNumber: '' });
-
-  // Fetch doctor's patients using react-query
-  const { data: patients, isLoading, error } = useQuery<Patient[]>({
-    queryKey: ['doctor-patients'],
-    queryFn: async () => {
-      const token = localStorage.getItem('accessToken');
-      // This API endpoint will need to be created in the backend
-      const response = await fetch('/api/doctor/patients', {
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
-      if (!response.ok) {
-        throw new Error('Failed to fetch patients.');
-      }
-      return response.json();
-    },
+  // Fetch doctor's patients ordered by alert count
+  const { data: patients = [], isLoading: loadingPatients } = useQuery({
+    queryKey: ['/api/doctor/patients'],
+    enabled: user?.role === 'doctor',
+    select: (data) => {
+      // Sort patients by alert count (highest first)
+      return [...data].sort((a, b) => (b.alertCount || 0) - (a.alertCount || 0));
+    }
   });
 
-  // Mutation for creating a new patient
+  // Create patient mutation
   const createPatientMutation = useMutation({
-    mutationFn: async () => {
-      const token = localStorage.getItem('accessToken');
-      // This API endpoint will need to be created in the backend
+    mutationFn: async (patientData: any) => {
       const response = await fetch('/api/doctor/create-patient', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(newPatient),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...patientData, doctorId: user?.id })
       });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to create patient.');
-      }
-      return data;
+      if (!response.ok) throw new Error('Failed to create patient');
+      return response.json();
     },
     onSuccess: () => {
-      toast({ title: 'Success', description: 'Patient account created and welcome email sent.' });
-      queryClient.invalidateQueries({ queryKey: ['doctor-patients'] });
-      setIsCreatePatientOpen(false);
-      setNewPatient({ name: '', email: '', phoneNumber: '' });
-    },
-    onError: (err: any) => {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
-    },
+      queryClient.invalidateQueries({ queryKey: ['/api/doctor/patients'] });
+      setShowCreatePatient(false);
+      toast({ title: 'Patient created successfully', description: 'Welcome email sent to patient' });
+    }
   });
 
-  const handleCreatePatientSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    createPatientMutation.mutate();
-  };
-
-  const getAlertIcon = (status: Patient['alertStatus']) => {
-    switch (status) {
-      case 'emergency':
-        return <Badge variant="destructive" className="flex items-center gap-1"><AlertTriangle className="h-4 w-4" /> Emergency</Badge>;
-      case 'inactive':
-        return <Badge variant="secondary" className="flex items-center gap-1"><Bell className="h-4 w-4" /> Inactive</Badge>;
-      default:
-        return <Badge variant="outline">OK</Badge>;
+  const getRiskColor = (risk: string) => {
+    switch (risk) {
+      case 'high': return 'bg-red-100 text-red-800';
+      case 'medium': return 'bg-yellow-100 text-yellow-800';
+      default: return 'bg-green-100 text-green-800';
     }
   };
 
   return (
-    <div className="p-8">
-      <header className="flex justify-between items-center mb-8">
-        <div>
-            <h1 className="text-3xl font-bold">Doctor Dashboard</h1>
-            <p className="text-muted-foreground">Welcome, Dr. {user?.name}</p>
+    <Layout>
+      <div className="container mx-auto p-6 max-w-7xl">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-[#2E8BC0] mb-2">Doctor Dashboard</h1>
+          <p className="text-[#676767]">
+            Manage your patients' Care Plan Directives and monitor their progress
+          </p>
         </div>
-        <div className="flex items-center gap-4">
-          {/* MCA CPD Button - Prominent placement */}
-          <Link href="/doctor/mca">
-            <Button className="bg-blue-600 hover:bg-blue-700 text-white">
-              <Award className="h-4 w-4 mr-2" />
-              MCA - Earn 5h CPD
-              <ExternalLink className="h-4 w-4 ml-2" />
-            </Button>
-          </Link>
-          <Dialog open={isCreatePatientOpen} onOpenChange={setIsCreatePatientOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <UserPlus className="h-4 w-4 mr-2" />
-                Create New Patient
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Create New Patient Account</DialogTitle>
-                <DialogDescription>Enter the patient's details. They will receive a welcome email to get started.</DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleCreatePatientSubmit} className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Full Name</Label>
-                  <Input id="name" value={newPatient.name} onChange={(e) => setNewPatient({ ...newPatient, name: e.target.value })} required />
+
+        {/* Quick Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center">
+                <Users className="h-8 w-8 text-[#2E8BC0]" />
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-[#676767]">Total Patients</p>
+                  <p className="text-2xl font-bold text-[#2E8BC0]">{patients.length}</p>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email Address</Label>
-                  <Input id="email" type="email" value={newPatient.email} onChange={(e) => setNewPatient({ ...newPatient, email: e.target.value })} required />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center">
+                <FileText className="h-8 w-8 text-[#2E8BC0]" />
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-[#676767]">Active CPDs</p>
+                  <p className="text-2xl font-bold text-[#2E8BC0]">{recentCPDs.length}</p>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Mobile Phone Number</Label>
-                  <Input id="phone" value={newPatient.phoneNumber} onChange={(e) => setNewPatient({ ...newPatient, phoneNumber: e.target.value })} required />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center">
+                <TrendingUp className="h-8 w-8 text-green-600" />
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-[#676767]">Avg Compliance</p>
+                  <p className="text-2xl font-bold text-green-600">
+                    {analytics?.avgCompliance || 0}%
+                  </p>
                 </div>
-                <DialogFooter>
-                  <Button type="submit" disabled={createPatientMutation.isPending}>
-                    {createPatientMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                    Create Patient
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center">
+                <AlertCircle className="h-8 w-8 text-red-600" />
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-[#676767]">High Risk</p>
+                  <p className="text-2xl font-bold text-red-600">
+                    {patients.filter((p: Patient) => p.riskLevel === 'high').length}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Main Content Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="grid w-full grid-cols-3 mb-6">
+            <TabsTrigger value="patients">Patient Management</TabsTrigger>
+            <TabsTrigger value="cpds">Care Plan Directives</TabsTrigger>
+            <TabsTrigger value="reports">Progress Reports</TabsTrigger>
+          </TabsList>
+
+          {/* Patients Tab */}
+          <TabsContent value="patients">
+            <Card>
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <CardTitle>Patient Overview</CardTitle>
+                    <CardDescription>Monitor patient progress and compliance</CardDescription>
+                  </div>
+                  <Button className="bg-[#2E8BC0] hover:bg-[#2E8BC0]/90">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Patient
                   </Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
-          <Button onClick={logout} variant="outline">
-            <LogOut className="h-4 w-4 mr-2" />
-            Logout
-          </Button>
-        </div>
-      </header>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {loadingPatients ? (
+                    <div className="text-center py-8">Loading patients...</div>
+                  ) : patients.length > 0 ? (
+                    patients.map((patient: Patient) => (
+                      <div key={patient.id} className="flex items-center justify-between p-4 border rounded-lg">
+                        <div className="flex items-center space-x-4">
+                          <div>
+                            <h3 className="font-medium">{patient.name}</h3>
+                            <p className="text-sm text-[#676767]">{patient.email}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-4">
+                          <Badge className={getRiskColor(patient.riskLevel)}>
+                            {patient.riskLevel} risk
+                          </Badge>
+                          <div className="text-right">
+                            <p className="text-sm font-medium">{patient.complianceScore}% compliance</p>
+                            <p className="text-xs text-[#676767]">{patient.activeCPDs} active CPDs</p>
+                          </div>
+                          <Button variant="outline" size="sm">
+                            View Details
+                          </Button>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-8 text-[#676767]">
+                      No patients assigned yet
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-      {/* CPD Progress Card */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-        <Card className="lg:col-span-1 border-blue-200 bg-blue-50/50">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-blue-900">
-              <Award className="h-5 w-5" />
-              CPD Progress
-            </CardTitle>
-            <CardDescription>"Measuring Outcomes" Accreditation</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-sm">Hours Completed</span>
-                <span className="font-bold text-blue-600">2.5 / 5.0</span>
-              </div>
-              <div className="w-full bg-blue-200 rounded-full h-2">
-                <div className="bg-blue-600 h-2 rounded-full" style={{ width: '50%' }}></div>
-              </div>
-              <div className="text-xs text-muted-foreground">
-                <Clock className="h-3 w-3 inline mr-1" />
-                2.5 hours remaining for certification
-              </div>
-              <Link href="/doctor/mca">
-                <Button size="sm" className="w-full mt-2">
-                  Continue MCA Program
-                </Button>
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Quick Stats</CardTitle>
-            <CardDescription>Your KGC PWA impact overview</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-3 gap-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-green-600">{patients?.length || 0}</div>
-                <div className="text-sm text-muted-foreground">Active Patients</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-blue-600">85%</div>
-                <div className="text-sm text-muted-foreground">Avg Health Score</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-purple-600">92%</div>
-                <div className="text-sm text-muted-foreground">Compliance Rate</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+          {/* CPDs Tab */}
+          <TabsContent value="cpds">
+            <Card>
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <CardTitle>Care Plan Directives</CardTitle>
+                    <CardDescription>Create and manage patient care plans</CardDescription>
+                  </div>
+                  <Button className="bg-[#2E8BC0] hover:bg-[#2E8BC0]/90">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create CPD
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {loadingCPDs ? (
+                    <div className="text-center py-8">Loading CPDs...</div>
+                  ) : recentCPDs.length > 0 ? (
+                    recentCPDs.map((cpd: CPD) => (
+                      <div key={cpd.id} className="p-4 border rounded-lg">
+                        <div className="flex justify-between items-start mb-2">
+                          <div>
+                            <h3 className="font-medium">{cpd.patientName}</h3>
+                            <Badge variant="outline" className="mt-1">
+                              {cpd.category}
+                            </Badge>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm text-[#676767]">
+                              {new Date(cpd.createdAt).toLocaleDateString()}
+                            </p>
+                            <p className="text-sm font-medium">{cpd.compliance}% compliance</p>
+                          </div>
+                        </div>
+                        <p className="text-sm text-[#676767] italic">"{cpd.directive}"</p>
+                        <div className="flex justify-end mt-3 space-x-2">
+                          <Button variant="outline" size="sm">Edit</Button>
+                          <Button variant="outline" size="sm">View Progress</Button>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-8 text-[#676767]">
+                      No CPDs created yet
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Reports Tab */}
+          <TabsContent value="reports">
+            <Card>
+              <CardHeader>
+                <CardTitle>Patient Progress Reports</CardTitle>
+                <CardDescription>AI-generated insights and recommendations</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-8 text-[#676767]">
+                  Progress reports will be generated by Kiro's Supervisor Agent
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>My Patients</CardTitle>
-          <CardDescription>View and manage all of your assigned patients. Patient data contributes to your MCA outcomes analysis.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin" /></div> :
-           error ? <p className="text-destructive">Error loading patients.</p> :
-           <Table>
-             <TableHeader>
-               <TableRow>
-                 <TableHead>Name</TableHead>
-                 <TableHead>Email</TableHead>
-                 <TableHead>Status</TableHead>
-                 <TableHead>Joined On</TableHead>
-                 <TableHead>Alerts</TableHead>
-                 <TableHead className="text-right">Actions</TableHead>
-               </TableRow>
-             </TableHeader>
-             <TableBody>
-               {patients?.map((p) => (
-                 <TableRow key={p.id}>
-                   <TableCell className="font-medium">{p.name}</TableCell>
-                   <TableCell>{p.email}</TableCell>
-                   <TableCell>
-                     <Badge variant={p.isActive ? 'default' : 'secondary'} className={p.isActive ? 'bg-green-600' : ''}>
-                       {p.isActive ? 'Active' : 'Inactive'}
-                     </Badge>
-                   </TableCell>
-                   <TableCell>{new Date(p.createdAt).toLocaleDateString()}</TableCell>
-                   <TableCell>{getAlertIcon(p.alertStatus)}</TableCell>
-                   <TableCell className="text-right">
-                     <div className="flex gap-2">
-                       <Link href={`/doctor/patient/${p.id}`}>
-                         <Button variant="ghost" size="sm">
-                           <LinkIcon className="h-4 w-4 mr-2" />
-                           View Profile
-                         </Button>
-                       </Link>
-                       <Button variant="outline" size="sm" title="Add to MCA Analysis">
-                         <Award className="h-4 w-4" />
-                       </Button>
-                     </div>
-                   </TableCell>
-                 </TableRow>
-               ))}
-             </TableBody>
-           </Table>
-          }
-        </CardContent>
-      </Card>
-    </div>
+    </Layout>
   );
-};
-
-export default DoctorDashboard;
+}

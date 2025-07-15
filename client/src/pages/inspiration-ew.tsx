@@ -11,6 +11,8 @@ import { Search, ExternalLink, ThumbsUp, Activity, Brain, Loader2, AlertCircle }
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import axios from "axios";
+import Layout from "@/components/layout/Layout";
+import { useAuth } from "@/hooks/useAuth";
 
 // Interface for video result from API
 interface VideoResult {
@@ -77,14 +79,9 @@ const InspirationEW: React.FC = () => {
   const { toast } = useToast();
   const isMobile = useIsMobile();
 
-  // Default user ID (should be replaced with actual user ID from context/auth)
   // Get current authenticated user
-  const { data: currentUser } = useQuery({
-    queryKey: ['/api/user/current-context'],
-    retry: false
-  });
-
-  const userId = currentUser?.id;
+  const { user } = useAuth();
+  const userId = user?.id;
 
   // Setup mutation for searching videos
   const videoSearchMutation = useMutation<VideoSearchResponse, Error, any>({
@@ -116,11 +113,12 @@ const InspirationEW: React.FC = () => {
   const handleSearch = () => {
     // Build search parameters based on current selections
     const searchParams = {
-      userId: 1, // Use default user ID
+      userId: userId || 1, // Use authenticated user ID
       category: activeTab,
       intensity: activeTab === "exercise" ? intensity : undefined,
       duration: duration || wellnessType,
-      tags: selectedTags
+      tags: selectedTags,
+      cpdContext: carePlanDirective // Include CPD for AI curation
     };
 
     // Execute the search
@@ -201,27 +199,39 @@ const InspirationEW: React.FC = () => {
   }, [userId, toast]);
 
   return (
-    <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-6">Inspiration Machine E&W</h1>
+    <Layout>
+      <div className="container mx-auto p-4 max-w-7xl">
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold tracking-tight text-[#2E8BC0] mb-2">Inspiration Machine E&W</h1>
+          <p className="text-[#676767]">Exercise & Wellness videos aligned with your doctor's physical activity recommendations</p>
+        </div>
 
-      {/* Doctor's CPD for Exercise & Wellness */}
-      {loadingCPD ? (
-        <Card className="mb-6">
-          <CardContent className="p-4">
-            <div className="flex items-center">
-              <Loader2 className="h-5 w-5 animate-spin text-primary mr-2" />
-              <p>Loading doctor's recommendations...</p>
-            </div>
+        {/* Doctor's CPD for Exercise & Wellness */}
+        <Card className="mb-6 border-[#2E8BC0]/30 bg-[#2E8BC0]/5">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-xl flex items-center gap-3 text-[#2E8BC0]">
+              <Activity className="h-6 w-6" />
+              Doctor's Exercise & Wellness Directive
+            </CardTitle>
+            <CardDescription>
+              Your doctor's specific physical activity and wellness recommendations
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loadingCPD ? (
+              <div className="flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Loading doctor's recommendations...</span>
+              </div>
+            ) : (
+              <div className="bg-white p-4 rounded-lg border border-[#2E8BC0]/20">
+                <p className="text-[#676767] italic text-base leading-relaxed">
+                  "{carePlanDirective}"
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
-      ) : (
-        <Card className="mb-6 border-l-4 border-l-primary">
-          <CardContent className="p-4">
-            <p className="text-sm font-medium text-muted-foreground mb-1">Doctor's recommendations:</p>
-            <p className="whitespace-pre-line">{carePlanDirective}</p>
-          </CardContent>
-        </Card>
-      )}
 
       <Card className="mb-6">
         <CardHeader>
@@ -511,8 +521,9 @@ const InspirationEW: React.FC = () => {
             ))}
           </>
         )}
+        </div>
       </div>
-    </div>
+    </Layout>
   );
 };
 
