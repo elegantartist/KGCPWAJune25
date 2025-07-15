@@ -18,7 +18,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import axios from 'axios';
 import { useSimpleToast } from '@/hooks/simple-toast';
 import { ConnectivityLevel } from '@/../../shared/types';
-import { useProgressMilestones } from '@/hooks/useProgressMilestones';
+import { useBadges } from '@/hooks/useBadges';
 import { useConnectivity } from '@/hooks/useConnectivity';
 import { speakText, stopSpeaking } from '@/lib/speechUtils';
 // We'll implement a simplified connectivity check directly rather than removing it entirely
@@ -112,10 +112,11 @@ export function EnhancedSupervisorAgent({
 
   // Initialize progress milestone hook
   const {
-    createOrUpdateMilestone,
-    milestoneExists,
-    milestones: userMilestones
-  } = useProgressMilestones(userId);
+    badges,
+    badgeProgress,
+    isLoading: isLoadingBadges,
+    error: badgesError,
+  } = useBadges(userId);
 
   // State for storing patient name
   const [patientName, setPatientName] = useState<string>('');
@@ -233,28 +234,6 @@ export function EnhancedSupervisorAgent({
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
-    // Initialize engagement milestone if it doesn't exist
-    const initializeEngagementMilestone = async () => {
-      try {
-        if (!milestoneExists("Chatbot Assistant Use", "Engagement")) {
-          await createOrUpdateMilestone(
-            "Chatbot Assistant Use",
-            "Interact with your Keep Going Care Personal Health Assistant regularly for personalised guidance",
-            "Engagement",
-            10, // Start with 10% progress for first interaction
-            false,
-            "Award" // Icon type
-          );
-          console.log("Created initial chatbot engagement milestone");
-        } else {
-          console.log("Chatbot engagement milestone already exists");
-        }
-      } catch (error) {
-        console.error("Error initializing engagement milestone:", error);
-      }
-    };
-
-    initializeEngagementMilestone();
 
     // Check if we have health metrics data and need to analyze it
     const hasHealthMetrics = healthMetrics &&
@@ -608,57 +587,6 @@ export function EnhancedSupervisorAgent({
         speakTextWithStatus(primaryResponse);
       }
 
-      // Update engagement milestone progress
-      const updateEngagementMilestone = async () => {
-        try {
-          // Get conversation count from message history (only count user messages)
-          const userMessageCount = messages.filter(msg => msg.role === 'user').length + 1; // +1 for current message
-
-          // Calculate progress based on conversation count (max at 20 conversations = 100%)
-          const progress = Math.min(Math.floor((userMessageCount / 20) * 100), 100);
-          const completed = progress >= 100;
-
-          // Update the milestone
-          await createOrUpdateMilestone(
-            "Chatbot Assistant Use",
-            "Interact with your Keep Going Care Personal Health Assistant regularly for personalised guidance",
-            "Engagement",
-            progress,
-            completed,
-            "Award"
-          );
-
-          console.log(`Updated chatbot engagement milestone: ${progress}%`);
-
-          // Check for health-related themes in the conversation to create or update a health milestone
-          const healthTerms = ["diet", "exercise", "medication", "health", "wellness", "nutrition"];
-          const conversationText = userMessage.content.toLowerCase() + ' ' + primaryResponse.toLowerCase();
-
-          if (healthTerms.some(term => conversationText.includes(term))) {
-            // If health-related conversation, create/update a health milestone
-            const healthMilestoneTitle = "Health Discussion Engagement";
-            const healthScore = Math.min(userMessageCount * 5, 100); // 20 health discussions = 100%
-
-            await createOrUpdateMilestone(
-              healthMilestoneTitle,
-              "Regularly discuss and learn about health topics with your Personal Health Assistant",
-              "Health",
-              healthScore,
-              healthScore >= 100,
-              "Star"
-            );
-
-            console.log(`Updated health discussion milestone: ${healthScore}%`);
-          }
-        } catch (error) {
-          console.error("Error updating milestones:", error);
-        }
-      };
-
-      // Only update milestones if we're not offline
-      if (!isOffline) {
-        updateEngagementMilestone();
-      }
 
       // Log memories for debugging - with safe access checks
       if (memories && memories.retrieved && memories.created) {

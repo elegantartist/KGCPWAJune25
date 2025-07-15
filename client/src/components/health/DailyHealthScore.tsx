@@ -11,6 +11,9 @@ import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { ModelContextProtocol } from "@/components/chatbot/ModelContextProtocol";
 import ScoreDiscussionDialog from "@/components/health/ScoreDiscussionDialog";
+import { useBadges } from "@/hooks/useBadges";
+import { AwardCeremony } from "@/components/features/AwardCeremony";
+import { BadgeDetails } from "@/components/achievement-badge";
 
 interface DailyHealthScoreProps {
   metric: HealthMetric;
@@ -30,6 +33,9 @@ const DailyHealthScore: React.FC<DailyHealthScoreProps> = ({ metric }) => {
   const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
   // State for discussion dialog
   const [showDiscussionDialog, setShowDiscussionDialog] = useState<boolean>(false);
+  const [showAwardCeremony, setShowAwardCeremony] = useState<boolean>(false);
+  const [newlyAwardedBadge, setNewlyAwardedBadge] = useState<BadgeDetails | null>(null);
+  const { checkBadges } = useBadges(metric.userId);
   
   // Check if user has already submitted today (based on local storage)
   useEffect(() => {
@@ -88,10 +94,17 @@ const DailyHealthScore: React.FC<DailyHealthScoreProps> = ({ metric }) => {
       // Mark this feature usage in MCP
       ModelContextProtocol.getInstance(metric.userId).recordFeatureUsage('health-metrics');
       
-      // Show the discussion dialog after a short delay
-      setTimeout(() => {
-        setShowDiscussionDialog(true);
-      }, 1000);
+      // Check for new badges
+      const newBadge = await checkBadges();
+      if (newBadge) {
+        setNewlyAwardedBadge(newBadge);
+        setShowAwardCeremony(true);
+      } else {
+        // Show the discussion dialog after a short delay
+        setTimeout(() => {
+          setShowDiscussionDialog(true);
+        }, 1000);
+      }
     } catch (error) {
       toast({
         title: "Error submitting scores",
@@ -108,6 +121,13 @@ const DailyHealthScore: React.FC<DailyHealthScoreProps> = ({ metric }) => {
     setShowDiscussionDialog(false);
   };
   
+  const handleAwardCeremonyComplete = () => {
+    setShowAwardCeremony(false);
+    setNewlyAwardedBadge(null);
+    // Optionally, navigate to the milestones page
+    setLocation('/progress-milestones');
+  };
+
   // Function to handle declining discussion
   const handleDeclineDiscussion = () => {
     setShowDiscussionDialog(false);
@@ -275,6 +295,13 @@ const DailyHealthScore: React.FC<DailyHealthScoreProps> = ({ metric }) => {
         medicationScore={medicationScore}
         userId={metric.userId}
       />
+
+      {showAwardCeremony && newlyAwardedBadge && (
+        <AwardCeremony
+          badge={newlyAwardedBadge}
+          onComplete={handleAwardCeremonyComplete}
+        />
+      )}
     </>
   );
 };
