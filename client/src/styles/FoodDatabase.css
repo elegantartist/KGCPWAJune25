@@ -1,0 +1,24 @@
+/* KGC Food Database Colors */
+:root {
+  --primary: #3b82f6;              /* Blue primary */
+  --primary-hover: #2563eb;        /* Darker blue hover */
+  --success: #10b981;              /* Green for recipes button */
+  --success-hover: #059669;        /* Dark green hover */
+  --warning: #f59e0b;              /* Yellow for warnings */
+  --destructive: #ef4444;          /* Red for offline alerts */
+  --muted: #f8fafc;               /* Light background */
+  --muted-foreground: #6b7280;    /* Muted text */
+  --blue-50: #eff6ff;             /* Light blue backgrounds */
+  --blue-100: #dbeafe;            /* Blue badge backgrounds */
+  --blue-600: #2563eb;            /* Blue text/icons */
+  --blue-700: #1d4ed8;            /* Darker blue text */
+  --blue-800: #1e40af;            /* Dark blue text */
+}
+
+/* Typography Scale */
+.page-title { font-size: 1.5rem; font-weight: 700; }     /* h1: 24px bold */
+.section-title { font-size: 1.25rem; font-weight: 600; } /* h2: 20px semibold */
+.card-title { font-size: 1.125rem; font-weight: 600; }   /* h3: 18px semibold */
+.card-subtitle { font-size: 1rem; font-weight: 500; }    /* 16px medium */
+.body-text { font-size: 0.875rem; line-height: 1.25rem; } /* 14px regular */
+.small-text { font-size: 0.75rem; line-height: 1rem; }   /* 12px small */

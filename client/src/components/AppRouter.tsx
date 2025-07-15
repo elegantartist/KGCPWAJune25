@@ -23,6 +23,7 @@ const EWSupport = React.lazy(() => import('@/pages/ew-support'));
 const MBPWiz = React.lazy(() => import('@/pages/mbp-wiz'));
 const Motivation = React.lazy(() => import('@/pages/motivation'));
 const HealthSnapshots = React.lazy(() => import('@/pages/health-snapshots'));
+const FoodDatabasePage = React.lazy(() => import('@/pages/FoodDatabasePage'));
 
 const LoadingSpinner = () => (
   <div className="flex items-center justify-center h-screen">
@@ -88,6 +89,7 @@ export function AppRouter() {
         <Route path="/mbp-wiz" component={MBPWiz} />
         <Route path="/motivation" component={Motivation} />
         <Route path="/health-snapshots" component={HealthSnapshots} />
+        <Route path="/food-database" component={FoodDatabasePage} />
 
         {/* Fallback 404 route */}
         <Route component={NotFound} />
