@@ -12,7 +12,6 @@ import {
   AuthenticatedRequest,
   userCreationService,
   AIContextService,
-  supervisorAgent,
   searchExerciseWellnessVideos,
   searchCookingVideos,
   getMealInspiration,
@@ -26,6 +25,7 @@ import {
   emergencyPiiScan,
   secureLog
 } from './mock-services';
+import { supervisorAgent } from './services/supervisorAgent';
 
 // Initialize Stripe
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -495,6 +495,289 @@ export async function registerRoutes(app: Express) {
         console.log(`Admin ${req.user!.userId} is impersonating doctor ${doctorIdToImpersonate}`);
         // In a real app, you'd set this in the admin's session.
         res.status(200).json({ message: 'Impersonation context set.' });
+    });
+
+    // ========================================
+    // ADMIN ENDPOINTS FOR Q'S ADMIN DASHBOARD
+    // ========================================
+
+    // Get all users (active) - combines doctors and patients
+    router.get('/admin/users', authMiddleware(['admin']), async (req, res) => {
+        try {
+            const users = await db.select({
+                id: schema.users.id,
+                firstName: schema.users.firstName,
+                lastName: schema.users.lastName,
+                email: schema.users.email,
+                phone: schema.users.phoneNumber,
+                role: schema.users.role,
+                status: sql`CASE WHEN ${schema.users.isActive} = true THEN 'active' ELSE 'inactive' END`.as('status'),
+                createdAt: schema.users.createdAt,
+                lastActive: schema.users.lastLogin
+            })
+            .from(schema.users)
+            .where(and(
+                sql`${schema.users.role} IN ('doctor', 'patient')`,
+                eq(schema.users.isActive, true)
+            ));
+
+            res.json(users);
+        } catch (error) {
+            console.error('Error fetching users:', error);
+            res.status(500).json({ message: 'Failed to fetch users' });
+        }
+    });
+
+    // Get deleted users
+    router.get('/admin/users/deleted', authMiddleware(['admin']), async (req, res) => {
+        try {
+            const deletedUsers = await db.select({
+                id: schema.users.id,
+                firstName: schema.users.firstName,
+                lastName: schema.users.lastName,
+                email: schema.users.email,
+                phone: schema.users.phoneNumber,
+                role: schema.users.role,
+                status: sql`'deleted'`.as('status'),
+                createdAt: schema.users.createdAt,
+                deletedAt: schema.users.updatedAt // Using updatedAt as proxy for deletion time
+            })
+            .from(schema.users)
+            .where(and(
+                sql`${schema.users.role} IN ('doctor', 'patient')`,
+                eq(schema.users.isActive, false)
+            ));
+
+            res.json(deletedUsers);
+        } catch (error) {
+            console.error('Error fetching deleted users:', error);
+            res.status(500).json({ message: 'Failed to fetch deleted users' });
+        }
+    });
+
+    // Create doctor (enhanced version for admin dashboard)
+    router.post('/admin/create-doctor', authMiddleware(['admin']), async (req, res) => {
+        try {
+            const { firstName, lastName, email, phone } = req.body;
+
+            if (!firstName || !lastName || !email || !phone) {
+                return res.status(400).json({ message: 'All fields are required' });
+            }
+
+            // Check if user already exists
+            const existingUser = await db.query.users.findFirst({
+                where: eq(schema.users.email, email)
+            });
+
+            if (existingUser) {
+                return res.status(409).json({ message: 'User with this email already exists' });
+            }
+
+            // Create user
+            const newUser = await db.insert(schema.users).values({
+                firstName,
+                lastName,
+                email,
+                phoneNumber: phone,
+                role: 'doctor',
+                isActive: true,
+                createdAt: new Date(),
+                lastLogin: null
+            }).returning();
+
+            // Create doctor record
+            await db.insert(schema.doctors).values({
+                userId: newUser[0].id,
+                specialization: 'General Practice', // Default
+                licenseNumber: `DOC${Date.now()}`, // Generate temp license number
+                isActive: true,
+                createdAt: new Date()
+            });
+
+            // TODO: Send welcome email here
+            console.log(`Welcome email would be sent to ${email}`);
+
+            res.status(201).json({
+                message: 'Doctor created successfully',
+                user: {
+                    id: newUser[0].id,
+                    firstName: newUser[0].firstName,
+                    lastName: newUser[0].lastName,
+                    email: newUser[0].email,
+                    role: newUser[0].role
+                }
+            });
+
+        } catch (error) {
+            console.error('Error creating doctor:', error);
+            res.status(500).json({ message: 'Failed to create doctor' });
+        }
+    });
+
+    // Create patient (enhanced version for admin dashboard)
+    router.post('/admin/create-patient', authMiddleware(['admin']), async (req, res) => {
+        try {
+            const { firstName, lastName, email, phone, assignedDoctorId } = req.body;
+
+            if (!firstName || !lastName || !email || !phone) {
+                return res.status(400).json({ message: 'All fields are required' });
+            }
+
+            // Check if user already exists
+            const existingUser = await db.query.users.findFirst({
+                where: eq(schema.users.email, email)
+            });
+
+            if (existingUser) {
+                return res.status(409).json({ message: 'User with this email already exists' });
+            }
+
+            // Verify doctor exists if assigned
+            if (assignedDoctorId) {
+                const doctor = await db.query.doctors.findFirst({
+                    where: eq(schema.doctors.userId, parseInt(assignedDoctorId))
+                });
+
+                if (!doctor) {
+                    return res.status(400).json({ message: 'Assigned doctor not found' });
+                }
+            }
+
+            // Create user
+            const newUser = await db.insert(schema.users).values({
+                firstName,
+                lastName,
+                email,
+                phoneNumber: phone,
+                role: 'patient',
+                isActive: true,
+                createdAt: new Date(),
+                lastLogin: null
+            }).returning();
+
+            // Create patient record
+            await db.insert(schema.patients).values({
+                userId: newUser[0].id,
+                doctorId: assignedDoctorId ? parseInt(assignedDoctorId) : null,
+                isActive: true,
+                createdAt: new Date()
+            });
+
+            // TODO: Send welcome email here
+            console.log(`Welcome email would be sent to ${email}`);
+
+            res.status(201).json({
+                message: 'Patient created successfully',
+                user: {
+                    id: newUser[0].id,
+                    firstName: newUser[0].firstName,
+                    lastName: newUser[0].lastName,
+                    email: newUser[0].email,
+                    role: newUser[0].role
+                }
+            });
+
+        } catch (error) {
+            console.error('Error creating patient:', error);
+            res.status(500).json({ message: 'Failed to create patient' });
+        }
+    });
+
+    // Delete user (soft delete)
+    router.delete('/admin/delete-user/:userId', authMiddleware(['admin']), async (req, res) => {
+        try {
+            const userId = parseInt(req.params.userId);
+            const { userType } = req.body;
+
+            if (!userId) {
+                return res.status(400).json({ message: 'User ID is required' });
+            }
+
+            // Check if user exists
+            const user = await db.query.users.findFirst({
+                where: eq(schema.users.id, userId)
+            });
+
+            if (!user) {
+                return res.status(404).json({ message: 'User not found' });
+            }
+
+            // Soft delete by setting isActive to false
+            await db.update(schema.users)
+                .set({ 
+                    isActive: false, 
+                    updatedAt: new Date() 
+                })
+                .where(eq(schema.users.id, userId));
+
+            // Also deactivate doctor/patient record
+            if (user.role === 'doctor') {
+                await db.update(schema.doctors)
+                    .set({ isActive: false })
+                    .where(eq(schema.doctors.userId, userId));
+            } else if (user.role === 'patient') {
+                await db.update(schema.patients)
+                    .set({ isActive: false })
+                    .where(eq(schema.patients.userId, userId));
+            }
+
+            res.json({
+                message: `${userType || user.role} deleted successfully`,
+                userId: userId
+            });
+
+        } catch (error) {
+            console.error('Error deleting user:', error);
+            res.status(500).json({ message: 'Failed to delete user' });
+        }
+    });
+
+    // Restore user
+    router.post('/admin/restore-user/:userId', authMiddleware(['admin']), async (req, res) => {
+        try {
+            const userId = parseInt(req.params.userId);
+
+            if (!userId) {
+                return res.status(400).json({ message: 'User ID is required' });
+            }
+
+            // Check if user exists
+            const user = await db.query.users.findFirst({
+                where: eq(schema.users.id, userId)
+            });
+
+            if (!user) {
+                return res.status(404).json({ message: 'User not found' });
+            }
+
+            // Restore by setting isActive to true
+            await db.update(schema.users)
+                .set({ 
+                    isActive: true, 
+                    updatedAt: new Date() 
+                })
+                .where(eq(schema.users.id, userId));
+
+            // Also reactivate doctor/patient record
+            if (user.role === 'doctor') {
+                await db.update(schema.doctors)
+                    .set({ isActive: true })
+                    .where(eq(schema.doctors.userId, userId));
+            } else if (user.role === 'patient') {
+                await db.update(schema.patients)
+                    .set({ isActive: true })
+                    .where(eq(schema.patients.userId, userId));
+            }
+
+            res.json({
+                message: `${user.role} restored successfully`,
+                userId: userId
+            });
+
+        } catch (error) {
+            console.error('Error restoring user:', error);
+            res.status(500).json({ message: 'Failed to restore user' });
+        }
     });
 
     router.delete('/admin/users/:userId', authMiddleware(['admin']), async (req, res) => {
@@ -971,8 +1254,7 @@ export async function registerRoutes(app: Express) {
 
     // --- SUPERVISOR AGENT ENDPOINTS (Phase 2) ---
     
-    // NEW: Simple chat endpoint for refactor. This will be the primary endpoint
-    // for the main chat interface once the client is updated.
+    // ENHANCED CHAT ENDPOINT - Connected to SupervisorAgent Service
     router.post('/chat', authMiddleware(['patient', 'doctor', 'admin']), async (req: AuthenticatedRequest, res) => {
         try {
             const { message, sessionId } = req.body;
@@ -981,24 +1263,37 @@ export async function registerRoutes(app: Express) {
                 return res.status(400).json({ message: 'A string "message" is required in the request body.' });
             }
 
-            // Use the authenticated user's ID from the token.
             const userId = req.user!.userId;
 
-            const response = await supervisorAgent.runSupervisorQuery({
-                message: { text: message, sentAt: new Date().toISOString() },
-                userId: userId,
-                sessionId: sessionId, 
+            // Build context for SupervisorAgent
+            const context = await buildSupervisorContext(userId);
+
+            // Generate response using our new SupervisorAgent service
+            const supervisorResponse = await supervisorAgent.generateResponse(context, message);
+
+            // Log the interaction for PPR generation
+            await logChatInteraction(userId, message, supervisorResponse.message);
+
+            // Return response in format expected by Enhanced Chatbot
+            res.json({ 
+                response: supervisorResponse.message,
+                interventionType: supervisorResponse.interventionType,
+                urgency: supervisorResponse.urgency,
+                cpdAlignment: supervisorResponse.cpdAlignment,
+                followUpRequired: supervisorResponse.followUpRequired
             });
 
-            // The client expects a simple object with a 'response' property.
-            res.json({ response: response.response });
-
         } catch (error: any) {
-            console.error('[/api/chat] Error:', error);
-            secureLog('error', '/api/chat endpoint error', { error: error.message });
-            res.status(500).json({ 
-                message: 'The chat agent is currently unavailable.',
-                error: process.env.NODE_ENV === 'development' ? error.message : undefined
+            console.error('[/api/chat] SupervisorAgent Error:', error);
+            secureLog('error', '/api/chat endpoint error', { error: error.message, userId: req.user!.userId });
+            
+            // Fallback response for errors
+            res.status(200).json({ 
+                response: "I'm here to support your health journey. How can I help you today?",
+                interventionType: 'chat',
+                urgency: 'low',
+                cpdAlignment: [],
+                followUpRequired: false
             });
         }
     });
@@ -1883,6 +2178,185 @@ export async function registerRoutes(app: Express) {
     });
 
     app.use('/api', router);
+}
+
+// ========================================
+// HELPER FUNCTIONS FOR SUPERVISOR AGENT
+// ========================================
+
+/**
+ * Build context for SupervisorAgent from user data
+ */
+async function buildSupervisorContext(userId: number): Promise<any> {
+    try {
+        // Get user data
+        const user = await db.query.users.findFirst({
+            where: eq(schema.users.id, userId)
+        });
+
+        if (!user) {
+            throw new Error('User not found');
+        }
+
+        // Get patient data if user is a patient
+        let patientData = null;
+        let cpdDirectives: any[] = [];
+        
+        if (user.role === 'patient') {
+            const patient = await db.query.patients.findFirst({
+                where: eq(schema.patients.userId, userId)
+            });
+
+            if (patient) {
+                // Get CPDs for this patient
+                cpdDirectives = await db.select()
+                    .from(schema.carePlanDirectives)
+                    .where(eq(schema.carePlanDirectives.patientId, patient.id));
+            }
+
+            patientData = {
+                name: `${user.firstName} ${user.lastName}`,
+                age: 45, // Default age - would be calculated from DOB in real system
+                conditions: ['metabolic syndrome'], // Default condition
+                preferences: {},
+                progressData: {
+                    milestonesCompleted: 0,
+                    badgesEarned: 0,
+                    streakDays: 0,
+                    totalInteractions: 0
+                }
+            };
+        }
+
+        // Get recent health metrics
+        const healthMetrics = await getHealthMetrics(userId);
+
+        // Get recent interactions (mock for now)
+        const recentInteractions: any[] = [];
+
+        return {
+            userId,
+            patientData: patientData || {
+                name: `${user.firstName} ${user.lastName}`,
+                age: 45,
+                conditions: [],
+                preferences: {},
+                progressData: {
+                    milestonesCompleted: 0,
+                    badgesEarned: 0,
+                    streakDays: 0,
+                    totalInteractions: 0
+                }
+            },
+            cpdDirectives: cpdDirectives.map(cpd => ({
+                id: cpd.id,
+                category: cpd.category as 'diet' | 'exercise' | 'medication' | 'wellness',
+                directive: cpd.directive,
+                priority: 'medium' as const,
+                createdAt: cpd.createdAt,
+                doctorId: cpd.doctorId || 0
+            })),
+            recentInteractions,
+            healthMetrics
+        };
+
+    } catch (error) {
+        console.error('Error building supervisor context:', error);
+        
+        // Return minimal context on error
+        return {
+            userId,
+            patientData: {
+                name: 'Patient',
+                age: 45,
+                conditions: [],
+                preferences: {},
+                progressData: {
+                    milestonesCompleted: 0,
+                    badgesEarned: 0,
+                    streakDays: 0,
+                    totalInteractions: 0
+                }
+            },
+            cpdDirectives: [],
+            recentInteractions: [],
+            healthMetrics: {
+                dailyScores: [],
+                badges: [],
+                milestones: [],
+                trends: []
+            }
+        };
+    }
+}
+
+/**
+ * Get health metrics for a user
+ */
+async function getHealthMetrics(userId: number): Promise<any> {
+    try {
+        // Get patient record
+        const patient = await db.query.patients.findFirst({
+            where: eq(schema.patients.userId, userId)
+        });
+
+        if (!patient) {
+            return {
+                dailyScores: [],
+                badges: [],
+                milestones: [],
+                trends: []
+            };
+        }
+
+        // Get recent health metrics
+        const healthMetrics = await db.select()
+            .from(schema.healthMetrics)
+            .where(eq(schema.healthMetrics.patientId, patient.id))
+            .orderBy(desc(schema.healthMetrics.date))
+            .limit(30);
+
+        // Convert to daily scores format
+        const dailyScores = healthMetrics.map(metric => ({
+            date: metric.date.toISOString().split('T')[0],
+            diet: metric.dietScore,
+            exercise: metric.exerciseScore,
+            medication: metric.medicationScore,
+            average: Math.round((metric.dietScore + metric.exerciseScore + metric.medicationScore) / 3)
+        }));
+
+        return {
+            dailyScores,
+            badges: [], // TODO: Implement badge system
+            milestones: [], // TODO: Implement milestone system
+            trends: [] // TODO: Implement trend analysis
+        };
+
+    } catch (error) {
+        console.error('Error getting health metrics:', error);
+        return {
+            dailyScores: [],
+            badges: [],
+            milestones: [],
+            trends: []
+        };
+    }
+}
+
+/**
+ * Log chat interaction for PPR generation
+ */
+async function logChatInteraction(userId: number, userMessage: string, agentResponse: string): Promise<void> {
+    try {
+        // TODO: Implement chat logging to database
+        console.log(`Chat interaction logged for user ${userId}:`, {
+            userMessage: userMessage.substring(0, 100),
+            agentResponse: agentResponse.substring(0, 100),
+            timestamp: new Date()
+        });
+    } catch (error) {
+        console.error('Error logging chat interaction:', error);
+    }
 }
 
 // Helper functions for analytics dashboard
