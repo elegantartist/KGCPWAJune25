@@ -188,7 +188,7 @@ const ProgressMilestones: React.FC = () => {
           onComplete={handleAwardCeremonyComplete}
         />
       )}
-    </>
+    </Layout>
   );
 };
 
