@@ -1792,7 +1792,7 @@ export async function registerRoutes(app: Express) {
 
     router.post('/stripe/create-credit-purchase-session', authMiddleware(['patient']), async (req: AuthenticatedRequest, res) => {
         const userId = req.user!.userId;
-        const { priceId, credits_to_add } = req.body;
+        const { priceId, credits_to_add } = req.body as any;
 
         if (!priceId || !credits_to_add) {
             return res.status(400).json({ message: 'Stripe Price ID and credit amount are required.' });
