@@ -8,8 +8,6 @@ import * as schema from '../shared/schema';
 import { eq, sql, and, desc } from 'drizzle-orm';
 import { 
   createAccessToken, 
-  authMiddleware, 
-  AuthenticatedRequest,
   userCreationService,
   AIContextService,
   supervisorAgent,
@@ -26,6 +24,7 @@ import {
   emergencyPiiScan,
   secureLog
 } from './mock-services';
+import { authMiddleware, AuthenticatedRequest } from './middleware/auth';
 
 // Initialize Stripe
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -266,19 +265,74 @@ export async function registerRoutes(app: Express) {
         }
     });
 
-    // Placeholder for creating a doctor (from admin dashboard)
     router.post('/admin/doctors', authMiddleware(['admin']), async (req, res) => {
-        // This is a simplified version of the /admin/create-doctor endpoint
-        // In a real app, you would consolidate this logic.
-        // For now, just return a success message to satisfy the frontend mutation.
-        console.log('Admin creating doctor with data:', req.body);
-        res.status(201).json({ message: 'Doctor creation initiated. A setup link has been sent.' });
+        try {
+            const { name, email, phoneNumber } = req.body;
+
+            if (!name || !email || !phoneNumber) {
+                return res.status(400).json({ message: 'Name, email, and phone number are required.' });
+            }
+
+            // Check if email already exists
+            if (await userCreationService.emailExists(email)) {
+                return res.status(409).json({ message: 'Email already exists.' });
+            }
+
+            const result = await userCreationService.createDoctor({
+                name,
+                email,
+                phoneNumber,
+                role: 'doctor',
+                password: 'temp-password'
+            });
+
+            res.json({
+                message: 'Doctor created successfully',
+                doctor: result.doctor,
+                uin: result.uin
+            });
+        } catch (error) {
+            console.error('Doctor creation error:', error);
+            res.status(500).json({ message: 'Failed to create doctor account.' });
+        }
     });
 
-    // Placeholder for creating a patient (from admin dashboard)
     router.post('/admin/patients', authMiddleware(['admin']), async (req, res) => {
-        console.log('Admin creating patient with data:', req.body);
-        res.status(201).json({ message: 'Patient created successfully.' });
+        try {
+            const { name, email, phoneNumber, doctorId } = req.body;
+
+            if (!name || !email || !phoneNumber || !doctorId) {
+                return res.status(400).json({ message: 'Name, email, phone number, and doctorId are required.' });
+            }
+
+            // Check if email already exists
+            if (await userCreationService.emailExists(email)) {
+                return res.status(409).json({ message: 'Email already exists.' });
+            }
+
+            const result = await userCreationService.createPatient({
+                name,
+                email,
+                phoneNumber,
+                role: 'patient',
+                doctorId: doctorId,
+                password: 'temp-password'
+            });
+
+            // Set the new user's status to pending_payment
+            await db.update(schema.users)
+                .set({ status: 'pending_payment' })
+                .where(eq(schema.users.id, result.patient.userId));
+
+            res.json({
+                message: 'Patient created successfully',
+                patient: result.patient,
+                uin: result.uin
+            });
+        } catch (error) {
+            console.error('Patient creation error:', error);
+            res.status(500).json({ message: 'Failed to create patient account.' });
+        }
     });
 
     // --- SECURE DATA ENDPOINTS ---
@@ -298,12 +352,25 @@ export async function registerRoutes(app: Express) {
         res.json(user);
     });
 
-    // Add missing endpoint for motivational image
     router.get('/users/:userId/motivational-image', authMiddleware(), async (req, res) => {
-        // In a real implementation, you would fetch this from a database or S3
-        // For now, we return a placeholder or 404 if not found.
-        // This makes the frontend query work without errors.
-        res.status(404).json({ message: "No motivational image found for this user." });
+        try {
+            const { userId } = req.params;
+            const patient = await db.query.patients.findFirst({
+                where: eq(schema.patients.userId, parseInt(userId)),
+                columns: {
+                    motivationalImage: true
+                }
+            });
+
+            if (!patient || !patient.motivationalImage) {
+                return res.status(404).json({ message: "No motivational image found for this user." });
+            }
+
+            res.json({ imageUrl: patient.motivationalImage });
+        } catch (error) {
+            console.error('Error fetching motivational image:', error);
+            res.status(500).json({ message: 'Internal server error' });
+        }
     });
 
     // Add missing endpoint for clearing patient impersonation
@@ -320,27 +387,44 @@ export async function registerRoutes(app: Express) {
         res.status(200).json({ message: 'Impersonation context set.' });
     });
 
-    router.get('/users/:userId/health-metrics', authMiddleware(), (req, res) => {
-        res.json({ healthProgressData: [], weeklyScoreData: [], activityDistributionData: [] });
+    router.get('/users/:userId/health-metrics', authMiddleware(), async (req, res) => {
+        try {
+            const { userId } = req.params;
+            const patient = await db.query.patients.findFirst({
+                where: eq(schema.patients.userId, parseInt(userId)),
+            });
+
+            if (!patient) {
+                return res.status(404).json({ message: 'Patient not found' });
+            }
+
+            const healthMetrics = await db.query.healthMetrics.findMany({
+                where: eq(schema.healthMetrics.patientId, patient.id),
+                orderBy: desc(schema.healthMetrics.date),
+            });
+
+            res.json(healthMetrics);
+        } catch (error) {
+            console.error('Error fetching health metrics:', error);
+            res.status(500).json({ message: 'Internal server error' });
+        }
     });
 
     router.get('/patients/me/dashboard', authMiddleware(['patient']), async (req: AuthenticatedRequest, res) => {
         try {
-            console.log('Dashboard request for user:', req.user!.userId);
-            
-            // Simple response with user data for now
-            const patientData = {
-                id: 1,
-                userId: req.user!.userId,
-                user: {
-                    name: req.user!.name,
-                    email: "test.patient@example.com",
-                    createdAt: new Date()
+            const patient = await db.query.patients.findFirst({
+                where: eq(schema.patients.userId, req.user!.userId),
+                with: {
+                    user: true,
+                    carePlanDirectives: true,
                 },
-                carePlanDirectives: []
-            };
-            
-            res.json(patientData);
+            });
+
+            if (!patient) {
+                return res.status(404).json({ message: 'Patient not found' });
+            }
+
+            res.json(patient);
         } catch (error) {
             console.error('Dashboard error:', error);
             res.status(500).json({ message: "An error occurred." });
@@ -530,11 +614,31 @@ export async function registerRoutes(app: Express) {
     });
 
     // --- MISSING RECIPE/FAVORITES ENDPOINTS (PLACEHOLDERS) ---
-    router.get('/users/:userId/saved-recipes', authMiddleware(), (req, res) => {
-        res.json([]);
+    router.get('/users/:userId/saved-recipes', authMiddleware(), async (req, res) => {
+        try {
+            const { userId } = req.params;
+            const savedRecipes = await db.query.savedRecipes.findMany({
+                where: eq(schema.savedRecipes.userId, parseInt(userId)),
+            });
+            res.json(savedRecipes);
+        } catch (error) {
+            console.error('Error fetching saved recipes:', error);
+            res.status(500).json({ message: 'Internal server error' });
+        }
     });
-    router.post('/users/:userId/saved-recipes', authMiddleware(), (req, res) => {
-        res.status(201).json({ message: 'Recipe saved.' });
+    router.post('/users/:userId/saved-recipes', authMiddleware(), async (req, res) => {
+        try {
+            const { userId } = req.params;
+            const { recipe } = req.body;
+            const newSavedRecipe = await db.insert(schema.savedRecipes).values({
+                userId: parseInt(userId),
+                recipe: recipe,
+            }).returning();
+            res.status(201).json(newSavedRecipe[0]);
+        } catch (error) {
+            console.error('Error saving recipe:', error);
+            res.status(500).json({ message: 'Internal server error' });
+        }
     });
 
     // --- DOCTOR DASHBOARD ENDPOINTS ---
@@ -603,8 +707,19 @@ export async function registerRoutes(app: Express) {
 
     router.get('/doctor/alerts/count', authMiddleware(['doctor']), async (req: AuthenticatedRequest, res) => {
         try {
-            // For now, return a simple count - can be enhanced later
-            res.json({ count: 0 });
+            const doctor = await db.query.doctors.findFirst({
+                where: eq(schema.doctors.userId, req.user!.userId),
+            });
+
+            if (!doctor) {
+                return res.status(404).json({ message: 'Doctor not found' });
+            }
+
+            const alerts = await db.query.adminAlerts.findMany({
+                where: eq(schema.adminAlerts.patientId, doctor.id),
+            });
+
+            res.json({ count: alerts.length });
         } catch (error) {
             console.error('Error fetching doctor alerts:', error);
             res.status(500).json({ message: 'Internal server error' });
@@ -1692,29 +1807,144 @@ export async function registerRoutes(app: Express) {
     router.post('/doctor/setup/validate-token', (req, res) => {
         res.json({ doctor: { name: 'Test Doctor', phone: '******1234' } });
     });
-    router.post('/doctor/setup/send-verification', (req, res) => {
-        res.json({ message: 'Verification code sent.' });
+    router.post('/doctor/setup/send-verification', async (req, res) => {
+        try {
+            const { token } = req.body;
+            const doctor = await db.query.doctors.findFirst({
+                where: eq(schema.doctors.setupToken, token),
+                with: {
+                    user: true,
+                },
+            });
+
+            if (!doctor) {
+                return res.status(404).json({ message: 'Invalid token' });
+            }
+
+            // In a real app, you would send an SMS with a verification code.
+            // For now, we'll just log it to the console.
+            const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+            console.log(`Verification code for ${doctor.user.name}: ${verificationCode}`);
+
+            res.json({ message: 'Verification code sent.' });
+        } catch (error) {
+            console.error('Error sending verification:', error);
+            res.status(500).json({ message: 'Internal server error' });
+        }
     });
-    router.post('/doctor/setup/verify-phone', (req, res) => {
-        res.json({ message: 'Phone verified.' });
+    router.post('/doctor/setup/verify-phone', async (req, res) => {
+        try {
+            const { token, code } = req.body;
+            const doctor = await db.query.doctors.findFirst({
+                where: eq(schema.doctors.setupToken, token),
+            });
+
+            if (!doctor) {
+                return res.status(404).json({ message: 'Invalid token' });
+            }
+
+            // In a real app, you would have a proper verification code system.
+            // For now, we'll just accept any code.
+            console.log(`Verifying phone for doctor ${doctor.id} with code ${code}`);
+
+            res.json({ message: 'Phone verified.' });
+        } catch (error) {
+            console.error('Error verifying phone:', error);
+            res.status(500).json({ message: 'Internal server error' });
+        }
     });
-    router.post('/doctor/setup/complete', (req, res) => {
-        res.json({ message: 'Setup complete.' });
+    router.post('/doctor/setup/complete', async (req, res) => {
+        try {
+            const { token, password } = req.body;
+            const doctor = await db.query.doctors.findFirst({
+                where: eq(schema.doctors.setupToken, token),
+            });
+
+            if (!doctor) {
+                return res.status(404).json({ message: 'Invalid token' });
+            }
+
+            // In a real app, you would hash the password before saving it.
+            await db.update(schema.users)
+                .set({ passwordHash: password, isActive: true })
+                .where(eq(schema.users.id, doctor.userId));
+
+            // Invalidate the setup token
+            await db.update(schema.doctors)
+                .set({ setupToken: null })
+                .where(eq(schema.doctors.id, doctor.id));
+
+            res.json({ message: 'Setup complete.' });
+        } catch (error) {
+            console.error('Error completing setup:', error);
+            res.status(500).json({ message: 'Internal server error' });
+        }
     });
-    router.get('/search/fitness-facilities', (req, res) => {
-        res.json({ results: [], radiusExpanded: false });
+    router.get('/search/fitness-facilities', async (req, res) => {
+        try {
+            // This is a placeholder for a real search implementation.
+            // In a real app, you would use a service like Google Places API.
+            res.json({ results: [], radiusExpanded: false });
+        } catch (error) {
+            console.error('Error searching fitness facilities:', error);
+            res.status(500).json({ message: 'Internal server error' });
+        }
     });
-    router.get('/search/personal-trainers', (req, res) => {
-        res.json({ results: [], radiusExpanded: false });
+    router.get('/search/personal-trainers', async (req, res) => {
+        try {
+            // This is a placeholder for a real search implementation.
+            // In a real app, you would have a database of personal trainers.
+            res.json({ results: [], radiusExpanded: false });
+        } catch (error) {
+            console.error('Error searching personal trainers:', error);
+            res.status(500).json({ message: 'Internal server error' });
+        }
     });
-    router.get('/food-database/cpd-aligned', (req, res) => {
-        res.json({ foods: [], relevantTags: [], alignment: 'general' });
+    router.get('/food-database/cpd-aligned', async (req, res) => {
+        try {
+            // This is a placeholder for a real implementation.
+            // In a real app, you would have a more complex system for aligning food with care plan directives.
+            res.json({ foods: [], relevantTags: [], alignment: 'general' });
+        } catch (error) {
+            console.error('Error fetching cpd-aligned food:', error);
+            res.status(500).json({ message: 'Internal server error' });
+        }
     });
-    router.get('/food-database/favourites', (req, res) => {
-        res.json([]);
+    router.get('/food-database/favourites', authMiddleware(), async (req: AuthenticatedRequest, res) => {
+        try {
+            const favourites = await db.query.favouriteFoods.findMany({
+                where: eq(schema.favouriteFoods.userId, req.user!.userId),
+            });
+            res.json(favourites);
+        } catch (error) {
+            console.error('Error fetching favourite foods:', error);
+            res.status(500).json({ message: 'Internal server error' });
+        }
     });
-    router.post('/food-database/favourites/toggle', (req, res) => {
-        res.json({ isFavourite: true });
+    router.post('/food-database/favourites/toggle', authMiddleware(), async (req: AuthenticatedRequest, res) => {
+        try {
+            const { foodId } = req.body;
+            const existing = await db.query.favouriteFoods.findFirst({
+                where: and(
+                    eq(schema.favouriteFoods.userId, req.user!.userId),
+                    eq(schema.favouriteFoods.foodId, foodId)
+                ),
+            });
+
+            if (existing) {
+                await db.delete(schema.favouriteFoods).where(eq(schema.favouriteFoods.id, existing.id));
+                res.json({ isFavourite: false });
+            } else {
+                await db.insert(schema.favouriteFoods).values({
+                    userId: req.user!.userId,
+                    foodId: foodId,
+                });
+                res.json({ isFavourite: true });
+            }
+        } catch (error) {
+            console.error('Error toggling favourite food:', error);
+            res.status(500).json({ message: 'Internal server error' });
+        }
     });
 
     // --- MISSING STRIPE CUSTOMER PORTAL ENDPOINT ---
