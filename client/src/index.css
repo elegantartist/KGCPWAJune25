@@ -1,0 +1,276 @@
+
+.metallic-blue {
+  background: linear-gradient(165deg, #2E8BC0 0%, #145DA0 100%);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1), inset 0 1px 2px rgba(255, 255, 255, 0.2);
+  transition: all 0.3s ease;
+}
+
+.metallic-blue:hover {
+  background: linear-gradient(165deg, #3399CC 0%, #1466B3 100%);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2), inset 0 2px 3px rgba(255, 255, 255, 0.3);
+}
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+  /* Custom scrollbar for better mobile experience */
+  .custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border)) transparent;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--border));
+    border-radius: 20px;
+  }
+}
+
+/* Logo Animation */
+@keyframes wiggle {
+  0% { transform: rotate(0deg) scale(1); }
+  10% { transform: rotate(-15deg) scale(1.3); }
+  20% { transform: rotate(15deg) scale(1.35); }
+  30% { transform: rotate(-12deg) scale(1.35); }
+  40% { transform: rotate(12deg) scale(1.35); }
+  50% { transform: rotate(-8deg) scale(1.3) translateY(-5px); }
+  60% { transform: rotate(8deg) scale(1.3) translateY(5px); }
+  70% { transform: rotate(-5deg) scale(1.25) translateY(-3px); }
+  80% { transform: rotate(5deg) scale(1.25) translateY(3px); }
+  90% { transform: rotate(-2deg) scale(1.1); }
+  100% { transform: rotate(0deg) scale(1); }
+}
+
+.logo-animation {
+  animation: wiggle 2s ease-in-out;
+}
+
+/* Enhanced Button Vibration - more pronounced effect for iOS devices */
+@keyframes vibrate {
+  0% { transform: translate(0) scale(1); box-shadow: 0 0 0 rgba(0,0,0,0); }
+  5% { transform: translate(-5px, 5px) scale(1.05) rotate(-1deg); box-shadow: 0 0 10px rgba(0,0,0,0.3); }
+  10% { transform: translate(5px, -5px) scale(1.07) rotate(1deg); box-shadow: 0 0 15px rgba(0,0,0,0.4); }
+  15% { transform: translate(-6px, -4px) scale(1.08) rotate(-2deg); box-shadow: 0 0 18px rgba(0,0,0,0.45); }
+  20% { transform: translate(6px, 4px) scale(1.08) rotate(2deg); box-shadow: 0 0 20px rgba(0,0,0,0.5); }
+  25% { transform: translate(-5px, 5px) scale(1.07) rotate(-1.5deg); box-shadow: 0 0 20px rgba(0,0,0,0.5); }
+  30% { transform: translate(5px, -5px) scale(1.07) rotate(1.5deg); box-shadow: 0 0 20px rgba(0,0,0,0.5); }
+  35% { transform: translate(-6px, -4px) scale(1.08) rotate(-2deg); box-shadow: 0 0 18px rgba(0,0,0,0.45); }
+  40% { transform: translate(6px, 4px) scale(1.08) rotate(2deg); box-shadow: 0 0 18px rgba(0,0,0,0.45); }
+  45% { transform: translate(-5px, 5px) scale(1.07) rotate(-1.5deg); box-shadow: 0 0 16px rgba(0,0,0,0.4); }
+  50% { transform: translate(5px, -5px) scale(1.07) rotate(1.5deg); box-shadow: 0 0 16px rgba(0,0,0,0.4); }
+  55% { transform: translate(-6px, -4px) scale(1.06) rotate(-1.5deg); box-shadow: 0 0 14px rgba(0,0,0,0.35); }
+  60% { transform: translate(6px, 4px) scale(1.06) rotate(1.5deg); box-shadow: 0 0 14px rgba(0,0,0,0.35); }
+  65% { transform: translate(-4px, 4px) scale(1.05) rotate(-1deg); box-shadow: 0 0 12px rgba(0,0,0,0.3); }
+  70% { transform: translate(4px, -4px) scale(1.05) rotate(1deg); box-shadow: 0 0 12px rgba(0,0,0,0.3); }
+  75% { transform: translate(-4px, -3px) scale(1.04) rotate(-0.5deg); box-shadow: 0 0 10px rgba(0,0,0,0.25); }
+  80% { transform: translate(4px, 3px) scale(1.03) rotate(0.5deg); box-shadow: 0 0 8px rgba(0,0,0,0.2); }
+  85% { transform: translate(-3px, -2px) scale(1.02) rotate(-0.2deg); box-shadow: 0 0 6px rgba(0,0,0,0.15); }
+  90% { transform: translate(3px, 2px) scale(1.02) rotate(0.2deg); box-shadow: 0 0 4px rgba(0,0,0,0.1); }
+  95% { transform: translate(-1px, -1px) scale(1.01) rotate(-0.1deg); box-shadow: 0 0 2px rgba(0,0,0,0.05); }
+  100% { transform: translate(0) scale(1); box-shadow: 0 0 0 rgba(0,0,0,0); }
+}
+
+/* Gentle glow animation for motivational image */
+@keyframes gentle-glow {
+  0% { 
+    filter: drop-shadow(0 0 20px rgba(255,255,255,0.8)) brightness(1.1) contrast(1.05);
+  }
+  50% { 
+    filter: drop-shadow(0 0 30px rgba(255,255,255,1.2)) brightness(1.3) contrast(1.15);
+  }
+  100% { 
+    filter: drop-shadow(0 0 20px rgba(255,255,255,0.8)) brightness(1.1) contrast(1.05);
+  }
+}
+
+.btn-vibrate {
+  animation: vibrate 2s cubic-bezier(0.2, 0.07, 0.19, 0.97) both; /* Updated to 2s to match gong sound duration */
+  backface-visibility: hidden; /* Ensure smooth animation */
+  perspective: 1000px; /* 3D effect */
+  transform-style: preserve-3d; /* Better 3D effect */
+  will-change: transform, box-shadow; /* Performance optimization */
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply font-sans antialiased bg-gray-50 text-foreground;
+  }
+  
+  :root {
+    --medication: 0 87% 62%;
+    --diet: 122 67% 45%;
+    --exercise: 291 77% 30%;
+    --sidebar-background: 150 88% 40%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-border: 150 88% 30%;
+    --chart-1: 0 87% 62%;
+    --chart-2: 122 67% 45%;
+    --chart-3: 291 77% 30%;
+    --chart-4: 210 79% 46%;
+    --chart-5: 45 93% 47%;
+  }
+}
+
+.medication-color {
+  @apply text-[hsl(var(--medication))];
+}
+
+.diet-color {
+  @apply text-[hsl(var(--diet))];
+}
+
+.exercise-color {
+  @apply text-[hsl(var(--exercise))];
+}
+
+.medication-bg {
+  @apply bg-[hsl(var(--medication))];
+}
+
+.diet-bg {
+  @apply bg-[hsl(var(--diet))];
+}
+
+.exercise-bg {
+  @apply bg-[hsl(var(--exercise))];
+}
+
+/* Custom slider styles */
+.slider-green [data-orientation="horizontal"] {
+  height: 0.5rem;
+  width: 100%;
+  background-color: #ddd;
+  border-radius: 9999px;
+}
+
+.slider-green [data-orientation="horizontal"] [data-orientation="horizontal"] {
+  height: 100%;
+  background-color: #4CAF50;
+}
+
+.slider-green [role="slider"] {
+  height: 1.15rem;
+  width: 1.15rem;
+  background-color: #4CAF50;
+  border: 2px solid white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.slider-blue [data-orientation="horizontal"] {
+  height: 0.5rem;
+  width: 100%;
+  background-color: #ddd;
+  border-radius: 9999px;
+}
+
+.slider-blue [data-orientation="horizontal"] [data-orientation="horizontal"] {
+  height: 100%;
+  background-color: #2E8BC0;
+}
+
+.slider-blue [role="slider"] {
+  height: 1.15rem;
+  width: 1.15rem;
+  background-color: #2E8BC0;
+  border: 2px solid white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.slider-red [data-orientation="horizontal"] {
+  height: 0.5rem;
+  width: 100%;
+  background-color: #ddd;
+  border-radius: 9999px;
+}
+
+.slider-red [data-orientation="horizontal"] [data-orientation="horizontal"] {
+  height: 100%;
+  background-color: #E53935;
+}
+
+.slider-red [role="slider"] {
+  height: 1.15rem;
+  width: 1.15rem;
+  background-color: #E53935;
+  border: 2px solid white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+/* Metallic blue styles */
+.metallic-blue {
+  background: linear-gradient(160deg, #2E8BC0 0%, #1c5880 50%, #2E8BC0 100%);
+  border: 2px solid #17a092;
+  box-shadow: 
+    inset 0 1px 3px rgba(255, 255, 255, 0.5),
+    inset 0 -1px 3px rgba(0, 0, 0, 0.3),
+    0 2px 5px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden; /* Keep the glossy effect contained */
+}
+
+.metallic-blue:hover {
+  background: linear-gradient(160deg, #3999d1 0%, #267cad 50%, #3999d1 100%);
+  box-shadow: 
+    inset 0 1px 4px rgba(255, 255, 255, 0.6),
+    inset 0 -1px 4px rgba(0, 0, 0, 0.4),
+    0 3px 7px rgba(0, 0, 0, 0.25);
+}
+
+.metallic-blue::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -50%;
+  width: 200%;
+  height: 35%;
+  background: linear-gradient(to bottom, 
+    rgba(255, 255, 255, 0.3) 0%, 
+    rgba(255, 255, 255, 0.1) 50%, 
+    rgba(255, 255, 255, 0) 100%);
+  transform: rotate(5deg);
+}
+
+/* Logo metallic effect */
+.logo-metallic {
+  border-radius: 50%;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Remove the glossy overlay effect */
+
+/* Dots with metallic effect */
+.dot-metallic {
+  background: linear-gradient(160deg, #2E8BC0 0%, #1c5880 100%) !important;
+  border: 1px solid #17a092 !important;
+  box-shadow: 
+    inset 0 1px 2px rgba(255, 255, 255, 0.5),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Icon metallic effect */
+.icon-metallic {
+  color: #2E8BC0;
+  filter: drop-shadow(0 0 1px #17a092);
+  transition: all 0.3s ease;
+}
+
+.icon-metallic:hover {
+  color: #3999d1;
+  filter: drop-shadow(0 0 2px #17a092);
+}

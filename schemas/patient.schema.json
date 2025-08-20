@@ -1,0 +1,137 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://keepgoingcare.com.au/schemas/patient.schema.json",
+  "title": "KGC Patient Entity",
+  "description": "Care recipient entity for Keep Going Care platform",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "integer",
+      "description": "Primary key identifier",
+      "minimum": 1
+    },
+    "uin": {
+      "type": "string",
+      "description": "Unique Identity Number in format KGC-PAT-XXX",
+      "pattern": "^KGC-PAT-\\d{3}$",
+      "examples": ["KGC-PAT-001"]
+    },
+    "name": {
+      "type": "string",
+      "description": "Full name of the patient",
+      "minLength": 1,
+      "maxLength": 255
+    },
+    "email": {
+      "type": "string",
+      "format": "email",
+      "description": "Email address for authentication and notifications",
+      "examples": ["reuben.collins@keepgoingcare.com"]
+    },
+    "roleId": {
+      "type": "integer",
+      "description": "Role identifier (3 = patient)",
+      "const": 3
+    },
+    "phoneNumber": {
+      "type": "string",
+      "description": "Australian phone number for SMS authentication",
+      "pattern": "^(\\+61|0)[2-9]\\d{8}$"
+    },
+    "joinedDate": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when patient account was created"
+    },
+    "isActive": {
+      "type": "boolean",
+      "description": "Whether the patient account is currently active",
+      "default": true
+    },
+    "lastLogin": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "Timestamp of last successful login"
+    },
+    "assignedDoctorId": {
+      "type": "integer",
+      "description": "ID of the doctor assigned to this patient",
+      "minimum": 1
+    },
+    "createdByUserId": {
+      "type": "integer",
+      "description": "ID of the doctor who created this patient account",
+      "minimum": 1
+    },
+    "uinSequence": {
+      "type": "integer",
+      "description": "Sequential number for patient UIN generation",
+      "minimum": 1
+    },
+    "dateOfBirth": {
+      "type": "string",
+      "format": "date",
+      "description": "Patient's date of birth (for age calculation)"
+    },
+    "medicareNumber": {
+      "type": "string",
+      "description": "Australian Medicare number",
+      "pattern": "^\\d{10}$"
+    },
+    "emergencyContact": {
+      "type": "object",
+      "description": "Emergency contact information",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of emergency contact"
+        },
+        "relationship": {
+          "type": "string",
+          "description": "Relationship to patient"
+        },
+        "phoneNumber": {
+          "type": "string",
+          "pattern": "^(\\+61|0)[2-9]\\d{8}$"
+        }
+      },
+      "required": ["name", "relationship", "phoneNumber"]
+    }
+  },
+  "required": [
+    "id",
+    "uin",
+    "name",
+    "email", 
+    "roleId",
+    "phoneNumber",
+    "joinedDate",
+    "isActive",
+    "assignedDoctorId",
+    "createdByUserId"
+  ],
+  "additionalProperties": false,
+  "examples": [
+    {
+      "id": 3,
+      "uin": "KGC-PAT-001",
+      "name": "Reuben Collins",
+      "email": "reuben.collins@keepgoingcare.com",
+      "roleId": 3,
+      "phoneNumber": "+61456789012",
+      "joinedDate": "2025-02-01T14:30:00Z",
+      "isActive": true,
+      "lastLogin": "2025-08-20T19:00:00Z",
+      "assignedDoctorId": 2,
+      "createdByUserId": 2,
+      "uinSequence": 1,
+      "dateOfBirth": "1990-05-15",
+      "medicareNumber": "1234567890",
+      "emergencyContact": {
+        "name": "Jane Collins",
+        "relationship": "Spouse",
+        "phoneNumber": "+61456789013"
+      }
+    }
+  ]
+}

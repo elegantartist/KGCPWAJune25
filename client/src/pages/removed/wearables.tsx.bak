@@ -1,0 +1,587 @@
+import React, { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { 
+  Watch, 
+  Heart, 
+  Activity, 
+  Zap, 
+  BarChart, 
+  Moon, 
+  Plus, 
+  Smartphone, 
+  Settings, 
+  Trash2,
+  Clock,
+  ArrowUpRight,
+  CalendarDays,
+  ThumbsUp,
+  FileBarChart
+} from "lucide-react";
+import { 
+  LineChart, 
+  Line, 
+  BarChart as RechartsBarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer,
+  Legend
+} from "recharts";
+import { Progress } from "@/components/ui/progress";
+import { cn } from "@/lib/utils";
+import { createHapticFeedback } from "@/lib/soundEffects";
+
+interface Device {
+  id: number;
+  name: string;
+  type: string;
+  connected: boolean;
+  batteryLevel: number;
+  lastSync?: Date;
+}
+
+interface HealthMetric {
+  date: string;
+  steps: number;
+  heartRate: number;
+  sleep: number;
+  calories: number;
+}
+
+const Wearables: React.FC = () => {
+  const [connectedDevices, setConnectedDevices] = useState<Device[]>([
+    {
+      id: 1,
+      name: "Apple Watch Series 8",
+      type: "smartwatch",
+      connected: true,
+      batteryLevel: 68,
+      lastSync: new Date(Date.now() - 1000 * 60 * 15) // 15 minutes ago
+    },
+    {
+      id: 2,
+      name: "Fitbit Charge 5",
+      type: "fitness-tracker",
+      connected: false,
+      batteryLevel: 45,
+      lastSync: new Date(Date.now() - 1000 * 60 * 60 * 3) // 3 hours ago
+    }
+  ]);
+  
+  // Example health data for a week
+  const weeklyData: HealthMetric[] = [
+    { date: "Monday", steps: 8732, heartRate: 68, sleep: 7.5, calories: 2450 },
+    { date: "Tuesday", steps: 10345, heartRate: 72, sleep: 6.8, calories: 2650 },
+    { date: "Wednesday", steps: 7651, heartRate: 70, sleep: 7.2, calories: 2350 },
+    { date: "Thursday", steps: 9245, heartRate: 69, sleep: 8.0, calories: 2500 },
+    { date: "Friday", steps: 11020, heartRate: 73, sleep: 6.5, calories: 2780 },
+    { date: "Saturday", steps: 6532, heartRate: 67, sleep: 8.5, calories: 2200 },
+    { date: "Sunday", steps: 8123, heartRate: 68, sleep: 7.8, calories: 2320 },
+  ];
+  
+  // Daily totals and goals
+  const dailyMetrics = {
+    steps: {
+      current: 8732,
+      goal: 10000,
+      unit: "steps"
+    },
+    calories: {
+      current: 2450,
+      goal: 3000,
+      unit: "kcal"
+    },
+    heartRate: {
+      current: 68,
+      min: 52,
+      max: 142,
+      avg: 72,
+      unit: "bpm"
+    },
+    sleep: {
+      current: 7.5,
+      goal: 8,
+      unit: "hours",
+      stages: {
+        deep: 2.1,
+        rem: 1.8,
+        light: 3.1,
+        awake: 0.5
+      }
+    }
+  };
+  
+  const toggleDeviceConnection = (deviceId: number) => {
+    createHapticFeedback();
+    setConnectedDevices(devices => 
+      devices.map(device => 
+        device.id === deviceId 
+          ? { ...device, connected: !device.connected } 
+          : device
+      )
+    );
+  };
+  
+  const formatTimeSince = (date: Date) => {
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    
+    if (diffMins < 60) {
+      return `${diffMins} min ago`;
+    } else if (diffMins < 1440) {
+      return `${Math.floor(diffMins / 60)} hr ago`;
+    } else {
+      return `${Math.floor(diffMins / 1440)} days ago`;
+    }
+  };
+  
+  const progressColor = (percent: number) => {
+    if (percent < 30) return "bg-red-500";
+    if (percent < 70) return "bg-yellow-500";
+    return "bg-green-500";
+  };
+
+  return (
+    <div className="space-y-6">
+      <Card className="bg-[#fdfdfd] border-[#2E8BC0]/20">
+        <CardHeader>
+          <CardTitle className="text-[#676767] flex items-center">
+            <Watch className="w-6 h-6 text-[#2E8BC0] mr-2" />
+            <span>Wearables Integration</span>
+          </CardTitle>
+          <CardDescription className="text-[#a4a4a4]">
+            View health data from your connected wearable devices
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Tabs defaultValue="dashboard" className="w-full">
+            <TabsList className="grid w-full grid-cols-3 mb-4">
+              <TabsTrigger value="dashboard" className="text-[#676767]">
+                <Activity className="h-4 w-4 mr-2" />
+                Dashboard
+              </TabsTrigger>
+              <TabsTrigger value="metrics" className="text-[#676767]">
+                <FileBarChart className="h-4 w-4 mr-2" />
+                Detailed Metrics
+              </TabsTrigger>
+              <TabsTrigger value="devices" className="text-[#676767]">
+                <Smartphone className="h-4 w-4 mr-2" />
+                Devices
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="dashboard">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Daily summary card */}
+                <Card className="border-[#2E8BC0]/20">
+                  <CardHeader>
+                    <CardTitle className="text-lg text-[#676767]">Today's Summary</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex flex-col gap-4">
+                      {/* Steps */}
+                      <div>
+                        <div className="flex justify-between items-center mb-2">
+                          <div className="flex items-center">
+                            <Zap className="h-5 w-5 text-[#2E8BC0] mr-2" />
+                            <span className="text-[#676767] font-medium">Steps</span>
+                          </div>
+                          <span className="text-[#676767] font-medium">
+                            {dailyMetrics.steps.current.toLocaleString()} / {dailyMetrics.steps.goal.toLocaleString()}
+                          </span>
+                        </div>
+                        <Progress 
+                          value={(dailyMetrics.steps.current / dailyMetrics.steps.goal) * 100}
+                          className="h-2"
+                        />
+                      </div>
+                      
+                      {/* Calories */}
+                      <div>
+                        <div className="flex justify-between items-center mb-2">
+                          <div className="flex items-center">
+                            <Activity className="h-5 w-5 text-[#2E8BC0] mr-2" />
+                            <span className="text-[#676767] font-medium">Calories Burned</span>
+                          </div>
+                          <span className="text-[#676767] font-medium">
+                            {dailyMetrics.calories.current.toLocaleString()} / {dailyMetrics.calories.goal.toLocaleString()} kcal
+                          </span>
+                        </div>
+                        <Progress 
+                          value={(dailyMetrics.calories.current / dailyMetrics.calories.goal) * 100}
+                          className="h-2"
+                        />
+                      </div>
+                      
+                      {/* Heart Rate */}
+                      <div>
+                        <div className="flex justify-between items-center mb-2">
+                          <div className="flex items-center">
+                            <Heart className="h-5 w-5 text-red-500 mr-2" />
+                            <span className="text-[#676767] font-medium">Heart Rate (Average)</span>
+                          </div>
+                          <span className="text-[#676767] font-medium">
+                            {dailyMetrics.heartRate.avg} bpm
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-[#a4a4a4]">
+                          <span>Min: {dailyMetrics.heartRate.min} bpm</span>
+                          <span>|</span>
+                          <span>Current: {dailyMetrics.heartRate.current} bpm</span>
+                          <span>|</span>
+                          <span>Max: {dailyMetrics.heartRate.max} bpm</span>
+                        </div>
+                      </div>
+                      
+                      {/* Sleep */}
+                      <div>
+                        <div className="flex justify-between items-center mb-2">
+                          <div className="flex items-center">
+                            <Moon className="h-5 w-5 text-[#2E8BC0] mr-2" />
+                            <span className="text-[#676767] font-medium">Sleep</span>
+                          </div>
+                          <span className="text-[#676767] font-medium">
+                            {dailyMetrics.sleep.current} / {dailyMetrics.sleep.goal} hrs
+                          </span>
+                        </div>
+                        <Progress 
+                          value={(dailyMetrics.sleep.current / dailyMetrics.sleep.goal) * 100}
+                          className="h-2"
+                        />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                {/* Weekly trends */}
+                <Card className="border-[#2E8BC0]/20">
+                  <CardHeader>
+                    <CardTitle className="text-lg text-[#676767]">Weekly Steps</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-[220px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <RechartsBarChart data={weeklyData} margin={{ top: 10, right: 10, left: 0, bottom: 20 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#2E8BC0" />
+                          <XAxis 
+                            dataKey="date" 
+                            tickLine={false}
+                            axisLine={false}
+                            tick={{ fontSize: 12, fill: '#676767' }}
+                          />
+                          <YAxis 
+                            tickLine={false}
+                            axisLine={false}
+                            tick={{ fontSize: 12, fill: '#676767' }}
+                          />
+                          <Tooltip />
+                          <Bar dataKey="steps" fill="#2E8BC0" radius={[4, 4, 0, 0]} />
+                        </RechartsBarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                {/* Heart rate chart */}
+                <Card className="border-[#2E8BC0]/20">
+                  <CardHeader>
+                    <CardTitle className="text-lg text-[#676767]">Heart Rate (Weekly Avg)</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-[220px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={weeklyData} margin={{ top: 10, right: 10, left: 0, bottom: 20 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#2E8BC0" />
+                          <XAxis 
+                            dataKey="date" 
+                            tickLine={false}
+                            axisLine={false}
+                            tick={{ fontSize: 12, fill: '#676767' }}
+                          />
+                          <YAxis 
+                            tickLine={false}
+                            axisLine={false}
+                            tick={{ fontSize: 12, fill: '#676767' }}
+                          />
+                          <Tooltip />
+                          <Line 
+                            type="monotone" 
+                            dataKey="heartRate" 
+                            stroke="#ee6688" 
+                            strokeWidth={2}
+                            dot={{ r: 4 }}
+                            activeDot={{ r: 6 }}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                {/* Sleep chart */}
+                <Card className="border-[#2E8BC0]/20">
+                  <CardHeader>
+                    <CardTitle className="text-lg text-[#676767]">Weekly Sleep (hours)</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-[220px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={weeklyData} margin={{ top: 10, right: 10, left: 0, bottom: 20 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#2E8BC0" />
+                          <XAxis 
+                            dataKey="date" 
+                            tickLine={false}
+                            axisLine={false}
+                            tick={{ fontSize: 12, fill: '#676767' }}
+                          />
+                          <YAxis 
+                            tickLine={false}
+                            axisLine={false}
+                            tick={{ fontSize: 12, fill: '#676767' }}
+                            domain={[0, 10]}
+                          />
+                          <Tooltip />
+                          <Line 
+                            type="monotone" 
+                            dataKey="sleep" 
+                            stroke="#2E8BC0" 
+                            strokeWidth={2}
+                            dot={{ r: 4 }}
+                            activeDot={{ r: 6 }}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="metrics">
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <Card className="border-[#2E8BC0]/20">
+                    <CardContent className="p-4 flex flex-col items-center justify-center">
+                      <Zap className="h-10 w-10 text-[#2E8BC0] mb-2" />
+                      <h3 className="text-3xl font-bold text-[#676767]">{dailyMetrics.steps.current.toLocaleString()}</h3>
+                      <p className="text-sm text-[#a4a4a4]">Steps Today</p>
+                      <p className="text-xs text-[#2E8BC0] flex items-center">
+                        <ArrowUpRight className="h-3 w-3 mr-1" />
+                        <span>+12% from yesterday</span>
+                      </p>
+                    </CardContent>
+                  </Card>
+                  <Card className="border-[#2E8BC0]/20">
+                    <CardContent className="p-4 flex flex-col items-center justify-center">
+                      <Activity className="h-10 w-10 text-[#2E8BC0] mb-2" />
+                      <h3 className="text-3xl font-bold text-[#676767]">{dailyMetrics.calories.current.toLocaleString()}</h3>
+                      <p className="text-sm text-[#a4a4a4]">Calories Burned</p>
+                      <p className="text-xs text-[#2E8BC0] flex items-center">
+                        <ArrowUpRight className="h-3 w-3 mr-1" />
+                        <span>+8% from yesterday</span>
+                      </p>
+                    </CardContent>
+                  </Card>
+                  <Card className="border-[#2E8BC0]/20">
+                    <CardContent className="p-4 flex flex-col items-center justify-center">
+                      <Heart className="h-10 w-10 text-red-500 mb-2" />
+                      <h3 className="text-3xl font-bold text-[#676767]">{dailyMetrics.heartRate.current}</h3>
+                      <p className="text-sm text-[#a4a4a4]">BPM (Current)</p>
+                      <p className="text-xs text-[#2E8BC0]">Resting: {dailyMetrics.heartRate.min} bpm</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="border-[#2E8BC0]/20">
+                    <CardContent className="p-4 flex flex-col items-center justify-center">
+                      <Moon className="h-10 w-10 text-[#2E8BC0] mb-2" />
+                      <h3 className="text-3xl font-bold text-[#676767]">{dailyMetrics.sleep.current}</h3>
+                      <p className="text-sm text-[#a4a4a4]">Hours of Sleep</p>
+                      <div className="w-full mt-2">
+                        <div className="flex text-xs justify-between mb-1">
+                          <span className="text-[#a4a4a4]">Deep</span>
+                          <span className="text-[#676767]">{dailyMetrics.sleep.stages.deep}h</span>
+                        </div>
+                        <Progress value={(dailyMetrics.sleep.stages.deep / dailyMetrics.sleep.current) * 100} className="h-1" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+                
+                <Card className="border-[#2E8BC0]/20">
+                  <CardHeader>
+                    <CardTitle className="text-lg text-[#676767]">Health Insights</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                      <div className="flex items-start">
+                        <ThumbsUp className="h-6 w-6 text-green-500 mr-3 mt-0.5" />
+                        <div>
+                          <h4 className="font-medium text-green-800">Your activity is on track</h4>
+                          <p className="text-green-700 text-sm">
+                            You've been consistently meeting your step goals for the past 5 days. Keep up the good work!
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                      <div className="flex items-start">
+                        <FileBarChart className="h-6 w-6 text-blue-500 mr-3 mt-0.5" />
+                        <div>
+                          <h4 className="font-medium text-blue-800">Sleep pattern analysis</h4>
+                          <p className="text-blue-700 text-sm">
+                            Your sleep has been consistent but slightly below your goal. Try going to bed 30 minutes earlier.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <h4 className="font-medium text-[#676767] mb-2 flex items-center">
+                        <CalendarDays className="h-5 w-5 text-[#2E8BC0] mr-2" />
+                        <span>Activity Streaks</span>
+                      </h4>
+                      <div className="grid grid-cols-7 gap-1">
+                        {Array.from({ length: 7 }).map((_, i) => (
+                          <div 
+                            key={i}
+                            className={cn(
+                              "h-8 rounded-md flex items-center justify-center text-xs font-medium",
+                              i < 5 ? "bg-[#2E8BC0] text-white" : "bg-[#2E8BC0]/30 text-[#676767]"
+                            )}
+                          >
+                            {['M', 'T', 'W', 'T', 'F', 'S', 'S'][i]}
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-sm text-[#a4a4a4] mt-2">
+                        You're on a 5-day activity streak! Keep going to reach your weekly goal.
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="devices">
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-lg font-medium text-[#676767]">Connected Devices</h3>
+                  <Button className="bg-[#2E8BC0] hover:bg-[#267cad]">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Device
+                  </Button>
+                </div>
+                
+                {connectedDevices.map(device => (
+                  <Card key={device.id} className="border-[#2E8BC0]/20">
+                    <CardContent className="p-4">
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center">
+                          {device.type === 'smartwatch' ? (
+                            <Watch className="h-10 w-10 text-[#2E8BC0] mr-3" />
+                          ) : (
+                            <Activity className="h-10 w-10 text-[#2E8BC0] mr-3" />
+                          )}
+                          <div>
+                            <h4 className="font-medium text-[#676767]">{device.name}</h4>
+                            <div className="flex items-center mt-1">
+                              <Badge 
+                                className={
+                                  device.connected 
+                                    ? "bg-green-500 hover:bg-green-600" 
+                                    : "bg-[#a4a4a4] hover:bg-[#a4a4a4]"
+                                }
+                              >
+                                {device.connected ? 'Connected' : 'Disconnected'}
+                              </Badge>
+                              {device.connected && device.lastSync && (
+                                <span className="text-xs text-[#a4a4a4] ml-2 flex items-center">
+                                  <Clock className="h-3 w-3 mr-1" />
+                                  Last sync: {formatTimeSince(device.lastSync)}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center gap-3">
+                          <div className="flex flex-col items-end">
+                            <span className="text-sm text-[#676767] font-medium">Battery</span>
+                            <div className="flex items-center">
+                              <span className={cn(
+                                "text-sm font-medium",
+                                device.batteryLevel > 20 ? "text-[#676767]" : "text-red-500"
+                              )}>
+                                {device.batteryLevel}%
+                              </span>
+                              <div className="w-16 ml-2">
+                                <Progress 
+                                  value={device.batteryLevel} 
+                                  className={cn(
+                                    "h-2",
+                                    device.batteryLevel > 60 ? "bg-green-500" :
+                                    device.batteryLevel > 20 ? "bg-yellow-500" : "bg-red-500"
+                                  )}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div className="flex gap-1">
+                            <Button 
+                              variant="outline" 
+                              size="icon"
+                              className="h-8 w-8 border-[#2E8BC0]/20"
+                              onClick={() => toggleDeviceConnection(device.id)}
+                            >
+                              {device.connected ? <Zap className="h-4 w-4 text-[#2E8BC0]" /> : <Plus className="h-4 w-4 text-[#676767]" />}
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="icon"
+                              className="h-8 w-8 border-[#2E8BC0]/20"
+                            >
+                              <Settings className="h-4 w-4 text-[#676767]" />
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="icon"
+                              className="h-8 w-8 border-[#2E8BC0]/20"
+                            >
+                              <Trash2 className="h-4 w-4 text-red-500" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+                
+                <Card className="border-dashed border-[#2E8BC0]/20 bg-[#fdfdfd]">
+                  <CardContent className="p-6 flex flex-col items-center justify-center">
+                    <Plus className="h-12 w-12 text-[#2E8BC0] mb-3" />
+                    <h3 className="text-lg font-medium text-[#676767] mb-1">Add a new device</h3>
+                    <p className="text-[#a4a4a4] text-center mb-4 max-w-md">
+                      Connect your smartwatch, fitness tracker, or other wearable devices to track your health metrics.
+                    </p>
+                    <Button className="bg-[#2E8BC0] hover:bg-[#267cad]">
+                      Connect Device
+                    </Button>
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+export default Wearables;

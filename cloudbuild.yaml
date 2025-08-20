@@ -1,0 +1,49 @@
+# Google Cloud Build configuration for KGC Healthcare Platform
+# HIPAA-compliant deployment to Google Cloud Run
+
+steps:
+  # Build the Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/kgc-healthcare:$BUILD_ID', '.']
+    env:
+      - 'NODE_ENV=production'
+
+  # Push the image to Google Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/kgc-healthcare:$BUILD_ID']
+
+  # Deploy to Cloud Run with HIPAA compliance settings
+  - name: 'gcr.io/cloud-builders/gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - 'kgc-healthcare'
+      - '--image=gcr.io/$PROJECT_ID/kgc-healthcare:$BUILD_ID'
+      - '--region=us-central1'
+      - '--platform=managed'
+      - '--allow-unauthenticated'
+      - '--set-env-vars=NODE_ENV=production,PORT=8080'
+      - '--memory=2Gi'
+      - '--cpu=2'
+      - '--max-instances=100'
+      - '--min-instances=1'
+      - '--timeout=300s'
+      - '--concurrency=80'
+      - '--port=8080'
+      - '--execution-environment=gen2'
+
+# Store build artifacts for compliance auditing
+images:
+  - 'gcr.io/$PROJECT_ID/kgc-healthcare:$BUILD_ID'
+
+# Build configuration for healthcare compliance
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: 'N1_HIGHCPU_8'
+  diskSizeGb: 100
+
+# Enable vulnerability scanning for security compliance
+vulnerabilityScanning: true
+
+# Set build timeout for large healthcare applications
+timeout: '1200s'

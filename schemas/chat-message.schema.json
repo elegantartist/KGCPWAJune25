@@ -1,0 +1,198 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://keepgoingcare.com.au/schemas/chat-message.schema.json",
+  "title": "KGC Chat Message Entity",
+  "description": "AI Supervisor Agent conversations with enhanced memory context",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "integer",
+      "description": "Primary key identifier",
+      "minimum": 1
+    },
+    "userId": {
+      "type": "integer",
+      "description": "Foreign key reference to patient",
+      "minimum": 1
+    },
+    "role": {
+      "type": "string",
+      "description": "Message sender role",
+      "enum": ["patient", "supervisor_agent", "system"]
+    },
+    "content": {
+      "type": "string",
+      "description": "The message content",
+      "minLength": 1,
+      "maxLength": 10000
+    },
+    "memorySystem": {
+      "type": "string",
+      "description": "Memory system classification for LangMem",
+      "enum": ["semantic", "procedural", "episodic"],
+      "default": "semantic"
+    },
+    "type": {
+      "type": "string",
+      "description": "Memory persistence type",
+      "enum": ["short_term", "medium_term", "long_term"]
+    },
+    "context": {
+      "type": "object",
+      "description": "Message context and metadata",
+      "properties": {
+        "cpdReferences": {
+          "type": "array",
+          "items": {"type": "integer"},
+          "description": "Referenced Care Plan Directive IDs"
+        },
+        "healthScores": {
+          "type": "object",
+          "properties": {
+            "diet": {"type": "number", "minimum": 1, "maximum": 10},
+            "exercise": {"type": "number", "minimum": 1, "maximum": 10},
+            "medication": {"type": "number", "minimum": 1, "maximum": 10}
+          }
+        },
+        "sessionMetadata": {
+          "type": "object",
+          "properties": {
+            "duration": {"type": "integer", "description": "Session duration in seconds"},
+            "messageCount": {"type": "integer", "description": "Number of messages in session"},
+            "aiProvider": {"type": "string", "enum": ["openai", "anthropic"]},
+            "modelVersion": {"type": "string"},
+            "responseTime": {"type": "number", "description": "AI response time in seconds"}
+          }
+        },
+        "featureRecommendations": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "KGC features recommended during conversation"
+        },
+        "emergencyKeywords": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "Safety keywords detected in message"
+        },
+        "sentimentScore": {
+          "type": "number",
+          "minimum": -1,
+          "maximum": 1,
+          "description": "Message sentiment analysis score"
+        }
+      },
+      "additionalProperties": true
+    },
+    "importance": {
+      "type": "number",
+      "description": "Priority score for memory retrieval (0-1)",
+      "minimum": 0,
+      "maximum": 1,
+      "default": 0.5
+    },
+    "embeddings": {
+      "type": ["string", "null"],
+      "description": "Vector embeddings for similarity search (JSON string)"
+    },
+    "lastAccessed": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "When this memory was last retrieved/used"
+    },
+    "accessCount": {
+      "type": "integer",
+      "description": "How many times this memory was accessed",
+      "minimum": 0,
+      "default": 0
+    },
+    "expiresAt": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "When to forget (null for long-term)"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when message was created"
+    },
+    "privacyRedacted": {
+      "type": "boolean",
+      "description": "Whether PII was redacted before AI processing",
+      "default": false
+    },
+    "redactionSessionId": {
+      "type": ["string", "null"],
+      "description": "Privacy redaction session ID if applicable"
+    }
+  },
+  "required": [
+    "id",
+    "userId",
+    "role",
+    "content",
+    "memorySystem",
+    "type",
+    "importance",
+    "accessCount",
+    "createdAt"
+  ],
+  "additionalProperties": false,
+  "examples": [
+    {
+      "id": 1,
+      "userId": 3,
+      "role": "patient",
+      "content": "I'm struggling with my medication timing. Sometimes I forget to take it in the morning.",
+      "memorySystem": "episodic",
+      "type": "medium_term",
+      "context": {
+        "cpdReferences": [3],
+        "healthScores": {
+          "diet": 7,
+          "exercise": 8,
+          "medication": 6
+        },
+        "sessionMetadata": {
+          "duration": 45,
+          "messageCount": 3,
+          "aiProvider": "openai",
+          "modelVersion": "gpt-4o",
+          "responseTime": 2.3
+        },
+        "sentimentScore": -0.2
+      },
+      "importance": 0.8,
+      "embeddings": null,
+      "lastAccessed": "2025-08-20T14:30:00Z",
+      "accessCount": 2,
+      "expiresAt": null,
+      "createdAt": "2025-08-20T14:25:00Z",
+      "privacyRedacted": true,
+      "redactionSessionId": "session-privacy-abc123"
+    },
+    {
+      "id": 2,
+      "userId": 3,
+      "role": "supervisor_agent",
+      "content": "I understand medication timing can be challenging. Based on your Care Plan Directive, let me suggest some strategies to help you remember your morning medication. Have you considered setting a daily alarm?",
+      "memorySystem": "procedural",
+      "type": "long_term",
+      "context": {
+        "cpdReferences": [3],
+        "featureRecommendations": ["medication-reminder", "progress-milestones"],
+        "sessionMetadata": {
+          "aiProvider": "openai",
+          "responseTime": 1.8
+        }
+      },
+      "importance": 0.9,
+      "embeddings": null,
+      "lastAccessed": null,
+      "accessCount": 0,
+      "expiresAt": null,
+      "createdAt": "2025-08-20T14:25:30Z",
+      "privacyRedacted": false,
+      "redactionSessionId": null
+    }
+  ]
+}

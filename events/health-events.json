@@ -1,0 +1,562 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://keepgoingcare.com/schemas/events/health-events.json",
+  "title": "KGC Health Events",
+  "description": "Event schemas for health-related activities in the KGC Healthcare Platform",
+  "type": "object",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/HealthMetricSubmittedEvent"
+    },
+    {
+      "$ref": "#/$defs/CarePlanDirectiveCreatedEvent"
+    },
+    {
+      "$ref": "#/$defs/CarePlanDirectiveUpdatedEvent"
+    },
+    {
+      "$ref": "#/$defs/ComplianceCalculatedEvent"
+    },
+    {
+      "$ref": "#/$defs/ProgressMilestoneCreatedEvent"
+    },
+    {
+      "$ref": "#/$defs/ProgressMilestoneCompletedEvent"
+    },
+    {
+      "$ref": "#/$defs/DailySubmissionMissedEvent"
+    }
+  ],
+  "$defs": {
+    "BaseHealthEvent": {
+      "type": "object",
+      "required": ["eventId", "eventType", "timestamp", "userId"],
+      "properties": {
+        "eventId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "eventType": {
+          "type": "string"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "userId": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Patient ID for health events"
+        },
+        "sessionId": {
+          "type": "string"
+        },
+        "ipAddress": {
+          "type": "string",
+          "format": "ipv4"
+        },
+        "userAgent": {
+          "type": "string"
+        }
+      }
+    },
+    "HealthMetricSubmittedEvent": {
+      "allOf": [
+        {"$ref": "#/$defs/BaseHealthEvent"},
+        {
+          "type": "object",
+          "properties": {
+            "eventType": {
+              "const": "health_metric_submitted"
+            },
+            "data": {
+              "type": "object",
+              "required": ["metricId", "scoreDate", "scores", "submissionMethod"],
+              "properties": {
+                "metricId": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "Unique health metric record ID"
+                },
+                "scoreDate": {
+                  "type": "string",
+                  "format": "date",
+                  "description": "Date for which scores were submitted"
+                },
+                "scores": {
+                  "type": "object",
+                  "required": ["diet", "exercise", "medication"],
+                  "properties": {
+                    "diet": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 10,
+                      "description": "Diet self-score (1-10)"
+                    },
+                    "exercise": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 10,
+                      "description": "Exercise self-score (1-10)"
+                    },
+                    "medication": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 10,
+                      "description": "Medication adherence self-score (1-10)"
+                    },
+                    "mood": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 10,
+                      "description": "Optional mood rating (1-10)"
+                    },
+                    "stress": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 10,
+                      "description": "Optional stress level (1-10)"
+                    }
+                  }
+                },
+                "submissionMethod": {
+                  "type": "string",
+                  "enum": ["manual_entry", "voice_input", "chatbot_guided", "api_integration"],
+                  "description": "Method used to submit scores"
+                },
+                "notes": {
+                  "type": "string",
+                  "maxLength": 1000,
+                  "description": "Patient notes (PII redacted for audit)"
+                },
+                "sleepHours": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 24,
+                  "description": "Hours of sleep"
+                },
+                "submissionTime": {
+                  "type": "string",
+                  "format": "time",
+                  "description": "Time of day when submitted"
+                },
+                "isLateSubmission": {
+                  "type": "boolean",
+                  "description": "Whether submitted after expected time"
+                },
+                "previousSubmissionDate": {
+                  "type": "string",
+                  "format": "date",
+                  "description": "Date of previous submission"
+                },
+                "streak": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Current consecutive submission streak"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "CarePlanDirectiveCreatedEvent": {
+      "allOf": [
+        {"$ref": "#/$defs/BaseHealthEvent"},
+        {
+          "type": "object",
+          "properties": {
+            "eventType": {
+              "const": "care_plan_directive_created"
+            },
+            "data": {
+              "type": "object",
+              "required": ["cpdId", "patientId", "createdById", "category", "priority"],
+              "properties": {
+                "cpdId": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "Care Plan Directive ID"
+                },
+                "patientId": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "Patient ID this CPD is for"
+                },
+                "createdById": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "Doctor/Admin who created the CPD"
+                },
+                "category": {
+                  "type": "string",
+                  "enum": ["diet", "exercise", "medication", "lifestyle"],
+                  "description": "CPD category"
+                },
+                "priority": {
+                  "type": "string",
+                  "enum": ["low", "medium", "high", "critical"],
+                  "description": "CPD priority level"
+                },
+                "directiveLength": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "Length of directive text (for audit)"
+                },
+                "hasTargetMeasures": {
+                  "type": "boolean",
+                  "description": "Whether CPD includes specific target measures"
+                },
+                "reviewDate": {
+                  "type": "string",
+                  "format": "date",
+                  "description": "Scheduled review date"
+                },
+                "replacesPreviousCPD": {
+                  "type": "integer",
+                  "description": "ID of CPD this replaces (if applicable)"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "CarePlanDirectiveUpdatedEvent": {
+      "allOf": [
+        {"$ref": "#/$defs/BaseHealthEvent"},
+        {
+          "type": "object",
+          "properties": {
+            "eventType": {
+              "const": "care_plan_directive_updated"
+            },
+            "data": {
+              "type": "object",
+              "required": ["cpdId", "updatedById", "updatedFields", "updateReason"],
+              "properties": {
+                "cpdId": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "Care Plan Directive ID"
+                },
+                "updatedById": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "Doctor/Admin who updated the CPD"
+                },
+                "updatedFields": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": ["directive", "category", "priority", "targetMeasures", "reviewDate", "notes", "active"]
+                  },
+                  "description": "Fields that were updated"
+                },
+                "updateReason": {
+                  "type": "string",
+                  "enum": ["medical_review", "patient_feedback", "compliance_adjustment", "error_correction", "routine_update"],
+                  "description": "Reason for the update"
+                },
+                "previousPriority": {
+                  "type": "string",
+                  "enum": ["low", "medium", "high", "critical"],
+                  "description": "Previous priority level"
+                },
+                "newPriority": {
+                  "type": "string",
+                  "enum": ["low", "medium", "high", "critical"],
+                  "description": "New priority level"
+                },
+                "versionNumber": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "CPD version after update"
+                },
+                "patientNotified": {
+                  "type": "boolean",
+                  "description": "Whether patient was notified of change"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "ComplianceCalculatedEvent": {
+      "allOf": [
+        {"$ref": "#/$defs/BaseHealthEvent"},
+        {
+          "type": "object",
+          "properties": {
+            "eventType": {
+              "const": "compliance_calculated"
+            },
+            "data": {
+              "type": "object",
+              "required": ["cpdId", "category", "complianceRate", "calculationPeriod"],
+              "properties": {
+                "cpdId": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "Care Plan Directive ID"
+                },
+                "category": {
+                  "type": "string",
+                  "enum": ["diet", "exercise", "medication", "lifestyle"],
+                  "description": "CPD category"
+                },
+                "complianceRate": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1,
+                  "description": "Calculated compliance rate (0-1)"
+                },
+                "calculationPeriod": {
+                  "type": "object",
+                  "required": ["startDate", "endDate", "daysAnalyzed"],
+                  "properties": {
+                    "startDate": {
+                      "type": "string",
+                      "format": "date"
+                    },
+                    "endDate": {
+                      "type": "string",
+                      "format": "date"
+                    },
+                    "daysAnalyzed": {
+                      "type": "integer",
+                      "minimum": 1
+                    }
+                  }
+                },
+                "averageScore": {
+                  "type": "number",
+                  "minimum": 1,
+                  "maximum": 10,
+                  "description": "Average score for the period"
+                },
+                "trend": {
+                  "type": "string",
+                  "enum": ["improving", "stable", "declining", "insufficient_data"],
+                  "description": "Compliance trend"
+                },
+                "triggerThreshold": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1,
+                  "description": "Threshold that triggered calculation"
+                },
+                "alertGenerated": {
+                  "type": "boolean",
+                  "description": "Whether low compliance alert was generated"
+                },
+                "previousComplianceRate": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1,
+                  "description": "Previous compliance rate for comparison"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "ProgressMilestoneCreatedEvent": {
+      "allOf": [
+        {"$ref": "#/$defs/BaseHealthEvent"},
+        {
+          "type": "object",
+          "properties": {
+            "eventType": {
+              "const": "progress_milestone_created"
+            },
+            "data": {
+              "type": "object",
+              "required": ["milestoneId", "title", "category", "creationMethod"],
+              "properties": {
+                "milestoneId": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "Progress milestone ID"
+                },
+                "title": {
+                  "type": "string",
+                  "maxLength": 255,
+                  "description": "Milestone title"
+                },
+                "category": {
+                  "type": "string",
+                  "enum": ["diet", "exercise", "medication", "lifestyle"],
+                  "description": "Milestone category"
+                },
+                "creationMethod": {
+                  "type": "string",
+                  "enum": ["user_manual", "ai_suggested", "doctor_assigned", "system_generated"],
+                  "description": "How the milestone was created"
+                },
+                "targetDate": {
+                  "type": "string",
+                  "format": "date",
+                  "description": "Target completion date"
+                },
+                "initialProgress": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 100,
+                  "description": "Initial progress percentage"
+                },
+                "linkedCPDId": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "Related Care Plan Directive ID"
+                },
+                "isSmartGoal": {
+                  "type": "boolean",
+                  "description": "Whether milestone follows SMART goal criteria"
+                },
+                "localUuid": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Local UUID for offline sync"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "ProgressMilestoneCompletedEvent": {
+      "allOf": [
+        {"$ref": "#/$defs/BaseHealthEvent"},
+        {
+          "type": "object",
+          "properties": {
+            "eventType": {
+              "const": "progress_milestone_completed"
+            },
+            "data": {
+              "type": "object",
+              "required": ["milestoneId", "completionDate", "daysToComplete"],
+              "properties": {
+                "milestoneId": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "Progress milestone ID"
+                },
+                "completionDate": {
+                  "type": "string",
+                  "format": "date",
+                  "description": "Date milestone was completed"
+                },
+                "daysToComplete": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Number of days from creation to completion"
+                },
+                "originalTargetDate": {
+                  "type": "string",
+                  "format": "date",
+                  "description": "Original target completion date"
+                },
+                "completedEarly": {
+                  "type": "boolean",
+                  "description": "Whether completed before target date"
+                },
+                "daysEarlyOrLate": {
+                  "type": "integer",
+                  "description": "Days early (positive) or late (negative)"
+                },
+                "category": {
+                  "type": "string",
+                  "enum": ["diet", "exercise", "medication", "lifestyle"],
+                  "description": "Milestone category"
+                },
+                "completionMethod": {
+                  "type": "string",
+                  "enum": ["manual_mark", "ai_detected", "auto_progression", "doctor_verified"],
+                  "description": "How completion was detected/recorded"
+                },
+                "celebrationTriggered": {
+                  "type": "boolean",
+                  "description": "Whether celebration animation/message was shown"
+                },
+                "nextMilestoneGenerated": {
+                  "type": "integer",
+                  "description": "ID of automatically generated next milestone"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "DailySubmissionMissedEvent": {
+      "allOf": [
+        {"$ref": "#/$defs/BaseHealthEvent"},
+        {
+          "type": "object",
+          "properties": {
+            "eventType": {
+              "const": "daily_submission_missed"
+            },
+            "data": {
+              "type": "object",
+              "required": ["missedDate", "consecutiveMissedDays", "lastSubmissionDate"],
+              "properties": {
+                "missedDate": {
+                  "type": "string",
+                  "format": "date",
+                  "description": "Date for which submission was missed"
+                },
+                "consecutiveMissedDays": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "Number of consecutive days missed"
+                },
+                "lastSubmissionDate": {
+                  "type": "string",
+                  "format": "date",
+                  "description": "Date of last successful submission"
+                },
+                "previousStreak": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Previous submission streak that was broken"
+                },
+                "remindersSent": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Number of reminders sent for this date"
+                },
+                "doctorNotified": {
+                  "type": "boolean",
+                  "description": "Whether assigned doctor was notified"
+                },
+                "alertGenerated": {
+                  "type": "boolean",
+                  "description": "Whether patient engagement alert was generated"
+                },
+                "riskLevel": {
+                  "type": "string",
+                  "enum": ["low", "medium", "high", "critical"],
+                  "description": "Risk level based on missed submissions pattern"
+                },
+                "detectionTime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "When the missed submission was detected"
+                },
+                "patientTimeZone": {
+                  "type": "string",
+                  "description": "Patient's timezone for accurate detection"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

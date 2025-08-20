@@ -1,0 +1,602 @@
+Why trajectory evaluation matters
+0:00
+hi this is Katherine from Lang Ching
+0:02
+today we'll chat about evaluating agent
+0:04
+trajectories with agent
+0:06
+evals we often evaluate the final
+0:08
+response from Agents but sometimes an
+0:11
+agent can arrive at the correct final
+0:13
+response with inefficient or incorrect
+0:15
+paths for example here's a situation
+0:18
+where I asked for a meeting on Friday
+0:20
+and if we scroll into the final response
+0:22
+our scheduler agent correctly responds
+0:24
+that it has set up meeting on Friday
+0:27
+this seems correct for the email output
+0:29
+but if take a closer look at the
+0:31
+trajectory here it only calls the get
+0:34
+calendar tool it never actually called
+0:36
+the scheduled calendar tool that it's
+0:38
+supposed to it simply hallucinated the
+0:40
+result this is an example where simply
+0:43
+evaluating on the final step is not
+0:45
+enough and it's necessary to evaluate
+0:47
+based on the trajectory that our agent
+0:48
+has taken which can be really helpful
+0:51
+for complex agents with multiple steps
+0:53
+and Tool calls and this is the
+Overview of AgentEvals
+0:56
+motivation behind agent evals agent
+0:59
+evals is is a pre-built open- Source
+1:01
+package designed for agent trajectory
+1:03
+evaluation it contains a collection of
+1:06
+evaluators and utilities allowing you to
+1:08
+perform checks including whether an
+1:10
+agent is calling the right tools or if
+1:12
+the overall trajectory is efficient I
+1:15
+also want to call it here that it is
+1:17
+designed to be framework agnostic and
+1:19
+works with the open AI
+1:22
+format so there are two main ways you
+1:25
+can conduct an evaluation for agent
+1:27
+trajectory first is a trajectory match
+1:31
+you can evaluate by directly comparing
+1:33
+trajectories which is a list of messages
+1:35
+of tool calls this approach is good for
+1:37
+testing for a welldefined set of
+1:39
+expected tool calls or steps for example
+1:42
+you could do a match to check whether
+1:44
+certain tools are called in the order
+1:46
+they're called
+1:47
+in second you can use LM as a judge to
+1:50
+evaluate the trajectory based on a
+1:52
+criteria for example you might want to
+1:55
+understand whether your agent is making
+1:56
+efficient progress and taking logical
+1:59
+reasoning steps
+2:00
+and unlike trajectory match which
+2:03
+focuses on tool calls themselves Elm as
+2:05
+a judge also takes the message content
+2:07
+into account and this can be helpful for
+2:10
+General assessment of agent reasoning
+2:12
+capabilities let's take a deeper look
+2:14
+together on how you can set up these
+2:16
+evaluators using agent
+2:19
+evals first let's take a look at
+2:21
+trajectory match together so agent eval
+2:24
+offers the create trajectory match
+2:26
+evaluator method it also offers acing
+2:29
+support as as
+2:30
+well the method has two main parameters
+2:33
+that you can customize first is the
+2:36
+trajectory match mode so this is how
+2:39
+you're conducting your overall
+2:40
+trajectory match and second how you're
+2:43
+choosing to match the argument of the
+2:46
+tools so on the trajectory match mode
+2:49
+side there are four main modes first is
+2:52
+the strict mode so this ensures the
+2:55
+agent uses the exact set of tools and
+2:57
+are called in exact order as the
+2:59
+reference reference in this example it
+3:02
+means that we will want the output to
+3:04
+match the exact tool call in the
+3:06
+reference output but actually in this
+3:08
+case in the output we see that it called
+3:10
+tool tools instead of one which would
+3:13
+actually leads to a false for
+3:16
+evaluator so this strict mode is useful
+3:19
+for cases where you want to enforce both
+3:21
+the exact set of tool calls and the
+3:23
+orders for example in a customer support
+3:26
+scenario you might want to enforce
+3:28
+policy lookup tool is always called
+3:30
+before invoking any
+3:32
+action
+3:34
+cool the second unorder mode also
+3:37
+ensures the exact set of tools are
+3:39
+called but they can now be in any order
+3:42
+so in this code example if we look at
+3:45
+the reference output here we called get
+3:47
+fun activities and get weather so this
+3:50
+means that as long as we call both of
+3:52
+these tools which we do but in reverse
+3:54
+order it would return true so this is
+3:58
+helpful in cases where actions from
+4:00
+tools are independent from one another
+4:02
+example could be looking up information
+4:04
+from two separate products where the
+4:06
+order doesn't really
+4:09
+matter great and the final two modes
+4:13
+subset and supet are partial matches of
+4:16
+the trajectory so for the superet mode
+4:20
+you want the actual agent output to be a
+4:22
+super set of the reference this is
+4:24
+helpful to check a few key tools are
+4:27
+called in the execution but you're okay
+4:29
+with the agent calling additional tools
+4:32
+so in this case the reference output
+4:34
+contains get weather tool so as long as
+4:37
+our actual output contains this tool
+4:39
+call it is okay um it has one additional
+4:43
+tool call as well it will still return
+4:45
+true and the subset mode is the opposite
+4:49
+of superet you actually want the agent
+4:51
+output to be a subset of their reference
+4:53
+so this is helpful when you want to
+4:55
+ensure agent efficiency so you want to
+4:58
+make sure they did not call any relevant
+5:00
+tools that would be
+5:02
+unnecessary
+5:05
+great and Beyond the four General modes
+5:08
+of matching trajectories of tool calls
+5:10
+there's also flexibility in how you want
+5:12
+to match the arguments are passed to
+5:14
+invok the tools by default tool
+5:17
+arguments are being compared and matched
+5:19
+exactly but you can bypass that by
+5:21
+calling match mode to be ignore which
+5:23
+can be done in this
+5:25
+example um or you can set up additional
+5:27
+override options so such as accounting
+5:30
+for case in sensitivity so that is done
+5:33
+with the tool ARS match overrides
+5:36
+method
+5:38
+great so now this brings us to the
+5:40
+second part of agent evil package so
+5:43
+other than directly matching the
+5:44
+trajectory we can also ask llm to be the
+5:47
+evaluator of our trajectory so in this
+5:50
+case we can either compare the output
+5:52
+trajectory directly to a reference or
+5:55
+ask the LM to judge an output trajectory
+5:57
+by itself so below here shows an example
+6:00
+of initiating an LM evaluator we created
+6:03
+an evaluator here called create
+6:05
+trajectory LM as a judge we pass in a
+6:08
+prompt as well as model and below this
+6:11
+initialization we use the same output
+6:13
+and reference output as the earlier
+6:14
+examples that we see so what does a
+6:17
+prompt look like for LM judges let's
+6:20
+actually take a look at an example
+6:23
+together so this is a pre-built prompt
+6:26
+from the agent eval package called
+6:28
+trajectory Act accuracy prompt we can
+6:31
+see that first it's asking LM to be an
+6:33
+expert data labeler and to Great the
+6:35
+accuracy of agent's trajectory so the
+6:38
+rubric here being several things it has
+6:41
+to make logical sense between steps it
+6:43
+has to show clear progression and it has
+6:46
+to be efficient at the end of The Prompt
+6:49
+we attach the output trajectory from our
+6:51
+agent now in addition to prompt and
+6:55
+model the create trajectory LM as a
+6:58
+judge can also optionally take on a few
+7:01
+additional parameters on defining the
+7:03
+format or value for the AL output you
+7:06
+can add system messages or few shot
+7:09
+examples so these are listed
+7:12
+here great now that we've covered
+7:14
+Concepts in agent evils let's go see how
+7:17
+we can actually use it to improve an
+7:19
+agent in the development
+7:21
+cycle in this notebook we have
+Using it in Code
+7:23
+initialized a react agent this is the
+7:26
+same scheduler agent we saw in the
+7:28
+beginning of this demo
+7:30
+let's now make use of the agent evals
+7:32
+package to evaluate the trajectories of
+7:34
+our agent in the first evaluation we'll
+7:37
+use the trajectory match evaluator we
+7:40
+likely want strict mode because we want
+7:42
+the exact three tool calls we likely
+7:44
+also don't care about the arguments
+7:46
+because there could be variabilities in
+7:48
+the arguments for scheduled meeting time
+7:51
+and email
+7:52
+content so to use our evaluator we need
+7:55
+to have both a reference trajectory and
+7:58
+an agent output of the
+8:00
+trajectory so let's first initialize our
+8:02
+reference trajectory so here we want to
+8:04
+make sure that we call three tools
+8:07
+versus get Cal and then schedule
+8:09
+calendar as well as sending
+8:12
+email so now we want to obtain a real
+8:14
+output from invoking the agent we just
+8:16
+created let's pass in the input from our
+8:19
+initial example and fetch the trajectory
+8:21
+great so our application just ran and it
+8:24
+looks like our application again only
+8:26
+called get Cal but not the schedule
+8:28
+calendar tool
+8:30
+from there we can pass a reference
+8:32
+output and real output to our evaluator
+8:35
+and as expected this return false let's
+8:39
+try another example with LM judge
+8:41
+similarly we can initialize an evaluator
+8:43
+with the pre-built accuracy prompt and
+8:46
+pass the application output and
+8:47
+reference outputs as parameters after
+8:50
+running this also gave us a score of
+8:52
+false and in the comments this also
+8:55
+highlighted missing the tool call for
+8:56
+Schedule
+8:57
+C now that we saw how to use agent evals
+Running experiments in LangSmith
+9:00
+for a single data point let's look at
+9:03
+how we can do that as part of a lsmith
+9:05
+evaluation run the benefits of running
+9:08
+experiments in lsmith is that first it
+9:10
+allows you to save the example as a data
+9:11
+set so you can continuously test against
+9:14
+those data points as you make changes to
+9:16
+your application you can also compare
+9:18
+the results across
+9:20
+experiments second it allows you to
+9:22
+automatically run multiple repetitions
+9:24
+for a given input that allows you to get
+9:27
+more confidence and reliability in the
+9:29
+test
+9:30
+to run an experiment through the lsmith
+9:32
+SDK there are four steps first we want
+9:35
+to create a data set with a list of
+9:37
+inputs and reference outputs here we'll
+9:39
+just be using the one example we saw
+9:41
+earlier next we want to define the
+9:43
+application logic to run the test and
+9:46
+then we want to Define our evaluators
+9:48
+which have defined for a single data
+9:49
+point earlier using the agent evals
+9:51
+package from there we can run the
+9:54
+experiment to view the results so we
+9:56
+have initialized the data set here we
+9:59
+only included one example in this data
+10:01
+set but realistically in development
+10:03
+Cycles we typically want to test against
+10:06
+a number of use cases and example set
+10:10
+and then we defined a Target function
+10:12
+this is basically invoking the graph
+10:14
+with input and returning the trajectory
+10:18
+and now let's define our evaluator so
+10:21
+here we are making use of the agent eval
+10:24
+package we create a trajectory match
+10:26
+evaluator we can just do the simple
+10:28
+strict mode match as as well as ignoring
+10:30
+the arguments in the tool calls itself
+10:33
+cool so now that we have our evaluator
+10:35
+Target function and data set defined
+10:37
+let's pass it in to this evalue function
+10:40
+and run our experiment and notice here
+10:42
+that I'm running three repetitions for
+10:45
+this example because LM can be a lot of
+10:47
+times non-deterministic so running over
+10:50
+a number of repetitions will allow for
+10:52
+reliability in the results so it looks
+10:54
+like our experiment results has finished
+10:56
+running two out of three times actually
+10:59
+is fail to call an our ideal trajectory
+11:02
+so now let's click on this lsmith link
+11:04
+this will take us to the data set and
+11:06
+experiment view that allow us to take a
+11:08
+look at the results the first two
+11:10
+columns are just the inputs and
+11:11
+reference outputs that we created the
+11:14
+third column is the real outputs from
+11:15
+invoking our agent and the fourth column
+11:18
+is the average of the evaluator results
+11:20
+from the three runs from here I can take
+11:23
+a quick flip through the outputs to
+11:25
+examine the trajectory of the three runs
+11:28
+cool so look look like only one of the
+11:30
+three runs did it actually correctly
+11:32
+called both the get cow and schedule cow
+11:34
+tools so now that I have a better
+11:37
+understanding of an example scenario
+11:39
+that my agent does not perform well on
+11:41
+we can then focus on refining The Prompt
+11:43
+or architecture to improve it from there
+11:45
+we can continuously rerun our
+11:47
+application against this data set to
+11:49
+ensure performance improvement over time

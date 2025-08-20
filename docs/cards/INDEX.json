@@ -1,0 +1,200 @@
+{
+  "metadata": {
+    "project": "KGC Healthcare Platform",
+    "classification": "TGA Class I SaMD",
+    "compliance": "Australian Privacy Principles, HIPAA-aligned",
+    "created": "2025-08-20",
+    "version": "1.0.0",
+    "total_cards": 8,
+    "total_size_bytes": 139701
+  },
+  
+  "cards": [
+    {
+      "id": "00",
+      "title": "Sitemap and Stack Overview",
+      "filename": "00_Sitemap_and_Stack_PART1.md",
+      "size_bytes": 15987,
+      "summary": "Complete technology stack, file system architecture, API endpoints, environment configuration, deployment architecture, and user journey mappings for React+TypeScript frontend, Express.js backend, PostgreSQL database with OpenAI/Anthropic AI integration.",
+      "topics": [
+        "Technology Stack (React, Express, PostgreSQL, AI APIs)",
+        "File System Structure (/client, /server, /shared)",
+        "API Endpoint Inventory (Auth, Users, Health, Chat, Admin)",
+        "Environment Configuration (Dev/Prod)",
+        "Deployment Architecture (Replit → Vercel + AWS)",
+        "User Journey Maps (Patient, Doctor, Admin workflows)"
+      ],
+      "cross_references": [
+        "01_C4_Architecture_PART1.md",
+        "03_Public_API_Contracts_PART1.md",
+        "06_Env_Vars_and_Secrets_Matrix_PART1.md"
+      ]
+    },
+    
+    {
+      "id": "01", 
+      "title": "C4 Architecture Model",
+      "filename": "01_C4_Architecture_PART1.md",
+      "size_bytes": 18456,
+      "summary": "Complete C4 model from system context through code architecture, showing external dependencies (OpenAI, Twilio, Neon DB), container breakdown (React frontend, Express API, PostgreSQL), component organization, and security architecture layers.",
+      "topics": [
+        "System Context (External Dependencies, User Types)",
+        "Container Architecture (Frontend, API, Database)",
+        "Component Breakdown (UI Components, API Routes, Services)",
+        "Code Architecture (Authentication Flow, AI Processing)",
+        "Security Architecture (Multi-layer Protection)",
+        "Data Flow Sequences (Auth, Chat, Health Data)"
+      ],
+      "cross_references": [
+        "00_Sitemap_and_Stack_PART1.md",
+        "02_Domain_and_Schemas_PART1.md",
+        "05_Privacy_AU_Compliance_PART1.md"
+      ]
+    },
+    
+    {
+      "id": "02",
+      "title": "Domain Models and Database Schemas", 
+      "filename": "02_Domain_and_Schemas_PART1.md",
+      "size_bytes": 21234,
+      "summary": "Complete domain entities (User, DailyScore, CarePlanDirective, AIInteraction, AuditLog), Drizzle ORM schemas, table relationships, validation schemas, business rules, and healthcare-specific data constraints for TGA Class I SaMD compliance.",
+      "topics": [
+        "Core Domain Entities (User, Health, Care Plans, AI, Audit)",
+        "Database Schema (Drizzle ORM with PostgreSQL)",
+        "Table Relationships and Constraints",
+        "Data Validation (Zod Schemas)",
+        "Business Logic Constraints",
+        "Healthcare Compliance (TGA Class I SaMD boundaries)"
+      ],
+      "cross_references": [
+        "01_C4_Architecture_PART1.md", 
+        "03_Public_API_Contracts_PART1.md",
+        "05_Privacy_AU_Compliance_PART1.md"
+      ]
+    },
+    
+    {
+      "id": "03",
+      "title": "Public API Contracts",
+      "filename": "03_Public_API_Contracts_PART1.md", 
+      "size_bytes": 24891,
+      "summary": "Complete REST API specification including authentication (SMS-based), user management, health data APIs, care plan directives, AI chat endpoints, admin functions, with request/response schemas, error handling, rate limiting, and healthcare compliance boundaries.",
+      "topics": [
+        "Authentication API (SMS-based MFA, Session Management)",
+        "User Management API (Profiles, RBAC)",
+        "Health Data API (Daily Scores, Progress Analytics)",
+        "Care Plan Directives API (CPD Management)",
+        "AI Chat API (OpenAI/Anthropic, Emergency Detection)",
+        "Admin API (System Metrics, User Management)",
+        "Error Handling Standards (HTTP Status, Error Codes)"
+      ],
+      "cross_references": [
+        "00_Sitemap_and_Stack_PART1.md",
+        "02_Domain_and_Schemas_PART1.md", 
+        "04_KGC_Agent_Spec_PART1.md"
+      ]
+    },
+    
+    {
+      "id": "04",
+      "title": "KGC AI Agent Specification",
+      "filename": "04_KGC_Agent_Spec_PART1.md",
+      "size_bytes": 19874,
+      "summary": "AI agent architecture with multi-provider support (OpenAI/Anthropic), CBT/MI integration, emergency detection, privacy protection, MCP tool implementation, healthcare boundary enforcement, and response quality assurance for TGA Class I SaMD compliance.",
+      "topics": [
+        "Multi-Provider AI System (OpenAI GPT-4o, Anthropic Claude)",
+        "Prompt Engineering (System Prompts, Healthcare Boundaries)",
+        "CBT and MI Integration (Therapeutic Techniques)",
+        "Emergency Detection (Keyword Classification, Safety Protocols)",
+        "Privacy Protection Agent (PII Anonymization)",
+        "MCP Implementation (Tool-based Architecture)",
+        "Response Quality Assurance (Validation Pipeline)"
+      ],
+      "cross_references": [
+        "03_Public_API_Contracts_PART1.md",
+        "05_Privacy_AU_Compliance_PART1.md",
+        "06_Env_Vars_and_Secrets_Matrix_PART1.md"
+      ]
+    },
+    
+    {
+      "id": "05",
+      "title": "Privacy and Australian Compliance",
+      "filename": "05_Privacy_AU_Compliance_PART1.md",
+      "size_bytes": 18932,
+      "summary": "Complete privacy compliance framework covering Australian Privacy Principles (APPs), TGA Class I SaMD requirements, data residency, privacy by design implementation, breach management, OAIC notification procedures, and automated compliance monitoring.",
+      "topics": [
+        "Australian Privacy Principles (APP 1-13 Compliance)",
+        "TGA Class I SaMD Compliance (Medical Device Boundaries)",
+        "Data Residency (Australian Data Centers, Cross-border Safeguards)",
+        "Privacy by Design (Technical Measures, User Controls)",
+        "Breach Management (Detection, Notification, Response)",
+        "Compliance Monitoring (Automated Checks, Reporting)"
+      ],
+      "cross_references": [
+        "01_C4_Architecture_PART1.md",
+        "02_Domain_and_Schemas_PART1.md",
+        "04_KGC_Agent_Spec_PART1.md"
+      ]
+    },
+    
+    {
+      "id": "06",
+      "title": "Environment Variables and Secrets Matrix",
+      "filename": "06_Env_Vars_and_Secrets_Matrix_PART1.md",
+      "size_bytes": 16784,
+      "summary": "Complete environment configuration matrix covering development/production settings, AWS Secrets Manager integration, secret classification and rotation schedules, service-specific configurations (OpenAI, Twilio, SendGrid), and environment validation schemas.",
+      "topics": [
+        "Environment Configuration Matrix (Dev/Prod)",
+        "AWS Secrets Manager (Structure, Access Patterns)",
+        "Secret Classification (Critical/High/Medium/Low)",
+        "Service Configurations (AI, SMS, Email, Database)",
+        "Environment Validation (Zod Schemas, Health Checks)",
+        "Security Implementation (Encryption, Access Controls)"
+      ],
+      "cross_references": [
+        "00_Sitemap_and_Stack_PART1.md",
+        "04_KGC_Agent_Spec_PART1.md",
+        "07_Migration_Playbook_PART1.md"
+      ]
+    },
+    
+    {
+      "id": "07",
+      "title": "Migration Playbook",
+      "filename": "07_Migration_Playbook_PART1.md", 
+      "size_bytes": 19423,
+      "summary": "8-phase migration plan from monolithic to monorepo architecture, including workspace configuration, package management, frontend/backend service migration, database optimization, deployment pipeline updates, testing strategies, and emergency rollback procedures.",
+      "topics": [
+        "8-Phase Migration Strategy (Repository Structure → Validation)",
+        "Monorepo Configuration (Turborepo, PNPM Workspaces)",
+        "Package Management (@kgc/shared, @kgc/ui packages)",
+        "Service Migration (Frontend Apps, Backend Microservices)",
+        "Deployment Pipelines (Vercel + AWS, Docker, GitHub Actions)",
+        "Testing and Validation (Migration Tests, Performance)",
+        "Rollback Procedures (Emergency Recovery Plans)"
+      ],
+      "cross_references": [
+        "00_Sitemap_and_Stack_PART1.md",
+        "01_C4_Architecture_PART1.md",
+        "06_Env_Vars_and_Secrets_Matrix_PART1.md"
+      ]
+    }
+  ],
+  
+  "usage_guide": {
+    "getting_started": "Begin with Card 00 (Sitemap and Stack) for project overview, then Card 01 (C4 Architecture) for system understanding.",
+    "development_workflow": "Reference Cards 02 (Schemas), 03 (APIs), and 06 (Environment) for daily development tasks.",
+    "ai_integration": "Use Card 04 (AI Agent Spec) for AI feature development and healthcare compliance boundaries.",
+    "compliance_work": "Card 05 (Privacy Compliance) covers all Australian healthcare regulatory requirements.",
+    "migration_planning": "Card 07 (Migration Playbook) provides complete guidance for monorepo transition."
+  },
+  
+  "healthcare_compliance_notes": {
+    "tga_classification": "All cards maintain TGA Class I SaMD boundaries - no diagnostic capabilities",
+    "privacy_principles": "Full Australian Privacy Principles compliance documented in Card 05",
+    "data_residency": "Australian data residency requirements covered across multiple cards",
+    "emergency_detection": "Safety protocols and emergency detection detailed in Cards 04 and 05",
+    "audit_requirements": "Comprehensive audit logging and compliance monitoring throughout"
+  }
+}

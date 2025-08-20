@@ -1,0 +1,209 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://keepgoingcare.com.au/schemas/health-snapshot.schema.json",
+  "title": "KGC Health Snapshot Entity",
+  "description": "Aggregated health metrics and milestone tracking for patients",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "integer",
+      "description": "Primary key identifier",
+      "minimum": 1
+    },
+    "userId": {
+      "type": "integer",
+      "description": "Foreign key reference to patient",
+      "minimum": 1
+    },
+    "date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp for this health snapshot"
+    },
+    "medicationScore": {
+      "type": ["number", "null"],
+      "description": "Averaged medication adherence score (1-10)",
+      "minimum": 1,
+      "maximum": 10
+    },
+    "dietScore": {
+      "type": ["number", "null"],
+      "description": "Averaged diet compliance score (1-10)",
+      "minimum": 1,
+      "maximum": 10
+    },
+    "exerciseScore": {
+      "type": ["number", "null"],
+      "description": "Averaged exercise adherence score (1-10)",
+      "minimum": 1,
+      "maximum": 10
+    },
+    "overallScore": {
+      "type": ["number", "null"],
+      "description": "Calculated overall health score (1-10)",
+      "minimum": 1,
+      "maximum": 10
+    },
+    "progressMilestones": {
+      "type": "object",
+      "description": "Current progress milestone status",
+      "properties": {
+        "completed": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {"type": "integer"},
+              "title": {"type": "string"},
+              "category": {"type": "string"},
+              "completedDate": {"type": "string", "format": "date-time"},
+              "iconType": {"type": "string"}
+            },
+            "required": ["id", "title", "category", "completedDate"]
+          }
+        },
+        "inProgress": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {"type": "integer"},
+              "title": {"type": "string"},
+              "category": {"type": "string"},
+              "progress": {"type": "number", "minimum": 0, "maximum": 100},
+              "targetDate": {"type": "string", "format": "date-time"}
+            },
+            "required": ["id", "title", "category", "progress"]
+          }
+        }
+      },
+      "required": ["completed", "inProgress"]
+    },
+    "complianceRate": {
+      "type": ["number", "null"],
+      "description": "Overall CPD compliance rate (0-1)",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "streakDays": {
+      "type": "integer",
+      "description": "Current streak of daily score submissions",
+      "minimum": 0,
+      "default": 0
+    },
+    "badgesEarned": {
+      "type": "array",
+      "description": "List of badges earned by the patient",
+      "items": {
+        "type": "object",
+        "properties": {
+          "badgeType": {
+            "type": "string",
+            "enum": ["exercise", "meal", "medication", "engagement", "milestone"]
+          },
+          "badgeLevel": {
+            "type": "string",
+            "enum": ["bronze", "silver", "gold", "platinum"]
+          },
+          "earnedDate": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "description": {
+            "type": "string"
+          }
+        },
+        "required": ["badgeType", "badgeLevel", "earnedDate"]
+      }
+    },
+    "trends": {
+      "type": "object",
+      "description": "Health score trends over time",
+      "properties": {
+        "weeklyTrend": {
+          "type": "string",
+          "enum": ["improving", "stable", "declining"],
+          "description": "7-day trend analysis"
+        },
+        "monthlyTrend": {
+          "type": "string",
+          "enum": ["improving", "stable", "declining"],
+          "description": "30-day trend analysis"
+        },
+        "improvementRate": {
+          "type": "number",
+          "description": "Rate of improvement as percentage change",
+          "minimum": -100
+        }
+      }
+    },
+    "lastUpdated": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When this snapshot was last calculated"
+    }
+  },
+  "required": [
+    "id",
+    "userId",
+    "date",
+    "progressMilestones",
+    "streakDays",
+    "badgesEarned",
+    "lastUpdated"
+  ],
+  "additionalProperties": false,
+  "examples": [
+    {
+      "id": 1,
+      "userId": 3,
+      "date": "2025-08-20T19:00:00Z",
+      "medicationScore": 9.2,
+      "dietScore": 7.8,
+      "exerciseScore": 8.1,
+      "overallScore": 8.4,
+      "progressMilestones": {
+        "completed": [
+          {
+            "id": 1,
+            "title": "7-Day Streak",
+            "category": "Engagement",
+            "completedDate": "2025-08-18T19:00:00Z",
+            "iconType": "Trophy"
+          }
+        ],
+        "inProgress": [
+          {
+            "id": 2,
+            "title": "30-Day Challenge",
+            "category": "Exercise",
+            "progress": 65,
+            "targetDate": "2025-09-01T23:59:59Z"
+          }
+        ]
+      },
+      "complianceRate": 0.82,
+      "streakDays": 17,
+      "badgesEarned": [
+        {
+          "badgeType": "engagement",
+          "badgeLevel": "silver",
+          "earnedDate": "2025-08-18T19:00:00Z",
+          "description": "7-day submission streak"
+        },
+        {
+          "badgeType": "medication",
+          "badgeLevel": "gold",
+          "earnedDate": "2025-08-15T10:00:00Z",
+          "description": "Perfect medication adherence"
+        }
+      ],
+      "trends": {
+        "weeklyTrend": "improving",
+        "monthlyTrend": "stable",
+        "improvementRate": 12.5
+      },
+      "lastUpdated": "2025-08-20T19:15:00Z"
+    }
+  ]
+}

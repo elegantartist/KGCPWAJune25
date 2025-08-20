@@ -1,0 +1,189 @@
+SDK overview and core architecture
+0:00
+Hi all, Will here. This week we're  excited to launch the LangMem SDK—a  
+0:04
+library of utilities for helping your  agents learn and adapt as they work.
+0:07
+In this video, we will show you  how to add procedural memory to  
+0:10
+your agents so they can learn instructions, rules,  
+0:13
+and other procedures that dictate how they  should respond and act in given situations.
+What we're building
+0:18
+By the end of this tutorial,  
+0:19
+you'll be able to create an email assistant  agent that's able to learn from feedback.
+0:25
+By submitting feedback, the agent will update  its prompt and learn new instructions inferred  
+0:30
+from the user. The updated prompt can live in  memory. You can see that it's able to learn  
+0:34
+these procedures so that anytime you start a new  conversation, it can act on this new behavior. As  
+0:39
+a result, it was able to learn these procedures.  Procedural memory is great for learning rules,  
+0:44
+instructions, and other elements that  dictate core behavioral tendencies.
+0:49
+Let's build an email assistant agent to  demonstrate how procedural memory works.  
+Initial email assistant implementation
+0:53
+We'll start by installing LangMem and LangGraph  and then set up our initial instructions for the  
+0:58
+agent. These instructions can be learned  over time, as we'll demonstrate later.
+1:02
+For now, we will manage the prompt  in the long-term memory store,  
+1:05
+simply because it’s convenient to  access it across different threads.
+1:09
+Now let's create the agent itself. It will have  a single tool called draft email—a placeholder  
+1:14
+that gets it to actually write the email as a  response. Then we'll define the prompt function.  
+1:19
+The prompt function takes the state, accesses  the long-term memory store, and prepares the  
+1:23
+list of messages to send directly to the LLM. In  our case, we'll extract the instructions list,  
+1:29
+obtain the prompt from it, and then insert that  into the system prompt that we'll pass to the LLM.
+1:33
+Notice that the agent doesn't yet know  my name. It has a pretty simple email  
+1:37
+structure. Suppose I wanted it to always  include my name in the sign-off because  
+1:41
+it is my personal email assistant. Also,  whenever it's handling meeting requests,  
+1:44
+it should offer to send a  Zoom or Google Meet link.
+1:47
+Let's have our agent learn from feedback.  We'll import the prompt optimizer from LangMem,  
+Optimization loop integration
+1:51
+initialize it using Claude Sonnet  to drive the optimization process,  
+1:54
+and then run the optimizer. It takes the  conversation and optional feedback and uses  
+1:59
+that to infer what type of instructions should  be included in the prompt for later interactions.
+2:04
+Here, we've passed in feedback instructing the  agent to always sign off with my name. But this  
+2:08
+information could also be found within  the existing conversation history—a very  
+2:13
+common scenario in chat interactions. Since we're  using an LLM to drive this optimizer, it should  
+2:19
+glean implicit feedback from the conversation  history. We call these "trajectories" because  
+2:23
+they could include any series of operations for  your agent, including tool calls and other data.
+2:28
+Let's print this out to see what it responded.  You can see the new, learned prompt—it’s able  
+2:33
+to notice that we implicitly condone the existing  structure, instructing it to use clear, concise  
+2:38
+language and to always sign off with my name.  For meeting requests, it has a conditional rule:  
+2:44
+it clearly states the proposed time and  offers two options for meeting scheduling.
+2:48
+So, it's able to learn different procedures  and propose a new instruction structure.  
+2:51
+It even provides a few-shot example to  illustrate the changes. You can control  
+2:55
+the parameters of the optimizer if you think  this is too verbose or not verbose enough,  
+2:59
+allowing more time for it to think or  imposing more constraints on the updates.
+3:04
+We'll put this updated prompt back in  the store and then run our process again.
+3:07
+Now we see that it signs off with my  name and offers to use whichever meeting  
+3:12
+platform the recipient prefers. Even if it's  drafting an email with different content,  
+3:17
+it still infers that it should sign off with  my name. However, if the email isn't about a  
+3:26
+meeting follow-up, it doesn't include any  meeting scheduling details. Simple, right?
+3:32
+We’ve shown how to update the  procedural memory for a single agent,  
+Initial multi-agent system
+3:35
+but what if you have multiple agents working  in concert? We're going to use LangGraph's  
+3:39
+multi-agent supervisor library to build a  multi-agent system and then demonstrate how  
+3:44
+you can improve the procedural memory  for both agents in a single pass.
+3:48
+We'll install the LangGraph Supervisor package  to get this additional functionality. Then,  
+3:52
+we'll create two working agents similar to  before. The first is our email agent, which  
+3:57
+looks the same, except that we've changed the  key for the memories to be specific to the email  
+4:02
+agent so that its instructions remain distinct  from those of our social media or Twitter agent.
+4:07
+Next, we've created a second agent, in  a similar style, that's able to send  
+4:10
+tweets. Please ensure you update the keys  so that their instructions aren’t mixed.
+4:15
+Now we'll create our supervisor agent. We'll  import from the LangGraph Supervisor package  
+Multi-agent prompt learning
+4:19
+and initialize it with our two agents. Our  prompt doesn't have to be very specific  
+4:25
+since it should know when to route to the  email or tweet assistant based on content.
+4:28
+We'll repeat our experiment from before, asking  it to draft an email to joe@langchain.dev. Then,  
+4:33
+we can see that the sub-agent has responded,  showing what type of content it generated.
+4:37
+Now comes the fun part. Let's say we want to leave  the same feedback: we always want to sign off  
+4:42
+emails with "William" for meeting requests, and  we want to offer the option to schedule on Zoom or  
+4:46
+Google Meet. This time, we'll use the multi-prompt  optimizer, which is designed to pick which  
+4:51
+prompts in a multi-agent system need updating  based on feedback and conversation history.
+4:55
+In an arbitrary multi-agent system, the prompt  relationships can get a bit complicated. To ensure  
+5:01
+more reliable attribution of responsibility,  we're going to provide more information about  
+5:06
+the prompt—namely, when to update it and  how to update it. We'll use a prompt type,  
+5:13
+which is just a typed dictionary, by providing a  name, the current prompt, the update instructions,  
+5:20
+and the conditions for updating. We'll fetch  these two prompts and initialize them accordingly.
+5:25
+If you look at the results, you can see  that the tweet prompt hasn't been updated,  
+5:29
+but the email prompt has. It has again learned  to incorporate my preferred sign-off and,  
+5:35
+in these specific situations, to offer  multiple meeting scheduling options.
+5:39
+If I put it back in the store  and then rerun the system,  
+5:42
+we should be able to see whether the  desired prompt effects are in place.
+5:45
+As you can see, it's learned how to sign off its  emails and is also offering multiple options for  
+5:50
+scheduling meetings. The multi-prompt  optimizer is useful in situations where  
+5:55
+you might have outcome-level supervision—either  from end-user feedback or other scenarios—but  
+6:00
+you want your entire system to learn and improve.
+6:04
+Under the hood, it takes the prompt's context,  as well as the feedback and ongoing trajectories,  
+6:09
+and learns which prompts contributed to the  overall outcome. It then uses an optimizer loop  
+6:14
+to determine what updates are necessary and  returns those suggested prompt improvements.
+6:20
+And that's all for today. In this tutorial,  you used LangMem's Prompt Optimizer to learn  
+Technical summary
+6:25
+instructions based on user feedback and  conversation history. You then created a  
+6:29
+multi-agent system and used the MultiPro optimizer  to update the system based on end-user feedback.
+6:35
+Procedural memory is useful  for teaching your agents how  
+6:38
+to accomplish tasks, especially when  those instructions are conditional.
+6:41
+For more information about  this and other types of memory,  
+6:44
+check out the LangMem docs and our other videos.

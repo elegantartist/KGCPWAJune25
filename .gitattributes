@@ -1,0 +1,53 @@
+# Set default line ending behavior
+* text=auto eol=lf
+
+# Ensure shell scripts always use LF
+*.sh text eol=lf
+*.bash text eol=lf
+
+# Ensure batch files use CRLF on Windows
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.mov binary
+*.mp4 binary
+*.mp3 binary
+*.flv binary
+*.fla binary
+*.swf binary
+*.gz binary
+*.zip binary
+*.7z binary
+*.ttf binary
+*.eot binary
+*.woff binary
+*.woff2 binary
+
+# Archive files
+*.tar binary
+*.gz binary
+*.bz2 binary
+*.xz binary
+
+# Font files
+*.ttf binary
+*.otf binary
+
+# Document files
+*.pdf binary
+*.doc binary
+*.docx binary
+
+# Lockfiles should not have line ending conversions
+pnpm-lock.yaml binary
+package-lock.json binary
+yarn.lock binary
+
+# Environment files
+.env* linguist-language=Shell

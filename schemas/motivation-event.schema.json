@@ -1,0 +1,143 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://keepgoingcare.com.au/schemas/motivation-event.schema.json",
+  "title": "KGC Motivation Event Entity",
+  "description": "Patient engagement activities and Keep Going button usage tracking",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "integer",
+      "description": "Primary key identifier",
+      "minimum": 1
+    },
+    "patientId": {
+      "type": "integer",
+      "description": "Foreign key reference to patient",
+      "minimum": 1
+    },
+    "eventType": {
+      "type": "string",
+      "description": "Type of motivation event",
+      "enum": [
+        "keep_going_button",
+        "feature_usage",
+        "badge_earned",
+        "milestone_completed",
+        "cpd_compliance",
+        "chat_interaction",
+        "media_engagement"
+      ]
+    },
+    "eventData": {
+      "type": "object",
+      "description": "Event-specific data and metadata",
+      "properties": {
+        "featureName": {
+          "type": "string",
+          "description": "Name of the feature used"
+        },
+        "duration": {
+          "type": "integer",
+          "description": "Duration of engagement in seconds",
+          "minimum": 0
+        },
+        "buttonLocation": {
+          "type": "string",
+          "description": "Location where Keep Going button was pressed",
+          "enum": ["dashboard", "chat", "daily-scores", "progress", "features"]
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Session identifier for tracking"
+        },
+        "userAgent": {
+          "type": "string",
+          "description": "Browser/device information"
+        },
+        "clickCount": {
+          "type": "integer",
+          "description": "Number of consecutive clicks",
+          "minimum": 1,
+          "default": 1
+        }
+      },
+      "additionalProperties": true
+    },
+    "mediaUrl": {
+      "type": ["string", "null"],
+      "format": "uri",
+      "description": "URL of associated media (image, video, audio)"
+    },
+    "eventDate": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when the event occurred"
+    },
+    "processedByAgent": {
+      "type": "boolean",
+      "description": "Whether the event has been processed by Supervisor Agent",
+      "default": false
+    },
+    "gongSoundPlayed": {
+      "type": "boolean",
+      "description": "Whether the therapeutic 110Hz gong sound was played",
+      "default": false
+    },
+    "emotionalContext": {
+      "type": ["string", "null"],
+      "description": "Patient's emotional state during the event",
+      "enum": ["motivated", "frustrated", "hopeful", "anxious", "confident", "discouraged", null]
+    },
+    "engagementScore": {
+      "type": ["number", "null"],
+      "description": "Calculated engagement score (0-1)",
+      "minimum": 0,
+      "maximum": 1
+    }
+  },
+  "required": [
+    "id",
+    "patientId",
+    "eventType",
+    "eventData",
+    "eventDate",
+    "processedByAgent"
+  ],
+  "additionalProperties": false,
+  "examples": [
+    {
+      "id": 1,
+      "patientId": 3,
+      "eventType": "keep_going_button",
+      "eventData": {
+        "buttonLocation": "dashboard",
+        "sessionId": "session-123-abc",
+        "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X)",
+        "clickCount": 1,
+        "duration": 2
+      },
+      "mediaUrl": null,
+      "eventDate": "2025-08-20T14:30:00Z",
+      "processedByAgent": true,
+      "gongSoundPlayed": true,
+      "emotionalContext": "motivated",
+      "engagementScore": 0.85
+    },
+    {
+      "id": 2,
+      "patientId": 3,
+      "eventType": "feature_usage",
+      "eventData": {
+        "featureName": "inspiration-machine-d",
+        "duration": 180,
+        "sessionId": "session-456-def"
+      },
+      "mediaUrl": "https://youtube.com/watch?v=example",
+      "eventDate": "2025-08-20T15:45:00Z",
+      "processedByAgent": false,
+      "gongSoundPlayed": false,
+      "emotionalContext": "hopeful",
+      "engagementScore": 0.72
+    }
+  ]
+}

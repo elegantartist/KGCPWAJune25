@@ -1,0 +1,296 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://keepgoingcare.com.au/schemas/sentiment-snapshot.schema.json",
+  "title": "KGC Sentiment Snapshot Entity",
+  "description": "Aggregated emotional and behavioral analysis for patients",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "integer",
+      "description": "Primary key identifier",
+      "minimum": 1
+    },
+    "patientId": {
+      "type": "integer",
+      "description": "Foreign key reference to patient",
+      "minimum": 1
+    },
+    "reportPeriodStart": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Start of the analysis period"
+    },
+    "reportPeriodEnd": {
+      "type": "string",
+      "format": "date-time",
+      "description": "End of the analysis period"
+    },
+    "chatSentimentScore": {
+      "type": ["number", "null"],
+      "description": "Overall chat sentiment score (-1 to 1)",
+      "minimum": -1,
+      "maximum": 1
+    },
+    "chatSentimentAnalysis": {
+      "type": ["string", "null"],
+      "description": "Textual analysis of patient sentiment patterns",
+      "maxLength": 2000
+    },
+    "behaviorInsights": {
+      "type": "object",
+      "description": "AI-generated insights about behavior patterns",
+      "properties": {
+        "engagementPatterns": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "pattern": {"type": "string"},
+              "frequency": {"type": "string"},
+              "timeOfDay": {"type": "string"},
+              "confidence": {"type": "number", "minimum": 0, "maximum": 1}
+            },
+            "required": ["pattern", "confidence"]
+          }
+        },
+        "emotionalTriggers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "trigger": {"type": "string"},
+              "emotion": {"type": "string"},
+              "frequency": {"type": "integer"},
+              "severity": {"type": "string", "enum": ["low", "medium", "high"]}
+            },
+            "required": ["trigger", "emotion", "frequency"]
+          }
+        },
+        "motivationalFactors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "factor": {"type": "string"},
+              "effectiveness": {"type": "number", "minimum": 0, "maximum": 1},
+              "category": {"type": "string", "enum": ["intrinsic", "extrinsic", "social", "health"]}
+            },
+            "required": ["factor", "effectiveness", "category"]
+          }
+        },
+        "complianceDrivers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "driver": {"type": "string"},
+              "impact": {"type": "number", "minimum": -1, "maximum": 1},
+              "cpdCategory": {"type": "string", "enum": ["diet", "exercise", "medication"]}
+            },
+            "required": ["driver", "impact"]
+          }
+        }
+      }
+    },
+    "engagementScore": {
+      "type": ["number", "null"],
+      "description": "Overall engagement score (0-100)",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "healthTrends": {
+      "type": "object",
+      "description": "Health-related trend analysis",
+      "properties": {
+        "scoreConsistency": {
+          "type": "number",
+          "description": "Consistency in daily score submissions (0-1)",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "improvementVelocity": {
+          "type": "number",
+          "description": "Rate of health score improvement per week"
+        },
+        "riskFactors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "factor": {"type": "string"},
+              "severity": {"type": "string", "enum": ["low", "medium", "high", "critical"]},
+              "trend": {"type": "string", "enum": ["improving", "stable", "worsening"]},
+              "recommendation": {"type": "string"}
+            },
+            "required": ["factor", "severity", "trend"]
+          }
+        },
+        "positiveIndicators": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "indicator": {"type": "string"},
+              "strength": {"type": "number", "minimum": 0, "maximum": 1},
+              "category": {"type": "string", "enum": ["behavioral", "emotional", "physical", "social"]}
+            },
+            "required": ["indicator", "strength", "category"]
+          }
+        }
+      }
+    },
+    "moodPattern": {
+      "type": "object",
+      "description": "Mood pattern analysis from daily scores",
+      "properties": {
+        "averageMood": {
+          "type": "string",
+          "enum": ["very_poor", "poor", "fair", "good", "excellent"]
+        },
+        "moodVariability": {
+          "type": "number",
+          "description": "Standard deviation of mood scores",
+          "minimum": 0
+        },
+        "moodTrend": {
+          "type": "string",
+          "enum": ["improving", "stable", "declining"]
+        },
+        "weeklyPattern": {
+          "type": "object",
+          "properties": {
+            "monday": {"type": "number"},
+            "tuesday": {"type": "number"},
+            "wednesday": {"type": "number"},
+            "thursday": {"type": "number"},
+            "friday": {"type": "number"},
+            "saturday": {"type": "number"},
+            "sunday": {"type": "number"}
+          }
+        }
+      }
+    },
+    "recommendationsGenerated": {
+      "type": "array",
+      "description": "AI-generated recommendations based on sentiment analysis",
+      "items": {
+        "type": "object",
+        "properties": {
+          "recommendation": {"type": "string"},
+          "category": {"type": "string", "enum": ["behavioral", "clinical", "motivational", "technical"]},
+          "priority": {"type": "string", "enum": ["low", "medium", "high", "urgent"]},
+          "evidence": {"type": "string"},
+          "expectedOutcome": {"type": "string"}
+        },
+        "required": ["recommendation", "category", "priority"]
+      }
+    },
+    "generatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When this sentiment snapshot was generated"
+    },
+    "analysisVersion": {
+      "type": "string",
+      "description": "Version of the sentiment analysis algorithm used",
+      "examples": ["v2.1", "v3.0-beta"]
+    }
+  },
+  "required": [
+    "id",
+    "patientId",
+    "reportPeriodStart",
+    "reportPeriodEnd",
+    "behaviorInsights",
+    "generatedAt",
+    "analysisVersion"
+  ],
+  "additionalProperties": false,
+  "examples": [
+    {
+      "id": 1,
+      "patientId": 3,
+      "reportPeriodStart": "2025-07-20T00:00:00Z",
+      "reportPeriodEnd": "2025-08-20T23:59:59Z",
+      "chatSentimentScore": 0.35,
+      "chatSentimentAnalysis": "Patient shows generally positive engagement with increasing confidence in self-management. Some anxiety around medication timing but responding well to motivational support.",
+      "behaviorInsights": {
+        "engagementPatterns": [
+          {
+            "pattern": "Daily score submission",
+            "frequency": "daily",
+            "timeOfDay": "evening",
+            "confidence": 0.92
+          }
+        ],
+        "emotionalTriggers": [
+          {
+            "trigger": "Medication reminders",
+            "emotion": "anxiety",
+            "frequency": 3,
+            "severity": "low"
+          }
+        ],
+        "motivationalFactors": [
+          {
+            "factor": "Progress badges",
+            "effectiveness": 0.85,
+            "category": "extrinsic"
+          }
+        ],
+        "complianceDrivers": [
+          {
+            "driver": "Visual progress tracking",
+            "impact": 0.75,
+            "cpdCategory": "exercise"
+          }
+        ]
+      },
+      "engagementScore": 78,
+      "healthTrends": {
+        "scoreConsistency": 0.88,
+        "improvementVelocity": 0.12,
+        "riskFactors": [
+          {
+            "factor": "Inconsistent medication timing",
+            "severity": "medium",
+            "trend": "improving",
+            "recommendation": "Implement automated reminder system"
+          }
+        ],
+        "positiveIndicators": [
+          {
+            "indicator": "Regular exercise engagement",
+            "strength": 0.82,
+            "category": "behavioral"
+          }
+        ]
+      },
+      "moodPattern": {
+        "averageMood": "good",
+        "moodVariability": 1.2,
+        "moodTrend": "improving",
+        "weeklyPattern": {
+          "monday": 7.2,
+          "tuesday": 8.1,
+          "wednesday": 7.8,
+          "thursday": 8.5,
+          "friday": 8.9,
+          "saturday": 7.6,
+          "sunday": 7.3
+        }
+      },
+      "recommendationsGenerated": [
+        {
+          "recommendation": "Implement morning medication alarm with positive reinforcement",
+          "category": "behavioral",
+          "priority": "medium",
+          "evidence": "Patient shows anxiety around medication timing but responds well to positive feedback",
+          "expectedOutcome": "Improved medication adherence and reduced anxiety"
+        }
+      ],
+      "generatedAt": "2025-08-20T20:00:00Z",
+      "analysisVersion": "v2.1"
+    }
+  ]
+}

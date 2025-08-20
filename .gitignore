@@ -1,0 +1,123 @@
+# Dependencies
+node_modules/
+*.pnp
+.pnp.js
+
+# Production builds
+dist/
+build/
+out/
+
+# Environment variables and secrets
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.*
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+*.log
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Temporary folders and files
+tmp/
+temp/
+.tmp/
+
+# Replit specific files
+.replit
+.replit.nix
+replit.nix
+replit_zip_error_log.txt
+.upm/
+.config/
+.local/
+.cache/
+.npm/
+.repldb/
+
+# Large asset directories (comment out if needed for production)
+attached_assets/
+cleanup-backups/
+cleanup-logs/
+clean-aws-deploy/
+
+# Large deployment files
+*.zip
+*.tar.gz
+*.tar
+kgc-application.tar.gz
+kgc-healthcare-*.zip
+kgc-aws-*.zip
+kgc-aws-*.tar.gz
+
+# Extracted logs and temporary files
+extracted_logs/
+
+# Monorepo build outputs
+apps/*/dist/
+apps/*/build/
+apps/*/.next/
+services/*/dist/
+services/*/build/
+packages/*/dist/
+packages/*/lib/
+
+# Workspace-specific ignores
+**/tsconfig.tsbuildinfo
+**/.turbo/
+.ultra.cache.json
+
+# Database files (if using local SQLite)
+*.db
+*.sqlite
+*.sqlite3
+
+# AWS and deployment files (keep configs, ignore temporary files)
+deploy-temp/
+
+# Public assets that are large
+public/videos/
+public/large-assets/
+public/*.mp4
+public/*.mov
+public/*.avi
+
+# Testing
+coverage/
+.nyc_output/
+test-results/
+
+# Misc
+.vercel

@@ -1,0 +1,1417 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://keepgoingcare.com/schemas/events/audit-events.json",
+  "title": "KGC Audit Events",
+  "description": "Event schemas for audit logging and compliance activities in the KGC Healthcare Platform",
+  "type": "object",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/DataAccessEvent"
+    },
+    {
+      "$ref": "#/$defs/DataModificationEvent"
+    },
+    {
+      "$ref": "#/$defs/PrivacyRedactionEvent"
+    },
+    {
+      "$ref": "#/$defs/ComplianceValidationEvent"
+    },
+    {
+      "$ref": "#/$defs/SecurityIncidentEvent"
+    },
+    {
+      "$ref": "#/$defs/SystemChangeEvent"
+    },
+    {
+      "$ref": "#/$defs/ExternalIntegrationEvent"
+    },
+    {
+      "$ref": "#/$defs/DataRetentionEvent"
+    }
+  ],
+  "$defs": {
+    "BaseAuditEvent": {
+      "type": "object",
+      "required": ["eventId", "eventType", "timestamp", "actorId"],
+      "properties": {
+        "eventId": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Unique audit event identifier"
+        },
+        "eventType": {
+          "type": "string",
+          "description": "Type of audit event"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Event timestamp in ISO 8601 format"
+        },
+        "actorId": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "ID of user performing the action"
+        },
+        "actorRole": {
+          "type": "string",
+          "enum": ["admin", "doctor", "patient", "system"],
+          "description": "Role of the actor"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Session identifier"
+        },
+        "ipAddress": {
+          "type": "string",
+          "format": "ipv4",
+          "description": "Source IP address"
+        },
+        "userAgent": {
+          "type": "string",
+          "description": "User agent string"
+        },
+        "requestId": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Request correlation ID"
+        },
+        "complianceFlags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["HIPAA", "TGA", "APP", "GDPR", "SOC2"]
+          },
+          "description": "Applicable compliance frameworks"
+        }
+      }
+    },
+    "DataAccessEvent": {
+      "allOf": [
+        {"$ref": "#/$defs/BaseAuditEvent"},
+        {
+          "type": "object",
+          "properties": {
+            "eventType": {
+              "const": "data_access"
+            },
+            "data": {
+              "type": "object",
+              "required": ["dataType", "dataSubjectId", "accessPurpose", "accessMethod"],
+              "properties": {
+                "dataType": {
+                  "type": "string",
+                  "enum": ["user_profile", "health_metrics", "care_plan_directives", "chat_messages", "progress_milestones", "patient_reports", "alerts", "feature_usage", "content_preferences", "audit_logs"],
+                  "description": "Type of data accessed"
+                },
+                "dataSubjectId": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "ID of user whose data was accessed"
+                },
+                "accessPurpose": {
+                  "type": "string",
+                  "enum": ["user_request", "clinical_care", "admin_management", "ai_processing", "report_generation", "compliance_audit", "emergency_response", "system_maintenance"],
+                  "description": "Purpose of data access"
+                },
+                "accessMethod": {
+                  "type": "string",
+                  "enum": ["direct_query", "api_endpoint", "bulk_export", "admin_panel", "ai_tool", "automated_process", "emergency_access"],
+                  "description": "Method used to access data"
+                },
+                "recordsAccessed": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "Number of records accessed"
+                },
+                "dataFields": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Specific data fields accessed"
+                },
+                "dateRange": {
+                  "type": "object",
+                  "properties": {
+                    "startDate": {
+                      "type": "string",
+                      "format": "date"
+                    },
+                    "endDate": {
+                      "type": "string",
+                      "format": "date"
+                    }
+                  },
+                  "description": "Date range of accessed data"
+                },
+                "accessJustification": {
+                  "type": "string",
+                  "maxLength": 500,
+                  "description": "Justification for data access"
+                },
+                "authorizedBy": {
+                  "type": "integer",
+                  "description": "ID of user who authorized access (if different from actor)"
+                },
+                "dataClassification": {
+                  "type": "string",
+                  "enum": ["public", "internal", "confidential", "restricted", "highly_sensitive"],
+                  "description": "Classification level of accessed data"
+                },
+                "crossTenantAccess": {
+                  "type": "boolean",
+                  "description": "Whether access crossed tenant boundaries"
+                },
+                "searchCriteria": {
+                  "type": "string",
+                  "maxLength": 1000,
+                  "description": "Search criteria used (if applicable)"
+                },
+                "resultsFiltered": {
+                  "type": "boolean",
+                  "description": "Whether results were filtered based on permissions"
+                },
+                "encryptionStatus": {
+                  "type": "string",
+                  "enum": ["encrypted_at_rest", "encrypted_in_transit", "both", "unencrypted"],
+                  "description": "Encryption status of accessed data"
+                },
+                "accessDuration": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Duration of data access in milliseconds"
+                },
+                "cacheUsed": {
+                  "type": "boolean",
+                  "description": "Whether cached data was accessed"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "DataModificationEvent": {
+      "allOf": [
+        {"$ref": "#/$defs/BaseAuditEvent"},
+        {
+          "type": "object",
+          "properties": {
+            "eventType": {
+              "const": "data_modification"
+            },
+            "data": {
+              "type": "object",
+              "required": ["dataType", "dataSubjectId", "operation", "modificationPurpose"],
+              "properties": {
+                "dataType": {
+                  "type": "string",
+                  "enum": ["user_profile", "health_metrics", "care_plan_directives", "chat_messages", "progress_milestones", "patient_reports", "alerts", "feature_usage", "content_preferences", "system_config"],
+                  "description": "Type of data modified"
+                },
+                "dataSubjectId": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "ID of user whose data was modified"
+                },
+                "operation": {
+                  "type": "string",
+                  "enum": ["create", "update", "delete", "bulk_update", "batch_create", "soft_delete", "restore", "archive"],
+                  "description": "Type of modification operation"
+                },
+                "modificationPurpose": {
+                  "type": "string",
+                  "enum": ["user_request", "clinical_update", "admin_correction", "system_maintenance", "compliance_requirement", "data_quality", "emergency_change", "automated_process"],
+                  "description": "Purpose of data modification"
+                },
+                "recordId": {
+                  "type": "integer",
+                  "description": "ID of specific record modified"
+                },
+                "fieldsModified": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "fieldName": {
+                        "type": "string"
+                      },
+                      "previousValue": {
+                        "type": "string",
+                        "description": "Previous value (redacted if sensitive)"
+                      },
+                      "newValue": {
+                        "type": "string",
+                        "description": "New value (redacted if sensitive)"
+                      },
+                      "changeReason": {
+                        "type": "string",
+                        "maxLength": 200
+                      }
+                    },
+                    "required": ["fieldName"]
+                  },
+                  "description": "Specific fields that were modified"
+                },
+                "validationPassed": {
+                  "type": "boolean",
+                  "description": "Whether data validation checks passed"
+                },
+                "validationErrors": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Validation errors encountered"
+                },
+                "businessRulesApplied": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Business rules applied during modification"
+                },
+                "approvalRequired": {
+                  "type": "boolean",
+                  "description": "Whether modification required approval"
+                },
+                "approvedBy": {
+                  "type": "integer",
+                  "description": "ID of user who approved modification"
+                },
+                "backupCreated": {
+                  "type": "boolean",
+                  "description": "Whether backup was created before modification"
+                },
+                "rollbackPossible": {
+                  "type": "boolean",
+                  "description": "Whether modification can be rolled back"
+                },
+                "cascadeEffects": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "affectedTable": {
+                        "type": "string"
+                      },
+                      "affectedRecords": {
+                        "type": "integer"
+                      },
+                      "changeType": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "description": "Cascade effects of the modification"
+                },
+                "dataIntegrityChecks": {
+                  "type": "object",
+                  "properties": {
+                    "checksPerformed": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "checksPassedOK": {
+                      "type": "boolean"
+                    },
+                    "issuesFound": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "complianceImpact": {
+                  "type": "object",
+                  "properties": {
+                    "requiresNotification": {
+                      "type": "boolean"
+                    },
+                    "affectedRegulations": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "retentionPolicyImpact": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "PrivacyRedactionEvent": {
+      "allOf": [
+        {"$ref": "#/$defs/BaseAuditEvent"},
+        {
+          "type": "object",
+          "properties": {
+            "eventType": {
+              "const": "privacy_redaction"
+            },
+            "data": {
+              "type": "object",
+              "required": ["redactionTrigger", "dataType", "redactionLevel", "piiTypesDetected"],
+              "properties": {
+                "redactionTrigger": {
+                  "type": "string",
+                  "enum": ["ai_processing", "external_sharing", "log_generation", "report_creation", "api_response", "backup_creation", "manual_request"],
+                  "description": "What triggered the redaction"
+                },
+                "dataType": {
+                  "type": "string",
+                  "enum": ["chat_message", "health_notes", "user_profile", "api_payload", "log_entry", "report_content", "export_file"],
+                  "description": "Type of data being redacted"
+                },
+                "redactionLevel": {
+                  "type": "string",
+                  "enum": ["partial", "full", "anonymization", "pseudonymization", "tokenization"],
+                  "description": "Level of redaction applied"
+                },
+                "piiTypesDetected": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": ["name", "email", "phone", "address", "medicare_number", "ahpra_registration", "date_of_birth", "medical_record_number", "family_member_names", "location_details"]
+                  },
+                  "description": "Types of PII detected and redacted"
+                },
+                "redactionMethod": {
+                  "type": "string",
+                  "enum": ["pattern_matching", "ml_detection", "manual_identification", "rule_based", "hybrid_approach"],
+                  "description": "Method used for PII detection"
+                },
+                "confidenceScore": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1,
+                  "description": "Confidence score in PII detection"
+                },
+                "originalDataLength": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Length of original data before redaction"
+                },
+                "redactedDataLength": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Length of data after redaction"
+                },
+                "redactionPercentage": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100,
+                  "description": "Percentage of data redacted"
+                },
+                "preservedContext": {
+                  "type": "boolean",
+                  "description": "Whether clinical/business context was preserved"
+                },
+                "qualityChecks": {
+                  "type": "object",
+                  "properties": {
+                    "manualReview": {
+                      "type": "boolean"
+                    },
+                    "automatedValidation": {
+                      "type": "boolean"
+                    },
+                    "qualityScore": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    }
+                  }
+                },
+                "reversibilityInfo": {
+                  "type": "object",
+                  "properties": {
+                    "isReversible": {
+                      "type": "boolean"
+                    },
+                    "keyStorageLocation": {
+                      "type": "string"
+                    },
+                    "expiryDate": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                },
+                "complianceFrameworks": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": ["HIPAA", "TGA", "APP", "GDPR", "CCPA"]
+                  },
+                  "description": "Compliance frameworks requiring redaction"
+                },
+                "destinationContext": {
+                  "type": "string",
+                  "enum": ["ai_training", "analytics", "reporting", "external_sharing", "backup", "logging", "debugging"],
+                  "description": "Intended use context for redacted data"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "ComplianceValidationEvent": {
+      "allOf": [
+        {"$ref": "#/$defs/BaseAuditEvent"},
+        {
+          "type": "object",
+          "properties": {
+            "eventType": {
+              "const": "compliance_validation"
+            },
+            "data": {
+              "type": "object",
+              "required": ["validationType", "complianceFramework", "validationResult"],
+              "properties": {
+                "validationType": {
+                  "type": "string",
+                  "enum": ["data_access_control", "consent_validation", "retention_policy", "cross_border_transfer", "purpose_limitation", "data_minimization", "security_controls", "audit_trail"],
+                  "description": "Type of compliance validation"
+                },
+                "complianceFramework": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": ["HIPAA", "TGA_SaMD", "APP", "GDPR", "SOC2", "ISO27001", "NIST"]
+                  },
+                  "description": "Applicable compliance frameworks"
+                },
+                "validationResult": {
+                  "type": "string",
+                  "enum": ["compliant", "non_compliant", "conditional_compliant", "requires_review", "exception_granted"],
+                  "description": "Result of compliance validation"
+                },
+                "validationRules": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "ruleId": {
+                        "type": "string"
+                      },
+                      "ruleName": {
+                        "type": "string"
+                      },
+                      "ruleResult": {
+                        "type": "string",
+                        "enum": ["pass", "fail", "warning", "not_applicable"]
+                      },
+                      "ruleDetails": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "description": "Individual compliance rules checked"
+                },
+                "dataInvolvedtype": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": ["health_data", "personal_data", "sensitive_data", "financial_data", "behavioral_data", "biometric_data"]
+                  },
+                  "description": "Types of data involved in validation"
+                },
+                "violationsFound": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "violationType": {
+                        "type": "string"
+                      },
+                      "severity": {
+                        "type": "string",
+                        "enum": ["low", "medium", "high", "critical"]
+                      },
+                      "description": {
+                        "type": "string"
+                      },
+                      "remediation": {
+                        "type": "string"
+                      },
+                      "deadline": {
+                        "type": "string",
+                        "format": "date-time"
+                      }
+                    }
+                  },
+                  "description": "Compliance violations found"
+                },
+                "mitigatingFactors": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Factors that mitigate compliance risks"
+                },
+                "recommendedActions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "action": {
+                        "type": "string"
+                      },
+                      "priority": {
+                        "type": "string",
+                        "enum": ["low", "medium", "high", "urgent"]
+                      },
+                      "estimatedEffort": {
+                        "type": "string"
+                      },
+                      "responsible": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "description": "Recommended remediation actions"
+                },
+                "validationAutomated": {
+                  "type": "boolean",
+                  "description": "Whether validation was automated"
+                },
+                "validationToolsUsed": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Tools used for validation"
+                },
+                "nextValidationDate": {
+                  "type": "string",
+                  "format": "date",
+                  "description": "Date for next compliance validation"
+                },
+                "evidenceCollected": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "evidenceType": {
+                        "type": "string"
+                      },
+                      "evidenceLocation": {
+                        "type": "string"
+                      },
+                      "evidenceHash": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "description": "Evidence collected for compliance"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "SecurityIncidentEvent": {
+      "allOf": [
+        {"$ref": "#/$defs/BaseAuditEvent"},
+        {
+          "type": "object",
+          "properties": {
+            "eventType": {
+              "const": "security_incident"
+            },
+            "data": {
+              "type": "object",
+              "required": ["incidentType", "severity", "detectionMethod", "incidentStatus"],
+              "properties": {
+                "incidentType": {
+                  "type": "string",
+                  "enum": ["unauthorized_access", "data_breach", "authentication_failure", "privilege_escalation", "malicious_activity", "system_compromise", "ddos_attack", "data_exfiltration", "account_takeover"],
+                  "description": "Type of security incident"
+                },
+                "severity": {
+                  "type": "string",
+                  "enum": ["low", "medium", "high", "critical"],
+                  "description": "Incident severity level"
+                },
+                "detectionMethod": {
+                  "type": "string",
+                  "enum": ["automated_monitoring", "user_report", "system_alert", "manual_discovery", "external_notification", "penetration_test", "audit_finding"],
+                  "description": "How the incident was detected"
+                },
+                "incidentStatus": {
+                  "type": "string",
+                  "enum": ["detected", "investigating", "contained", "eradicated", "recovered", "closed"],
+                  "description": "Current status of incident"
+                },
+                "detectionTime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "When incident was first detected"
+                },
+                "affectedSystems": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Systems affected by the incident"
+                },
+                "affectedData": {
+                  "type": "object",
+                  "properties": {
+                    "dataTypes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "recordCount": {
+                      "type": "integer"
+                    },
+                    "dataClassification": {
+                      "type": "string"
+                    },
+                    "containsPHI": {
+                      "type": "boolean"
+                    }
+                  },
+                  "description": "Data affected by the incident"
+                },
+                "attackVector": {
+                  "type": "string",
+                  "enum": ["phishing", "malware", "sql_injection", "xss", "social_engineering", "physical_access", "insider_threat", "third_party", "configuration_error"],
+                  "description": "Attack vector used"
+                },
+                "sourceIpAddresses": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "format": "ipv4"
+                  },
+                  "description": "Source IP addresses involved"
+                },
+                "geographicOrigin": {
+                  "type": "string",
+                  "description": "Geographic origin of attack"
+                },
+                "responsibleParty": {
+                  "type": "object",
+                  "properties": {
+                    "assignedTo": {
+                      "type": "integer"
+                    },
+                    "escalatedTo": {
+                      "type": "integer"
+                    },
+                    "responseTeam": {
+                      "type": "array",
+                      "items": {
+                        "type": "integer"
+                      }
+                    }
+                  },
+                  "description": "Parties responsible for incident response"
+                },
+                "immediateActions": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Immediate actions taken"
+                },
+                "evidenceCollected": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "evidenceType": {
+                        "type": "string"
+                      },
+                      "location": {
+                        "type": "string"
+                      },
+                      "hash": {
+                        "type": "string"
+                      },
+                      "chain_of_custody": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "description": "Digital evidence collected"
+                },
+                "lawEnforcementNotified": {
+                  "type": "boolean",
+                  "description": "Whether law enforcement was notified"
+                },
+                "regulatoryNotification": {
+                  "type": "object",
+                  "properties": {
+                    "required": {
+                      "type": "boolean"
+                    },
+                    "notified": {
+                      "type": "boolean"
+                    },
+                    "deadline": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "authorities": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "description": "Regulatory notification requirements"
+                },
+                "customerNotification": {
+                  "type": "object",
+                  "properties": {
+                    "required": {
+                      "type": "boolean"
+                    },
+                    "completed": {
+                      "type": "boolean"
+                    },
+                    "method": {
+                      "type": "string"
+                    },
+                    "affectedUsers": {
+                      "type": "integer"
+                    }
+                  },
+                  "description": "Customer notification details"
+                },
+                "businessImpact": {
+                  "type": "object",
+                  "properties": {
+                    "serviceDisruption": {
+                      "type": "boolean"
+                    },
+                    "downtime": {
+                      "type": "integer",
+                      "description": "Downtime in minutes"
+                    },
+                    "affectedUsers": {
+                      "type": "integer"
+                    },
+                    "revenueImpact": {
+                      "type": "number"
+                    }
+                  },
+                  "description": "Business impact assessment"
+                },
+                "lessons learned": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Lessons learned from incident"
+                },
+                "remediation": {
+                  "type": "object",
+                  "properties": {
+                    "completed": {
+                      "type": "boolean"
+                    },
+                    "actions": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "preventiveMeasures": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "description": "Remediation activities"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "SystemChangeEvent": {
+      "allOf": [
+        {"$ref": "#/$defs/BaseAuditEvent"},
+        {
+          "type": "object",
+          "properties": {
+            "eventType": {
+              "const": "system_change"
+            },
+            "data": {
+              "type": "object",
+              "required": ["changeType", "changeCategory", "changeApproval", "implementedBy"],
+              "properties": {
+                "changeType": {
+                  "type": "string",
+                  "enum": ["configuration", "software_update", "security_patch", "feature_addition", "bug_fix", "infrastructure", "database_schema", "permission_change", "integration"],
+                  "description": "Type of system change"
+                },
+                "changeCategory": {
+                  "type": "string",
+                  "enum": ["emergency", "standard", "normal", "minor", "major"],
+                  "description": "Category of change"
+                },
+                "changeApproval": {
+                  "type": "object",
+                  "properties": {
+                    "required": {
+                      "type": "boolean"
+                    },
+                    "approvedBy": {
+                      "type": "integer"
+                    },
+                    "approvalDate": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "approvalMethod": {
+                      "type": "string"
+                    }
+                  },
+                  "description": "Change approval details"
+                },
+                "implementedBy": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "ID of user who implemented the change"
+                },
+                "changeDescription": {
+                  "type": "string",
+                  "maxLength": 2000,
+                  "description": "Detailed description of the change"
+                },
+                "affectedComponents": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "System components affected by change"
+                },
+                "riskAssessment": {
+                  "type": "object",
+                  "properties": {
+                    "riskLevel": {
+                      "type": "string",
+                      "enum": ["low", "medium", "high", "critical"]
+                    },
+                    "riskFactors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "mitigationMeasures": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "description": "Risk assessment for the change"
+                },
+                "testingPerformed": {
+                  "type": "object",
+                  "properties": {
+                    "testingRequired": {
+                      "type": "boolean"
+                    },
+                    "testingCompleted": {
+                      "type": "boolean"
+                    },
+                    "testResults": {
+                      "type": "string",
+                      "enum": ["passed", "failed", "partially_passed", "not_tested"]
+                    },
+                    "testEnvironment": {
+                      "type": "string"
+                    }
+                  },
+                  "description": "Testing performed for the change"
+                },
+                "rollbackPlan": {
+                  "type": "object",
+                  "properties": {
+                    "hasRollbackPlan": {
+                      "type": "boolean"
+                    },
+                    "rollbackTested": {
+                      "type": "boolean"
+                    },
+                    "rollbackTime": {
+                      "type": "integer",
+                      "description": "Estimated rollback time in minutes"
+                    }
+                  },
+                  "description": "Rollback plan details"
+                },
+                "maintenanceWindow": {
+                  "type": "object",
+                  "properties": {
+                    "scheduled": {
+                      "type": "boolean"
+                    },
+                    "startTime": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "endTime": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "notificationSent": {
+                      "type": "boolean"
+                    }
+                  },
+                  "description": "Maintenance window information"
+                },
+                "complianceImpact": {
+                  "type": "object",
+                  "properties": {
+                    "impactsCompliance": {
+                      "type": "boolean"
+                    },
+                    "affectedFrameworks": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "reviewRequired": {
+                      "type": "boolean"
+                    }
+                  },
+                  "description": "Compliance impact assessment"
+                },
+                "documentationUpdated": {
+                  "type": "boolean",
+                  "description": "Whether documentation was updated"
+                },
+                "changeResult": {
+                  "type": "string",
+                  "enum": ["successful", "failed", "partially_successful", "rolled_back"],
+                  "description": "Result of the change implementation"
+                },
+                "postChangeValidation": {
+                  "type": "object",
+                  "properties": {
+                    "validationPerformed": {
+                      "type": "boolean"
+                    },
+                    "validationResults": {
+                      "type": "string"
+                    },
+                    "issuesFound": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "description": "Post-change validation results"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "ExternalIntegrationEvent": {
+      "allOf": [
+        {"$ref": "#/$defs/BaseAuditEvent"},
+        {
+          "type": "object",
+          "properties": {
+            "eventType": {
+              "const": "external_integration"
+            },
+            "data": {
+              "type": "object",
+              "required": ["integrationType", "externalService", "operationType", "dataTransferred"],
+              "properties": {
+                "integrationType": {
+                  "type": "string",
+                  "enum": ["api_call", "data_export", "data_import", "authentication", "notification", "payment_processing", "analytics", "backup"],
+                  "description": "Type of external integration"
+                },
+                "externalService": {
+                  "type": "string",
+                  "enum": ["openai", "anthropic", "twilio", "sendgrid", "tavily", "stripe", "youtube", "food_standards", "aws_secrets", "neon_database"],
+                  "description": "External service involved"
+                },
+                "operationType": {
+                  "type": "string",
+                  "enum": ["read", "write", "delete", "authenticate", "authorize", "notify", "process", "analyze"],
+                  "description": "Type of operation performed"
+                },
+                "dataTransferred": {
+                  "type": "object",
+                  "properties": {
+                    "dataType": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "dataSize": {
+                      "type": "integer",
+                      "description": "Size of data transferred in bytes"
+                    },
+                    "recordCount": {
+                      "type": "integer"
+                    },
+                    "containsPII": {
+                      "type": "boolean"
+                    },
+                    "containsPHI": {
+                      "type": "boolean"
+                    },
+                    "encryptionUsed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "description": "Information about data transferred"
+                },
+                "requestDetails": {
+                  "type": "object",
+                  "properties": {
+                    "endpoint": {
+                      "type": "string"
+                    },
+                    "method": {
+                      "type": "string"
+                    },
+                    "parameters": {
+                      "type": "string",
+                      "description": "Request parameters (redacted for security)"
+                    },
+                    "headers": {
+                      "type": "string",
+                      "description": "Request headers (sensitive headers redacted)"
+                    }
+                  },
+                  "description": "Details of the API request"
+                },
+                "responseDetails": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "responseTime": {
+                      "type": "integer",
+                      "description": "Response time in milliseconds"
+                    },
+                    "responseSize": {
+                      "type": "integer",
+                      "description": "Response size in bytes"
+                    },
+                    "errorMessage": {
+                      "type": "string"
+                    }
+                  },
+                  "description": "Details of the API response"
+                },
+                "authenticationMethod": {
+                  "type": "string",
+                  "enum": ["api_key", "oauth", "jwt", "basic_auth", "certificate", "none"],
+                  "description": "Authentication method used"
+                },
+                "dataProcessingPurpose": {
+                  "type": "string",
+                  "enum": ["ai_processing", "communication", "analytics", "backup", "payment", "authentication", "content_retrieval", "health_analysis"],
+                  "description": "Purpose of data processing"
+                },
+                "retentionPolicy": {
+                  "type": "object",
+                  "properties": {
+                    "externalRetention": {
+                      "type": "string"
+                    },
+                    "dataLocation": {
+                      "type": "string"
+                    },
+                    "deletionSchedule": {
+                      "type": "string"
+                    }
+                  },
+                  "description": "Data retention policy for external service"
+                },
+                "complianceVerification": {
+                  "type": "object",
+                  "properties": {
+                    "baAgreement": {
+                      "type": "boolean",
+                      "description": "Business Associate Agreement in place"
+                    },
+                    "dpAgreement": {
+                      "type": "boolean",
+                      "description": "Data Processing Agreement in place"
+                    },
+                    "certifications": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "description": "Compliance verification for external service"
+                },
+                "costImpact": {
+                  "type": "object",
+                  "properties": {
+                    "costIncurred": {
+                      "type": "number"
+                    },
+                    "billingMetric": {
+                      "type": "string"
+                    },
+                    "budgetImpact": {
+                      "type": "string"
+                    }
+                  },
+                  "description": "Cost impact of external service usage"
+                },
+                "rateLimit": {
+                  "type": "object",
+                  "properties": {
+                    "limitApplied": {
+                      "type": "boolean"
+                    },
+                    "currentUsage": {
+                      "type": "integer"
+                    },
+                    "limitThreshold": {
+                      "type": "integer"
+                    },
+                    "resetTime": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "description": "Rate limiting information"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "DataRetentionEvent": {
+      "allOf": [
+        {"$ref": "#/$defs/BaseAuditEvent"},
+        {
+          "type": "object",
+          "properties": {
+            "eventType": {
+              "const": "data_retention"
+            },
+            "data": {
+              "type": "object",
+              "required": ["retentionAction", "dataType", "retentionPolicy", "recordsAffected"],
+              "properties": {
+                "retentionAction": {
+                  "type": "string",
+                  "enum": ["archive", "delete", "purge", "anonymize", "pseudonymize", "restore", "extend_retention", "review"],
+                  "description": "Retention action performed"
+                },
+                "dataType": {
+                  "type": "string",
+                  "enum": ["user_data", "health_records", "chat_logs", "audit_logs", "system_logs", "backup_data", "temporary_files", "cache_data"],
+                  "description": "Type of data affected by retention action"
+                },
+                "retentionPolicy": {
+                  "type": "object",
+                  "properties": {
+                    "policyId": {
+                      "type": "string"
+                    },
+                    "policyName": {
+                      "type": "string"
+                    },
+                    "retentionPeriod": {
+                      "type": "string"
+                    },
+                    "legalBasis": {
+                      "type": "string"
+                    }
+                  },
+                  "description": "Retention policy details"
+                },
+                "recordsAffected": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Number of records affected"
+                },
+                "dataSize": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Size of data affected in bytes"
+                },
+                "retentionCriteria": {
+                  "type": "object",
+                  "properties": {
+                    "ageThreshold": {
+                      "type": "string"
+                    },
+                    "lastAccessDate": {
+                      "type": "string",
+                      "format": "date"
+                    },
+                    "dataClassification": {
+                      "type": "string"
+                    },
+                    "businessJustification": {
+                      "type": "string"
+                    }
+                  },
+                  "description": "Criteria used for retention decision"
+                },
+                "verificationMethods": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": ["manual_review", "automated_scan", "sampling", "hash_verification", "audit_trail_check"]
+                  },
+                  "description": "Methods used to verify retention action"
+                },
+                "backupStatus": {
+                  "type": "object",
+                  "properties": {
+                    "backupCreated": {
+                      "type": "boolean"
+                    },
+                    "backupLocation": {
+                      "type": "string"
+                    },
+                    "backupRetention": {
+                      "type": "string"
+                    },
+                    "backupEncrypted": {
+                      "type": "boolean"
+                    }
+                  },
+                  "description": "Backup status before retention action"
+                },
+                "legalHolds": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "holdId": {
+                        "type": "string"
+                      },
+                      "holdReason": {
+                        "type": "string"
+                      },
+                      "holdStatus": {
+                        "type": "string"
+                      },
+                      "exemptedRecords": {
+                        "type": "integer"
+                      }
+                    }
+                  },
+                  "description": "Legal holds affecting retention"
+                },
+                "complianceRequirements": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "regulation": {
+                        "type": "string"
+                      },
+                      "requirement": {
+                        "type": "string"
+                      },
+                      "minimumRetention": {
+                        "type": "string"
+                      },
+                      "maximumRetention": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "description": "Compliance requirements affecting retention"
+                },
+                "destructionMethod": {
+                  "type": "string",
+                  "enum": ["secure_delete", "cryptographic_erasure", "physical_destruction", "overwriting", "degaussing"],
+                  "description": "Method used for data destruction"
+                },
+                "destructionCertificate": {
+                  "type": "object",
+                  "properties": {
+                    "certificateId": {
+                      "type": "string"
+                    },
+                    "issuedBy": {
+                      "type": "string"
+                    },
+                    "verificationHash": {
+                      "type": "string"
+                    },
+                    "witnessedBy": {
+                      "type": "integer"
+                    }
+                  },
+                  "description": "Certificate of destruction details"
+                },
+                "reviewComments": {
+                  "type": "string",
+                  "maxLength": 1000,
+                  "description": "Comments from retention review"
+                },
+                "nextReviewDate": {
+                  "type": "string",
+                  "format": "date",
+                  "description": "Date for next retention review"
+                },
+                "exceptionGranted": {
+                  "type": "object",
+                  "properties": {
+                    "granted": {
+                      "type": "boolean"
+                    },
+                    "reason": {
+                      "type": "string"
+                    },
+                    "grantedBy": {
+                      "type": "integer"
+                    },
+                    "expiryDate": {
+                      "type": "string",
+                      "format": "date"
+                    }
+                  },
+                  "description": "Retention exception details"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

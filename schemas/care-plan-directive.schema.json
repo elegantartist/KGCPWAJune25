@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://keepgoingcare.com.au/schemas/care-plan-directive.schema.json",
+  "title": "KGC Care Plan Directive (CPD) Entity",
+  "description": "Doctor-defined health goals and targets for patients",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "integer",
+      "description": "Primary key identifier",
+      "minimum": 1
+    },
+    "userId": {
+      "type": "integer",
+      "description": "Foreign key reference to patient",
+      "minimum": 1
+    },
+    "directive": {
+      "type": "string",
+      "description": "The care plan directive text",
+      "minLength": 1,
+      "maxLength": 2000,
+      "examples": [
+        "Reduce sodium intake to less than 2300mg per day",
+        "Exercise for at least 30 minutes, 5 days per week",
+        "Take medication at 8:00 AM and 6:00 PM daily"
+      ]
+    },
+    "category": {
+      "type": "string",
+      "description": "Category of the care plan directive",
+      "enum": ["diet", "exercise", "medication"]
+    },
+    "targetValue": {
+      "type": ["number", "null"],
+      "description": "Numerical target if applicable (e.g., steps, mg, minutes)",
+      "minimum": 0
+    },
+    "active": {
+      "type": "boolean",
+      "description": "Whether the directive is currently active",
+      "default": true
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when directive was created"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when directive was last updated"
+    },
+    "priority": {
+      "type": "string",
+      "description": "Priority level of the directive",
+      "enum": ["low", "medium", "high", "critical"],
+      "default": "medium"
+    },
+    "measurementUnit": {
+      "type": ["string", "null"],
+      "description": "Unit of measurement for the target value",
+      "examples": ["mg", "minutes", "steps", "servings", "hours"]
+    },
+    "frequency": {
+      "type": "string",
+      "description": "How often the directive should be followed",
+      "enum": ["daily", "weekly", "monthly", "as_needed"],
+      "default": "daily"
+    },
+    "doctorNotes": {
+      "type": ["string", "null"],
+      "description": "Additional notes from the doctor",
+      "maxLength": 1000
+    }
+  },
+  "required": [
+    "id",
+    "userId",
+    "directive",
+    "category",
+    "active",
+    "createdAt",
+    "updatedAt"
+  ],
+  "additionalProperties": false,
+  "examples": [
+    {
+      "id": 1,
+      "userId": 3,
+      "directive": "Reduce sodium intake to less than 2300mg per day",
+      "category": "diet",
+      "targetValue": 2300,
+      "active": true,
+      "createdAt": "2025-02-01T15:00:00Z",
+      "updatedAt": "2025-02-01T15:00:00Z",
+      "priority": "high",
+      "measurementUnit": "mg",
+      "frequency": "daily",
+      "doctorNotes": "Patient has hypertension, sodium reduction is critical"
+    },
+    {
+      "id": 2,
+      "userId": 3,
+      "directive": "Exercise for at least 30 minutes, 5 days per week",
+      "category": "exercise",
+      "targetValue": 30,
+      "active": true,
+      "createdAt": "2025-02-01T15:05:00Z",
+      "updatedAt": "2025-02-01T15:05:00Z",
+      "priority": "medium",
+      "measurementUnit": "minutes",
+      "frequency": "daily",
+      "doctorNotes": "Start with light walking, gradually increase intensity"
+    }
+  ]
+}

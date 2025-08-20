@@ -1,0 +1,401 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://keepgoingcare.com/schemas/events/user-events.json",
+  "title": "KGC User Events",
+  "description": "Event schemas for user-related activities in the KGC Healthcare Platform",
+  "type": "object",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/UserCreatedEvent"
+    },
+    {
+      "$ref": "#/$defs/UserUpdatedEvent"
+    },
+    {
+      "$ref": "#/$defs/UserLoginEvent"
+    },
+    {
+      "$ref": "#/$defs/UserLogoutEvent"
+    },
+    {
+      "$ref": "#/$defs/SMSVerificationEvent"
+    },
+    {
+      "$ref": "#/$defs/PasswordChangeEvent"
+    },
+    {
+      "$ref": "#/$defs/RoleAssignmentEvent"
+    }
+  ],
+  "$defs": {
+    "BaseEvent": {
+      "type": "object",
+      "required": ["eventId", "eventType", "timestamp", "userId"],
+      "properties": {
+        "eventId": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Unique event identifier"
+        },
+        "eventType": {
+          "type": "string",
+          "description": "Type of event"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Event timestamp in ISO 8601 format"
+        },
+        "userId": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "User ID associated with the event"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Session identifier if applicable"
+        },
+        "ipAddress": {
+          "type": "string",
+          "format": "ipv4",
+          "description": "Client IP address"
+        },
+        "userAgent": {
+          "type": "string",
+          "description": "Client user agent string"
+        }
+      }
+    },
+    "UserCreatedEvent": {
+      "allOf": [
+        {"$ref": "#/$defs/BaseEvent"},
+        {
+          "type": "object",
+          "properties": {
+            "eventType": {
+              "const": "user_created"
+            },
+            "data": {
+              "type": "object",
+              "required": ["newUserId", "name", "email", "roleId", "uin", "createdBy"],
+              "properties": {
+                "newUserId": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "ID of the newly created user"
+                },
+                "name": {
+                  "type": "string",
+                  "maxLength": 255,
+                  "description": "Full name of the new user"
+                },
+                "email": {
+                  "type": "string",
+                  "format": "email",
+                  "description": "Email address of the new user"
+                },
+                "roleId": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 3,
+                  "description": "Role ID (1=Admin, 2=Doctor, 3=Patient)"
+                },
+                "uin": {
+                  "type": "string",
+                  "pattern": "^KGC-(ADM|DOC|PAT)-\\d{3,}$",
+                  "description": "Generated User Identification Number"
+                },
+                "createdBy": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "ID of user who created this account"
+                },
+                "phoneNumber": {
+                  "type": "string",
+                  "pattern": "^\\+61[0-9]{9}$",
+                  "description": "Australian phone number"
+                },
+                "medicareNumber": {
+                  "type": "string",
+                  "pattern": "^[0-9]{10}$",
+                  "description": "10-digit Medicare number (patients only)"
+                },
+                "ahpraRegistration": {
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}[0-9]{10}$",
+                  "description": "AHPRA registration number (doctors only)"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "UserUpdatedEvent": {
+      "allOf": [
+        {"$ref": "#/$defs/BaseEvent"},
+        {
+          "type": "object",
+          "properties": {
+            "eventType": {
+              "const": "user_updated"
+            },
+            "data": {
+              "type": "object",
+              "required": ["updatedFields", "updatedBy"],
+              "properties": {
+                "updatedFields": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "List of fields that were updated"
+                },
+                "updatedBy": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "ID of user who made the update"
+                },
+                "previousValues": {
+                  "type": "object",
+                  "description": "Previous values of updated fields (sensitive data redacted)"
+                },
+                "newValues": {
+                  "type": "object",
+                  "description": "New values of updated fields (sensitive data redacted)"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "UserLoginEvent": {
+      "allOf": [
+        {"$ref": "#/$defs/BaseEvent"},
+        {
+          "type": "object",
+          "properties": {
+            "eventType": {
+              "const": "user_login"
+            },
+            "data": {
+              "type": "object",
+              "required": ["loginMethod", "success", "roleId"],
+              "properties": {
+                "loginMethod": {
+                  "type": "string",
+                  "enum": ["email_password", "sms_verification", "session_resume"],
+                  "description": "Method used for authentication"
+                },
+                "success": {
+                  "type": "boolean",
+                  "description": "Whether login was successful"
+                },
+                "roleId": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 3,
+                  "description": "User role ID"
+                },
+                "failureReason": {
+                  "type": "string",
+                  "description": "Reason for login failure (if applicable)"
+                },
+                "phoneNumber": {
+                  "type": "string",
+                  "pattern": "^\\+61[0-9]{9}$",
+                  "description": "Phone number used (for SMS login)"
+                },
+                "email": {
+                  "type": "string",
+                  "format": "email",
+                  "description": "Email used (for email/password login)"
+                },
+                "attemptCount": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "Number of login attempts in this session"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "UserLogoutEvent": {
+      "allOf": [
+        {"$ref": "#/$defs/BaseEvent"},
+        {
+          "type": "object",
+          "properties": {
+            "eventType": {
+              "const": "user_logout"
+            },
+            "data": {
+              "type": "object",
+              "required": ["logoutType", "sessionDuration"],
+              "properties": {
+                "logoutType": {
+                  "type": "string",
+                  "enum": ["manual", "timeout", "forced"],
+                  "description": "Type of logout"
+                },
+                "sessionDuration": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Session duration in seconds"
+                },
+                "roleId": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 3,
+                  "description": "User role ID"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "SMSVerificationEvent": {
+      "allOf": [
+        {"$ref": "#/$defs/BaseEvent"},
+        {
+          "type": "object",
+          "properties": {
+            "eventType": {
+              "const": "sms_verification"
+            },
+            "data": {
+              "type": "object",
+              "required": ["action", "phoneNumber", "success"],
+              "properties": {
+                "action": {
+                  "type": "string",
+                  "enum": ["code_sent", "code_verified", "code_failed"],
+                  "description": "SMS verification action"
+                },
+                "phoneNumber": {
+                  "type": "string",
+                  "pattern": "^\\+61[0-9]{9}$",
+                  "description": "Target phone number"
+                },
+                "success": {
+                  "type": "boolean",
+                  "description": "Whether action was successful"
+                },
+                "attemptCount": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "Number of verification attempts"
+                },
+                "failureReason": {
+                  "type": "string",
+                  "description": "Reason for failure (if applicable)"
+                },
+                "codeExpiry": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "When the verification code expires"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "PasswordChangeEvent": {
+      "allOf": [
+        {"$ref": "#/$defs/BaseEvent"},
+        {
+          "type": "object",
+          "properties": {
+            "eventType": {
+              "const": "password_change"
+            },
+            "data": {
+              "type": "object",
+              "required": ["changeType", "success", "initiatedBy"],
+              "properties": {
+                "changeType": {
+                  "type": "string",
+                  "enum": ["self_initiated", "admin_reset", "forced_reset"],
+                  "description": "Type of password change"
+                },
+                "success": {
+                  "type": "boolean",
+                  "description": "Whether password change was successful"
+                },
+                "initiatedBy": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "ID of user who initiated the change"
+                },
+                "requiresReauth": {
+                  "type": "boolean",
+                  "description": "Whether user needs to re-authenticate"
+                },
+                "failureReason": {
+                  "type": "string",
+                  "description": "Reason for failure (if applicable)"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "RoleAssignmentEvent": {
+      "allOf": [
+        {"$ref": "#/$defs/BaseEvent"},
+        {
+          "type": "object",
+          "properties": {
+            "eventType": {
+              "const": "role_assignment"
+            },
+            "data": {
+              "type": "object",
+              "required": ["targetUserId", "previousRoleId", "newRoleId", "assignedBy"],
+              "properties": {
+                "targetUserId": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "ID of user whose role is being changed"
+                },
+                "previousRoleId": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 3,
+                  "description": "Previous role ID"
+                },
+                "newRoleId": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 3,
+                  "description": "New role ID"
+                },
+                "assignedBy": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "ID of user who made the role assignment"
+                },
+                "reason": {
+                  "type": "string",
+                  "maxLength": 500,
+                  "description": "Reason for role change"
+                },
+                "effectiveDate": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "When the role change takes effect"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

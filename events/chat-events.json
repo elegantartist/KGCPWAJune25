@@ -1,0 +1,763 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://keepgoingcare.com/schemas/events/chat-events.json",
+  "title": "KGC Chat Events",
+  "description": "Event schemas for AI chat and communication activities in the KGC Healthcare Platform",
+  "type": "object",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/ChatMessageSentEvent"
+    },
+    {
+      "$ref": "#/$defs/ChatMessageReceivedEvent"
+    },
+    {
+      "$ref": "#/$defs/EmergencyDetectedEvent"
+    },
+    {
+      "$ref": "#/$defs/AIRecommendationGeneratedEvent"
+    },
+    {
+      "$ref": "#/$defs/MCPToolUsedEvent"
+    },
+    {
+      "$ref": "#/$defs/ConversationStartedEvent"
+    },
+    {
+      "$ref": "#/$defs/ConversationEndedEvent"
+    },
+    {
+      "$ref": "#/$defs/SentimentAnalyzedEvent"
+    }
+  ],
+  "$defs": {
+    "BaseChatEvent": {
+      "type": "object",
+      "required": ["eventId", "eventType", "timestamp", "userId"],
+      "properties": {
+        "eventId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "eventType": {
+          "type": "string"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "userId": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Patient ID for chat events"
+        },
+        "conversationId": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Conversation session identifier"
+        },
+        "sessionId": {
+          "type": "string"
+        },
+        "ipAddress": {
+          "type": "string",
+          "format": "ipv4"
+        },
+        "userAgent": {
+          "type": "string"
+        }
+      }
+    },
+    "ChatMessageSentEvent": {
+      "allOf": [
+        {"$ref": "#/$defs/BaseChatEvent"},
+        {
+          "type": "object",
+          "properties": {
+            "eventType": {
+              "const": "chat_message_sent"
+            },
+            "data": {
+              "type": "object",
+              "required": ["messageId", "messageLength", "messageType", "containsPII"],
+              "properties": {
+                "messageId": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "Chat message database ID"
+                },
+                "messageLength": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "Length of message content"
+                },
+                "messageType": {
+                  "type": "string",
+                  "enum": ["text", "recommendation", "alert", "system"],
+                  "description": "Type of message"
+                },
+                "containsPII": {
+                  "type": "boolean",
+                  "description": "Whether message contains personally identifiable information"
+                },
+                "language": {
+                  "type": "string",
+                  "pattern": "^[a-z]{2}(-[A-Z]{2})?$",
+                  "description": "Detected message language (ISO 639-1)"
+                },
+                "inputMethod": {
+                  "type": "string",
+                  "enum": ["keyboard", "voice", "quick_reply", "suggestion_click"],
+                  "description": "How the message was input"
+                },
+                "containsHealthTerms": {
+                  "type": "boolean",
+                  "description": "Whether message contains health-related terminology"
+                },
+                "topicCategories": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": ["diet", "exercise", "medication", "mood", "symptoms", "general", "technical_support"]
+                  },
+                  "description": "Detected topic categories"
+                },
+                "urgencyLevel": {
+                  "type": "string",
+                  "enum": ["low", "medium", "high", "emergency"],
+                  "description": "Detected urgency level"
+                },
+                "previousMessageId": {
+                  "type": "integer",
+                  "description": "ID of previous message in conversation"
+                },
+                "responseTimeSeconds": {
+                  "type": "number",
+                  "minimum": 0,
+                  "description": "Time since last AI response"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "ChatMessageReceivedEvent": {
+      "allOf": [
+        {"$ref": "#/$defs/BaseChatEvent"},
+        {
+          "type": "object",
+          "properties": {
+            "eventType": {
+              "const": "chat_message_received"
+            },
+            "data": {
+              "type": "object",
+              "required": ["messageId", "aiProvider", "processingTimeMs", "responseLength"],
+              "properties": {
+                "messageId": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "AI response message database ID"
+                },
+                "aiProvider": {
+                  "type": "string",
+                  "enum": ["openai_gpt4o", "anthropic_claude37", "fallback_response"],
+                  "description": "AI provider used for response"
+                },
+                "processingTimeMs": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "AI processing time in milliseconds"
+                },
+                "responseLength": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "Length of AI response"
+                },
+                "mcpToolsUsed": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": ["health-metrics", "care-plan-directives", "inspiration-machine-d", "food-database", "ew-support", "progress-milestones", "journaling", "motivational-imaging", "mbp-wizard"]
+                  },
+                  "description": "MCP tools used to generate response"
+                },
+                "cpdDataAccessed": {
+                  "type": "boolean",
+                  "description": "Whether Care Plan Directive data was accessed"
+                },
+                "personalizedContent": {
+                  "type": "boolean",
+                  "description": "Whether response was personalized to user"
+                },
+                "cbtTechniquesUsed": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": ["cognitive_restructuring", "behavioral_activation", "mindfulness", "exposure_therapy", "problem_solving"]
+                  },
+                  "description": "CBT techniques incorporated in response"
+                },
+                "miTechniquesUsed": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": ["reflective_listening", "change_talk", "rolling_with_resistance", "expressing_empathy", "developing_discrepancy"]
+                  },
+                  "description": "Motivational Interviewing techniques used"
+                },
+                "responseQuality": {
+                  "type": "string",
+                  "enum": ["excellent", "good", "adequate", "poor", "error"],
+                  "description": "Assessed response quality"
+                },
+                "containsRecommendations": {
+                  "type": "boolean",
+                  "description": "Whether response includes specific recommendations"
+                },
+                "privacyCompliant": {
+                  "type": "boolean",
+                  "description": "Whether response maintains privacy compliance"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "EmergencyDetectedEvent": {
+      "allOf": [
+        {"$ref": "#/$defs/BaseChatEvent"},
+        {
+          "type": "object",
+          "properties": {
+            "eventType": {
+              "const": "emergency_detected"
+            },
+            "data": {
+              "type": "object",
+              "required": ["detectedKeywords", "severityLevel", "responseTime", "actionsTaken"],
+              "properties": {
+                "detectedKeywords": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Emergency keywords detected (redacted for privacy)"
+                },
+                "severityLevel": {
+                  "type": "string",
+                  "enum": ["moderate", "high", "critical", "immediate"],
+                  "description": "Assessed severity of emergency"
+                },
+                "responseTime": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Time to detect emergency in milliseconds"
+                },
+                "actionsTaken": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": ["crisis_resources_provided", "doctor_notified", "admin_alerted", "conversation_escalated", "external_services_contacted"]
+                  },
+                  "description": "Immediate actions taken in response"
+                },
+                "messageContent": {
+                  "type": "string",
+                  "description": "Message content hash (not actual content for privacy)"
+                },
+                "contextAnalysis": {
+                  "type": "object",
+                  "properties": {
+                    "isGenuineEmergency": {
+                      "type": "boolean",
+                      "description": "AI assessment of whether this is a genuine emergency"
+                    },
+                    "confidenceScore": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1,
+                      "description": "Confidence in emergency detection"
+                    },
+                    "contextualFactors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Contextual factors influencing assessment"
+                    }
+                  }
+                },
+                "followUpRequired": {
+                  "type": "boolean",
+                  "description": "Whether human follow-up is required"
+                },
+                "externalResourcesProvided": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Crisis resources provided to user"
+                },
+                "doctorId": {
+                  "type": "integer",
+                  "description": "ID of doctor notified (if applicable)"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "AIRecommendationGeneratedEvent": {
+      "allOf": [
+        {"$ref": "#/$defs/BaseChatEvent"},
+        {
+          "type": "object",
+          "properties": {
+            "eventType": {
+              "const": "ai_recommendation_generated"
+            },
+            "data": {
+              "type": "object",
+              "required": ["recommendationType", "recommendationCount", "basedOnCPD", "personalizationLevel"],
+              "properties": {
+                "recommendationType": {
+                  "type": "string",
+                  "enum": ["feature_suggestion", "health_improvement", "content_recommendation", "behavioral_change", "medical_compliance"],
+                  "description": "Type of recommendation generated"
+                },
+                "recommendationCount": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "Number of recommendations provided"
+                },
+                "featuresRecommended": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": ["daily_scores", "progress_milestones", "inspiration_machine", "food_database", "exercise_support", "medication_wizard", "journaling", "keep_going_button"]
+                  },
+                  "description": "KGC features recommended to user"
+                },
+                "basedOnCPD": {
+                  "type": "boolean",
+                  "description": "Whether recommendations based on Care Plan Directives"
+                },
+                "cpdCategories": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": ["diet", "exercise", "medication", "lifestyle"]
+                  },
+                  "description": "CPD categories influencing recommendations"
+                },
+                "personalizationLevel": {
+                  "type": "string",
+                  "enum": ["generic", "basic", "moderate", "highly_personalized"],
+                  "description": "Level of personalization in recommendations"
+                },
+                "confidenceScore": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1,
+                  "description": "AI confidence in recommendation quality"
+                },
+                "dataSourcesUsed": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": ["health_metrics", "cpd_data", "chat_history", "feature_usage", "progress_milestones", "external_content"]
+                  },
+                  "description": "Data sources used to generate recommendations"
+                },
+                "expectedImpact": {
+                  "type": "string",
+                  "enum": ["low", "moderate", "high", "significant"],
+                  "description": "Expected impact on patient outcomes"
+                },
+                "recommendationContext": {
+                  "type": "string",
+                  "enum": ["user_requested", "proactive_suggestion", "compliance_improvement", "engagement_boost", "crisis_prevention"],
+                  "description": "Context that triggered recommendation"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "MCPToolUsedEvent": {
+      "allOf": [
+        {"$ref": "#/$defs/BaseChatEvent"},
+        {
+          "type": "object",
+          "properties": {
+            "eventType": {
+              "const": "mcp_tool_used"
+            },
+            "data": {
+              "type": "object",
+              "required": ["toolName", "action", "executionTimeMs", "success"],
+              "properties": {
+                "toolName": {
+                  "type": "string",
+                  "enum": ["health-metrics", "care-plan-directives", "inspiration-machine-d", "food-database", "ew-support", "progress-milestones", "journaling", "motivational-imaging", "mbp-wizard"],
+                  "description": "MCP tool used"
+                },
+                "action": {
+                  "type": "string",
+                  "description": "Specific action performed by the tool"
+                },
+                "executionTimeMs": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Tool execution time in milliseconds"
+                },
+                "success": {
+                  "type": "boolean",
+                  "description": "Whether tool execution was successful"
+                },
+                "dataAccessed": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": ["user_profile", "health_metrics", "cpd_data", "chat_history", "progress_data", "external_apis"]
+                  },
+                  "description": "Types of data accessed by the tool"
+                },
+                "externalAPIsUsed": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": ["openai", "anthropic", "tavily", "youtube", "food_standards", "twilio", "sendgrid"]
+                  },
+                  "description": "External APIs called by the tool"
+                },
+                "cacheHit": {
+                  "type": "boolean",
+                  "description": "Whether cached data was used"
+                },
+                "resultCount": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Number of results returned by tool"
+                },
+                "privacyRedactionApplied": {
+                  "type": "boolean",
+                  "description": "Whether PII redaction was applied"
+                },
+                "auditLogGenerated": {
+                  "type": "boolean",
+                  "description": "Whether audit log entry was created"
+                },
+                "errorMessage": {
+                  "type": "string",
+                  "description": "Error message if tool execution failed"
+                },
+                "resourcesConsumed": {
+                  "type": "object",
+                  "properties": {
+                    "cpuTimeMs": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "memoryUsedMB": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "externalApiCalls": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "ConversationStartedEvent": {
+      "allOf": [
+        {"$ref": "#/$defs/BaseChatEvent"},
+        {
+          "type": "object",
+          "properties": {
+            "eventType": {
+              "const": "conversation_started"
+            },
+            "data": {
+              "type": "object",
+              "required": ["initiatedBy", "conversationContext", "userRole"],
+              "properties": {
+                "initiatedBy": {
+                  "type": "string",
+                  "enum": ["patient", "system", "doctor_handoff", "emergency_response"],
+                  "description": "Who or what initiated the conversation"
+                },
+                "conversationContext": {
+                  "type": "string",
+                  "enum": ["daily_checkin", "health_question", "feature_exploration", "crisis_support", "routine_chat", "follow_up"],
+                  "description": "Context for starting conversation"
+                },
+                "userRole": {
+                  "type": "string",
+                  "enum": ["admin", "doctor", "patient"],
+                  "description": "Role of user starting conversation"
+                },
+                "previousConversationId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "ID of previous conversation (if continuation)"
+                },
+                "timesinceLastConversation": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Hours since last conversation"
+                },
+                "activeCPDsCount": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Number of active Care Plan Directives"
+                },
+                "recentHealthScores": {
+                  "type": "object",
+                  "properties": {
+                    "hasRecentScores": {
+                      "type": "boolean"
+                    },
+                    "lastScoreDate": {
+                      "type": "string",
+                      "format": "date"
+                    },
+                    "averageScores": {
+                      "type": "object",
+                      "properties": {
+                        "diet": {
+                          "type": "number",
+                          "minimum": 1,
+                          "maximum": 10
+                        },
+                        "exercise": {
+                          "type": "number",
+                          "minimum": 1,
+                          "maximum": 10
+                        },
+                        "medication": {
+                          "type": "number",
+                          "minimum": 1,
+                          "maximum": 10
+                        }
+                      }
+                    }
+                  }
+                },
+                "deviceType": {
+                  "type": "string",
+                  "enum": ["mobile", "tablet", "desktop", "unknown"],
+                  "description": "Device type used to start conversation"
+                },
+                "entryPoint": {
+                  "type": "string",
+                  "enum": ["chat_button", "dashboard_widget", "notification_click", "direct_url", "feature_handoff"],
+                  "description": "How user accessed chat interface"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "ConversationEndedEvent": {
+      "allOf": [
+        {"$ref": "#/$defs/BaseChatEvent"},
+        {
+          "type": "object",
+          "properties": {
+            "eventType": {
+              "const": "conversation_ended"
+            },
+            "data": {
+              "type": "object",
+              "required": ["endReason", "durationMinutes", "messageCount"],
+              "properties": {
+                "endReason": {
+                  "type": "string",
+                  "enum": ["user_closed", "timeout", "system_error", "emergency_escalation", "feature_handoff", "session_expired"],
+                  "description": "Reason conversation ended"
+                },
+                "durationMinutes": {
+                  "type": "number",
+                  "minimum": 0,
+                  "description": "Total conversation duration in minutes"
+                },
+                "messageCount": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Total number of messages exchanged"
+                },
+                "userMessageCount": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Number of user messages"
+                },
+                "aiMessageCount": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Number of AI responses"
+                },
+                "topicsDiscussed": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": ["diet", "exercise", "medication", "mood", "symptoms", "features", "technical_support", "crisis_support"]
+                  },
+                  "description": "Main topics discussed in conversation"
+                },
+                "recommendationsGiven": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Number of recommendations provided"
+                },
+                "mcpToolsUsed": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Number of MCP tools used"
+                },
+                "satisfactionIndicators": {
+                  "type": "object",
+                  "properties": {
+                    "userEngagement": {
+                      "type": "string",
+                      "enum": ["low", "moderate", "high"],
+                      "description": "Assessed user engagement level"
+                    },
+                    "goalAchievement": {
+                      "type": "string",
+                      "enum": ["not_achieved", "partially_achieved", "fully_achieved"],
+                      "description": "Whether user's goals were met"
+                    },
+                    "followUpNeeded": {
+                      "type": "boolean",
+                      "description": "Whether follow-up is recommended"
+                    }
+                  }
+                },
+                "emergencyDetected": {
+                  "type": "boolean",
+                  "description": "Whether any emergency situations were detected"
+                },
+                "handoffOccurred": {
+                  "type": "boolean",
+                  "description": "Whether conversation was handed off to another service"
+                },
+                "nextRecommendedAction": {
+                  "type": "string",
+                  "enum": ["continue_monitoring", "schedule_follow_up", "contact_doctor", "use_specific_feature", "no_action_needed"],
+                  "description": "Recommended next action for user"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "SentimentAnalyzedEvent": {
+      "allOf": [
+        {"$ref": "#/$defs/BaseChatEvent"},
+        {
+          "type": "object",
+          "properties": {
+            "eventType": {
+              "const": "sentiment_analyzed"
+            },
+            "data": {
+              "type": "object",
+              "required": ["messageId", "sentimentScore", "emotionalState", "confidenceLevel"],
+              "properties": {
+                "messageId": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "ID of message that was analyzed"
+                },
+                "sentimentScore": {
+                  "type": "number",
+                  "minimum": -1,
+                  "maximum": 1,
+                  "description": "Sentiment score (-1 negative to 1 positive)"
+                },
+                "emotionalState": {
+                  "type": "string",
+                  "enum": ["very_negative", "negative", "neutral", "positive", "very_positive"],
+                  "description": "Classified emotional state"
+                },
+                "confidenceLevel": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1,
+                  "description": "Confidence in sentiment analysis"
+                },
+                "detectedEmotions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "emotion": {
+                        "type": "string",
+                        "enum": ["joy", "sadness", "anger", "fear", "surprise", "disgust", "anticipation", "trust"]
+                      },
+                      "intensity": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      }
+                    }
+                  },
+                  "description": "Detected emotions with intensity scores"
+                },
+                "contextualFactors": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": ["health_concern", "medication_side_effect", "progress_celebration", "frustration", "motivation", "anxiety", "depression_indicator"]
+                  },
+                  "description": "Health-related contextual factors affecting sentiment"
+                },
+                "trendAnalysis": {
+                  "type": "object",
+                  "properties": {
+                    "recentTrend": {
+                      "type": "string",
+                      "enum": ["improving", "stable", "declining", "volatile"],
+                      "description": "Recent sentiment trend"
+                    },
+                    "comparedToPrevious": {
+                      "type": "number",
+                      "description": "Change from previous sentiment score"
+                    },
+                    "alertTriggered": {
+                      "type": "boolean",
+                      "description": "Whether negative sentiment alert was triggered"
+                    }
+                  }
+                },
+                "responseStrategy": {
+                  "type": "string",
+                  "enum": ["empathetic_support", "motivational_boost", "problem_solving", "crisis_intervention", "celebration", "neutral_response"],
+                  "description": "AI response strategy based on sentiment"
+                },
+                "requiresHumanAttention": {
+                  "type": "boolean",
+                  "description": "Whether sentiment indicates need for human attention"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

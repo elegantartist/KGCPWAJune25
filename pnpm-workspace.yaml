@@ -1,0 +1,9 @@
+packages:
+  # Applications (Vercel/Netlify deployments)
+  - "apps/*"
+  
+  # Backend Services (AWS/GCP/Docker deployments)
+  - "services/*"
+  
+  # Shared Libraries (packages used across apps/services)
+  - "packages/*"

@@ -1,0 +1,241 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://keepgoingcare.com.au/schemas/user-auth-identity.schema.json",
+  "title": "KGC User Auth Identity Entity",
+  "description": "Authentication events and security monitoring for users",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "integer",
+      "description": "Primary key identifier",
+      "minimum": 1
+    },
+    "userId": {
+      "type": "integer",
+      "description": "Foreign key reference to user",
+      "minimum": 1
+    },
+    "authMethod": {
+      "type": "string",
+      "description": "Authentication method used",
+      "enum": ["email_pin", "sms_verification", "password", "oauth", "biometric"]
+    },
+    "emailOrPhone": {
+      "type": "string",
+      "description": "Email address or phone number used for authentication"
+    },
+    "pinCode": {
+      "type": ["string", "null"],
+      "description": "Generated PIN code (hashed for security)",
+      "pattern": "^[0-9]{6}$"
+    },
+    "pinExpiry": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "When the PIN expires"
+    },
+    "attemptCount": {
+      "type": "integer",
+      "description": "Number of authentication attempts",
+      "minimum": 0,
+      "default": 0
+    },
+    "isVerified": {
+      "type": "boolean",
+      "description": "Whether authentication was successful",
+      "default": false
+    },
+    "verifiedAt": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "Timestamp when authentication succeeded"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the auth attempt was initiated"
+    },
+    "ipAddress": {
+      "type": "string",
+      "description": "IP address of authentication attempt",
+      "anyOf": [
+        {"format": "ipv4"},
+        {"format": "ipv6"}
+      ]
+    },
+    "userAgent": {
+      "type": "string",
+      "description": "Browser/device user agent",
+      "maxLength": 1000
+    },
+    "deviceFingerprint": {
+      "type": ["string", "null"],
+      "description": "Device fingerprint for security tracking"
+    },
+    "dashboardType": {
+      "type": "string",
+      "description": "Type of dashboard being accessed",
+      "enum": ["admin", "doctor", "patient"]
+    },
+    "sessionId": {
+      "type": ["string", "null"],
+      "description": "Session ID created after successful auth",
+      "pattern": "^[a-f0-9-]{36}$"
+    },
+    "failureReason": {
+      "type": ["string", "null"],
+      "description": "Reason for authentication failure",
+      "enum": [
+        "invalid_pin",
+        "expired_pin",
+        "too_many_attempts",
+        "invalid_email",
+        "user_not_found",
+        "account_disabled",
+        "rate_limited",
+        "suspicious_activity",
+        null
+      ]
+    },
+    "securityFlags": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "new_device",
+          "new_location",
+          "unusual_time",
+          "multiple_failures",
+          "proxy_detected",
+          "tor_detected",
+          "suspicious_pattern"
+        ]
+      },
+      "description": "Security flags raised during authentication"
+    },
+    "geolocation": {
+      "type": ["object", "null"],
+      "description": "Geographic location of authentication attempt",
+      "properties": {
+        "country": {"type": "string"},
+        "region": {"type": "string"},
+        "city": {"type": "string"},
+        "latitude": {"type": "number"},
+        "longitude": {"type": "number"},
+        "timezone": {"type": "string"}
+      }
+    },
+    "riskScore": {
+      "type": ["number", "null"],
+      "description": "Calculated risk score for the auth attempt (0-1)",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "twoFactorRequired": {
+      "type": "boolean",
+      "description": "Whether 2FA was required for this attempt",
+      "default": false
+    },
+    "twoFactorCompleted": {
+      "type": "boolean",
+      "description": "Whether 2FA was successfully completed",
+      "default": false
+    },
+    "loginDuration": {
+      "type": ["integer", "null"],
+      "description": "How long the user stayed logged in (seconds)",
+      "minimum": 0
+    },
+    "logoutMethod": {
+      "type": ["string", "null"],
+      "description": "How the session ended",
+      "enum": ["manual_logout", "timeout", "forced_logout", "session_expired", null]
+    },
+    "complianceNotes": {
+      "type": ["string", "null"],
+      "description": "Notes for regulatory compliance",
+      "maxLength": 500
+    }
+  },
+  "required": [
+    "id",
+    "userId",
+    "authMethod",
+    "emailOrPhone",
+    "attemptCount",
+    "isVerified",
+    "createdAt",
+    "ipAddress",
+    "userAgent",
+    "dashboardType"
+  ],
+  "additionalProperties": false,
+  "examples": [
+    {
+      "id": 1,
+      "userId": 3,
+      "authMethod": "email_pin",
+      "emailOrPhone": "reuben.collins@keepgoingcare.com",
+      "pinCode": "123456",
+      "pinExpiry": "2025-08-20T14:35:00Z",
+      "attemptCount": 1,
+      "isVerified": true,
+      "verifiedAt": "2025-08-20T14:25:30Z",
+      "createdAt": "2025-08-20T14:25:00Z",
+      "ipAddress": "203.123.45.67",
+      "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15",
+      "deviceFingerprint": "abc123def456",
+      "dashboardType": "patient",
+      "sessionId": "550e8400-e29b-41d4-a716-446655440004",
+      "failureReason": null,
+      "securityFlags": [],
+      "geolocation": {
+        "country": "Australia",
+        "region": "New South Wales",
+        "city": "Sydney",
+        "latitude": -33.8688,
+        "longitude": 151.2093,
+        "timezone": "Australia/Sydney"
+      },
+      "riskScore": 0.15,
+      "twoFactorRequired": false,
+      "twoFactorCompleted": false,
+      "loginDuration": 3600,
+      "logoutMethod": "manual_logout",
+      "complianceNotes": "Standard patient authentication for daily health score submission"
+    },
+    {
+      "id": 2,
+      "userId": 2,
+      "authMethod": "email_pin",
+      "emailOrPhone": "marijke.collins@keepgoingcare.com",
+      "pinCode": "654321",
+      "pinExpiry": "2025-08-20T15:05:00Z",
+      "attemptCount": 1,
+      "isVerified": true,
+      "verifiedAt": "2025-08-20T15:00:15Z",
+      "createdAt": "2025-08-20T15:00:00Z",
+      "ipAddress": "203.45.67.89",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+      "deviceFingerprint": "def456ghi789",
+      "dashboardType": "doctor",
+      "sessionId": "550e8400-e29b-41d4-a716-446655440005",
+      "failureReason": null,
+      "securityFlags": [],
+      "geolocation": {
+        "country": "Australia",
+        "region": "Victoria",
+        "city": "Melbourne",
+        "latitude": -37.8136,
+        "longitude": 144.9631,
+        "timezone": "Australia/Melbourne"
+      },
+      "riskScore": 0.12,
+      "twoFactorRequired": true,
+      "twoFactorCompleted": true,
+      "loginDuration": 7200,
+      "logoutMethod": "timeout",
+      "complianceNotes": "Doctor access for patient progress review and CPD updates"
+    }
+  ]
+}

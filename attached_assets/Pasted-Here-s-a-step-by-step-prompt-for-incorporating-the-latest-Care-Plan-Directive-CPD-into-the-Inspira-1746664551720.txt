@@ -1,0 +1,137 @@
+Here's a step-by-step prompt for incorporating the latest Care Plan Directive (CPD) into the Inspiration Machine D feature, similar to how it's implemented in the diet logistics feature:
+
+Client-Side Implementation
+Add State Variables for CPD:
+// Add these state variables to store the Care Plan Directive
+const [carePlanDirective, setCarePlanDirective] = useState<string>("");
+const [loadingCPD, setLoadingCPD] = useState<boolean>(false);
+Fetch the Active CPD on Component Load:
+// Add this useEffect to fetch the Care Plan Directive when the component loads
+useEffect(() => {
+  const fetchCarePlanDirective = async () => {
+    try {
+      setLoadingCPD(true);
+      // Fetch active CPDs for the current user
+      const response = await apiRequest<CarePlanDirective[]>(
+        'GET', 
+        `/api/users/${userId}/care-plan-directives/active`
+      );
+      
+      // Filter for diet-related CPDs
+      const dietCPDs = response.filter(cpd => 
+        cpd.category.toLowerCase() === 'diet' || 
+        cpd.directive.toLowerCase().includes('diet') ||
+        cpd.directive.toLowerCase().includes('meal') ||
+        cpd.directive.toLowerCase().includes('food') ||
+        cpd.directive.toLowerCase().includes('eat')
+      );
+      
+      // Get the most recent diet CPD if available
+      if (dietCPDs.length > 0) {
+        // Sort by updatedAt date (most recent first)
+        dietCPDs.sort((a, b) => 
+          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+        );
+        setCarePlanDirective(dietCPDs[0].directive);
+      }
+    } catch (error) {
+      console.error('Error fetching care plan directives:', error);
+    } finally {
+      setLoadingCPD(false);
+    }
+  };
+  
+  if (userId) {
+    fetchCarePlanDirective();
+  }
+}, [userId]);
+Display the CPD in the UI:
+{/* Add this component to display the Care Plan Directive */}
+{carePlanDirective && (
+  <Card className="mb-6 border-primary/30 bg-primary/5">
+    <CardHeader className="pb-2">
+      <CardTitle className="text-lg flex items-center gap-2">
+        <Stethoscope className="h-5 w-5 text-primary" />
+        Doctor's Care Plan Directive
+      </CardTitle>
+    </CardHeader>
+    <CardContent>
+      <p className="text-sm italic">"{carePlanDirective}"</p>
+    </CardContent>
+  </Card>
+)}
+Include the CPD in Search Requests:
+// When making the search request, include the CPD as additional context
+const handleSearch = async (formValues) => {
+  try {
+    setLoading(true);
+    
+    // Include the CPD in the search request
+    const searchResults = await searchCookingVideos({
+      ...formValues,
+      useCPDs: true, // Flag to indicate CPDs should be used
+      additionalContext: {
+        doctorCPD: carePlanDirective // Pass the CPD directly
+      }
+    });
+    
+    setRecipes(searchResults);
+  } catch (error) {
+    console.error('Recipe search error:', error);
+    toast({
+      title: "Search Failed",
+      description: error.message || "Failed to search for recipes. Please try again.",
+      variant: "destructive"
+    });
+  } finally {
+    setLoading(false);
+  }
+};
+Server-Side Implementation
+Update the API Endpoint to Process the CPD:
+// In server/routes.ts, modify the /api/recipes/videos endpoint
+app.post("/api/recipes/videos", async (req, res) => {
+  try {
+    // Extract the CPD from the request body if available
+    const doctorCPD = req.body.additionalContext?.doctorCPD || '';
+    
+    // Use the CPD in your search logic
+    // ...
+    
+    // Pass the CPD to the OpenAI analysis if needed
+    if (process.env.OPENAI_API_KEY && doctorCPD) {
+      // Add the CPD to the OpenAI prompt for recipe analysis
+      const prompt = `
+        Analyze this recipe video title and description.
+        Doctor's Diet Recommendations: ${doctorCPD}
+        
+        Please consider if this recipe is compatible with the doctor's recommendations above.
+        
+        Title: ${video.title}
+        Description: ${video.description}
+        
+        Return your analysis as a JSON object with the following fields:
+        1. calories: estimated calories (number between 200-1200)
+        2. difficulty: cooking difficulty level ("easy", "medium", or "hard")
+        3. healthScore: health score (number between 1-10)
+        4. allergens: array of possible allergens in this recipe
+        5. dietCompatibility: object with diet types as keys and boolean values
+        6. cpdCompliance: how well this recipe complies with the doctor's care plan directive (scale 1-10)
+        7. cpdNotes: brief note on why this recipe is or isn't compliant with the recommendations
+      `;
+      
+      // Call OpenAI with the enhanced prompt
+      // ...
+    }
+    
+    // Return the results
+    return res.json({
+      videos: analyzedResults,
+      query: searchQuery,
+      cpdIncluded: !!doctorCPD // Indicate if CPD was used in the search
+    });
+  } catch (error) {
+    console.error('Error searching cooking videos:', error);
+    return res.status(500).json({ message: "Failed to search for cooking videos." });
+  }
+});

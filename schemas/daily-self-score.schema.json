@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://keepgoingcare.com.au/schemas/daily-self-score.schema.json",
+  "title": "KGC Daily Self-Score Entity",
+  "description": "Patient-submitted daily health scores for diet, exercise, and medication compliance",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "integer",
+      "description": "Primary key identifier",
+      "minimum": 1
+    },
+    "patientId": {
+      "type": "integer",
+      "description": "Foreign key reference to patient",
+      "minimum": 1
+    },
+    "scoreDate": {
+      "type": "string",
+      "format": "date",
+      "description": "Date for which the scores are submitted (YYYY-MM-DD)"
+    },
+    "exerciseSelfScore": {
+      "type": ["integer", "null"],
+      "description": "Self-assessed exercise score (1-10 scale)",
+      "minimum": 1,
+      "maximum": 10
+    },
+    "mealPlanSelfScore": {
+      "type": ["integer", "null"],
+      "description": "Self-assessed meal plan adherence score (1-10 scale)",
+      "minimum": 1,
+      "maximum": 10
+    },
+    "medicationSelfScore": {
+      "type": ["integer", "null"],
+      "description": "Self-assessed medication adherence score (1-10 scale)",
+      "minimum": 1,
+      "maximum": 10
+    },
+    "notes": {
+      "type": ["string", "null"],
+      "description": "Optional notes from the patient about their day",
+      "maxLength": 500
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when scores were submitted"
+    },
+    "submissionTime": {
+      "type": "string",
+      "format": "time",
+      "description": "Time of day when scores were submitted (HH:MM:SS)"
+    },
+    "mood": {
+      "type": ["string", "null"],
+      "description": "Patient's mood assessment",
+      "enum": ["very_poor", "poor", "fair", "good", "excellent", null]
+    },
+    "energyLevel": {
+      "type": ["integer", "null"],
+      "description": "Energy level assessment (1-10 scale)",
+      "minimum": 1,
+      "maximum": 10
+    },
+    "sleepQuality": {
+      "type": ["integer", "null"],
+      "description": "Sleep quality from previous night (1-10 scale)",
+      "minimum": 1,
+      "maximum": 10
+    },
+    "stressLevel": {
+      "type": ["integer", "null"],
+      "description": "Stress level assessment (1-10 scale, 1=low stress)",
+      "minimum": 1,
+      "maximum": 10
+    }
+  },
+  "required": [
+    "id",
+    "patientId",
+    "scoreDate",
+    "createdAt"
+  ],
+  "additionalProperties": false,
+  "examples": [
+    {
+      "id": 1,
+      "patientId": 3,
+      "scoreDate": "2025-08-20",
+      "exerciseSelfScore": 8,
+      "mealPlanSelfScore": 7,
+      "medicationSelfScore": 9,
+      "notes": "Had a good day overall. Managed to go for a 45-minute walk.",
+      "createdAt": "2025-08-20T19:15:00Z",
+      "submissionTime": "19:15:00",
+      "mood": "good",
+      "energyLevel": 7,
+      "sleepQuality": 8,
+      "stressLevel": 3
+    },
+    {
+      "id": 2,
+      "patientId": 3,
+      "scoreDate": "2025-08-19",
+      "exerciseSelfScore": 6,
+      "mealPlanSelfScore": 9,
+      "medicationSelfScore": 10,
+      "notes": "Felt tired today, but stuck to my meal plan perfectly.",
+      "createdAt": "2025-08-19T20:30:00Z",
+      "submissionTime": "20:30:00",
+      "mood": "fair",
+      "energyLevel": 5,
+      "sleepQuality": 6,
+      "stressLevel": 5
+    }
+  ]
+}

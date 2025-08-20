@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://keepgoingcare.com.au/schemas/admin.schema.json",
+  "title": "KGC Admin Entity",
+  "description": "System administrator entity for Keep Going Care platform",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "integer",
+      "description": "Primary key identifier",
+      "minimum": 1
+    },
+    "uin": {
+      "type": "string",
+      "description": "Unique Identity Number in format KGC-ADM-XXX",
+      "pattern": "^KGC-ADM-\\d{3}$",
+      "examples": ["KGC-ADM-001"]
+    },
+    "name": {
+      "type": "string",
+      "description": "Full name of the administrator",
+      "minLength": 1,
+      "maxLength": 255
+    },
+    "email": {
+      "type": "string",
+      "format": "email",
+      "description": "Email address for authentication and notifications",
+      "examples": ["admin@keepgoingcare.com"]
+    },
+    "roleId": {
+      "type": "integer",
+      "description": "Role identifier (1 = admin)",
+      "const": 1
+    },
+    "phoneNumber": {
+      "type": "string",
+      "description": "Australian phone number for SMS authentication",
+      "pattern": "^(\\+61|0)[2-9]\\d{8}$"
+    },
+    "joinedDate": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when admin account was created"
+    },
+    "isActive": {
+      "type": "boolean",
+      "description": "Whether the admin account is currently active",
+      "default": true
+    },
+    "lastLogin": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "Timestamp of last successful login"
+    },
+    "createdByUserId": {
+      "type": ["integer", "null"],
+      "description": "ID of the user who created this admin (system creation if null)",
+      "minimum": 1
+    },
+    "uinSequence": {
+      "type": "integer",
+      "description": "Sequential number for admin UIN generation",
+      "minimum": 1
+    }
+  },
+  "required": [
+    "id",
+    "uin", 
+    "name",
+    "email",
+    "roleId",
+    "phoneNumber",
+    "joinedDate",
+    "isActive"
+  ],
+  "additionalProperties": false,
+  "examples": [
+    {
+      "id": 1,
+      "uin": "KGC-ADM-001",
+      "name": "KGC System Administrator",
+      "email": "admin@keepgoingcare.com",
+      "roleId": 1,
+      "phoneNumber": "+61412345678",
+      "joinedDate": "2025-01-01T00:00:00Z",
+      "isActive": true,
+      "lastLogin": "2025-08-20T14:30:00Z",
+      "createdByUserId": null,
+      "uinSequence": 1
+    }
+  ]
+}

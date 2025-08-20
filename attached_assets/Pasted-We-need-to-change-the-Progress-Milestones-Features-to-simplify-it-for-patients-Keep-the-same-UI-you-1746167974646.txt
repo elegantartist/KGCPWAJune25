@@ -1,0 +1,17 @@
+We need to change the Progress Milestones Features to simplify it for patients. Keep the same UI you designed but I want to use various colours of the attached KGC logo as the badges for the progress milestones. Awarded badges must be displayed prominently when the patient achieves them along with the meta data about the award as a pop. Play a crowd cheering sound as part of the sequence that plays for 3 seconds automatically on the application. Use the attached logo for the badge as a 5mm x 5mm icon. Can you apply colour filters of this KGC logo image for each of the following badges - "Exercise Consistency Champion" - Purple, "Healthy Eating Hero" - Green, "Mindfulness Master" - Blue. For the tiers Bronze, Silver, Gold, Platinum add brown for bronze, grey for silver, yellow for gold and white for platinum ring around each badge. Parameters for achieving each Progress Milestone Badge: 
+1. Healthy Meal Plan Hero levels:
+Bronze: Maintain target Healthy Meal Plan Self-Score (5-10) for 2 consecutive weeks.
+Silver: Maintain target Healthy Meal Plan Self-Score (7-10) for 4 consecutive weeks.
+Gold: Maintain target Healthy Meal Plan Self-Score (8-10) for 16 consecutive weeks.
+Platinum: Maintain target Healthy Meal Plan Self-Score (9-10) for 24 consecutive weeks.
+2. E&W Consistency Champion levels:
+Bronze: Maintain target Exercise Self-Score (5-10) for 2 consecutive weeks.
+Silver: Maintain target Exercise Self-Score (7-10) for 4 consecutive weeks.
+Gold: Maintain target Exercise Self-Score (8-10) for 16 consecutive weeks.
+Platinum: Maintain target Exercise Self-Score (9-10) for 24 consecutive weeks.
+3. Medication Maverick:
+Bronze: Maintain target Prescription Medication Self-Score (5-10) for 2 consecutive weeks.
+Silver: Maintain target Prescription Medication Self-Score (7-10) for 4 consecutive weeks.
+Gold: Maintain target Prescription Medication Self-Score (8-10) for 16 consecutive weeks.
+Platinum: Maintain target Prescription Medication Self-Score (9-10) for 24 consecutive weeks.
+Financial Incentives - If a patient achieves Platinum badges for all 3 types at once they receive a voucher to the value of $100 to spend on healthy experiences in their local area including gym memberships, health spas, pilates and yoga studios, health food stores, Coles, Woolworths. Every patient who has achieved the $100 voucher level is automatically entered into a monthly lottery to win a $250 voucher to spend on healthy experiences in their local area including gym memberships, health spas, pilates and yoga studios, health food stores, Coles, Woolworths. Create a small “i” button that shows a pop up explaining how this feature works for the patient including the badges and a badge award sequence at the start of this “I” button process. Create this new Progress Milestones feature with all of these parameters and ensure it is fully integrated with the application in the backend including the process to keep track of contributing work done by the patient during all levels of internet connectivity. Let me know if you need any more details to make these crucial changes to this important KGC feature.

@@ -1,0 +1,230 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://keepgoingcare.com.au/schemas/audit-log.schema.json",
+  "title": "KGC Audit Log Entity",
+  "description": "Regulatory compliance tracking for security events and data access",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "integer",
+      "description": "Primary key identifier",
+      "minimum": 1
+    },
+    "eventId": {
+      "type": "string",
+      "description": "Unique event identifier",
+      "pattern": "^[a-f0-9-]{36}$"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the event occurred"
+    },
+    "eventType": {
+      "type": "string",
+      "description": "Type of security/audit event",
+      "enum": [
+        "LOGIN",
+        "LOGOUT", 
+        "DATA_ACCESS",
+        "DATA_MODIFICATION",
+        "DATA_EXPORT",
+        "USER_CREATION",
+        "USER_DELETION",
+        "ROLE_CHANGE",
+        "CPD_CREATED",
+        "CPD_MODIFIED",
+        "HEALTH_SCORE_SUBMITTED",
+        "EMERGENCY_ALERT",
+        "AI_INTERACTION",
+        "PRIVACY_REDACTION",
+        "FAILED_LOGIN",
+        "SUSPICIOUS_ACTIVITY",
+        "SYSTEM_ERROR",
+        "COMPLIANCE_VIOLATION"
+      ]
+    },
+    "severity": {
+      "type": "string",
+      "description": "Event severity level",
+      "enum": ["LOW", "MEDIUM", "HIGH", "CRITICAL"]
+    },
+    "userId": {
+      "type": ["integer", "null"],
+      "description": "ID of user who performed the action",
+      "minimum": 1
+    },
+    "targetUserId": {
+      "type": ["integer", "null"],
+      "description": "ID of user who was affected by the action",
+      "minimum": 1
+    },
+    "ipAddress": {
+      "type": "string",
+      "description": "IP address of the user",
+      "anyOf": [
+        {"format": "ipv4"},
+        {"format": "ipv6"}
+      ]
+    },
+    "userAgent": {
+      "type": "string",
+      "description": "Browser/client user agent string",
+      "maxLength": 1000
+    },
+    "details": {
+      "type": ["string", "null"],
+      "description": "Additional event details as JSON string",
+      "maxLength": 5000
+    },
+    "complianceStandards": {
+      "type": ["string", "null"],
+      "description": "Comma-separated list of applicable compliance standards",
+      "examples": ["HIPAA,TGA,APP", "GDPR,HIPAA"]
+    },
+    "environment": {
+      "type": "string",
+      "description": "Environment where event occurred",
+      "enum": ["development", "replit", "aws", "production", "staging"]
+    },
+    "sessionId": {
+      "type": ["string", "null"],
+      "description": "User session identifier",
+      "pattern": "^[a-f0-9-]{36}$"
+    },
+    "actionResult": {
+      "type": "string",
+      "description": "Result of the audited action",
+      "enum": ["SUCCESS", "FAILURE", "PARTIAL", "ERROR", "BLOCKED"]
+    },
+    "dataCategories": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "PHI", 
+          "PII", 
+          "HEALTH_SCORES", 
+          "CPD_DATA", 
+          "CHAT_MESSAGES", 
+          "USER_CREDENTIALS", 
+          "SYSTEM_CONFIG",
+          "AUDIT_LOGS"
+        ]
+      },
+      "description": "Categories of data involved in the event"
+    },
+    "riskScore": {
+      "type": ["number", "null"],
+      "description": "Calculated risk score for the event (0-1)",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "geolocation": {
+      "type": ["object", "null"],
+      "description": "Geographic location data",
+      "properties": {
+        "country": {"type": "string"},
+        "region": {"type": "string"},
+        "city": {"type": "string"},
+        "latitude": {"type": "number"},
+        "longitude": {"type": "number"},
+        "timezone": {"type": "string"}
+      }
+    },
+    "deviceFingerprint": {
+      "type": ["string", "null"],
+      "description": "Device fingerprint hash for security tracking"
+    },
+    "regulatoryNotificationSent": {
+      "type": "boolean",
+      "description": "Whether regulatory authorities were notified",
+      "default": false
+    },
+    "investigationRequired": {
+      "type": "boolean",
+      "description": "Whether this event requires investigation",
+      "default": false
+    },
+    "retentionPeriod": {
+      "type": "integer",
+      "description": "How long to retain this audit record (days)",
+      "minimum": 1,
+      "default": 2555
+    }
+  },
+  "required": [
+    "id",
+    "eventId",
+    "timestamp",
+    "eventType",
+    "severity",
+    "ipAddress",
+    "userAgent",
+    "environment",
+    "actionResult"
+  ],
+  "additionalProperties": false,
+  "examples": [
+    {
+      "id": 1,
+      "eventId": "550e8400-e29b-41d4-a716-446655440001",
+      "timestamp": "2025-08-20T14:25:00Z",
+      "eventType": "LOGIN",
+      "severity": "LOW",
+      "userId": 3,
+      "targetUserId": null,
+      "ipAddress": "203.123.45.67",
+      "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15",
+      "details": "{\"authMethod\": \"email_pin\", \"dashboardType\": \"patient\", \"loginAttempts\": 1}",
+      "complianceStandards": "HIPAA,TGA,APP",
+      "environment": "production",
+      "sessionId": "550e8400-e29b-41d4-a716-446655440002",
+      "actionResult": "SUCCESS",
+      "dataCategories": ["USER_CREDENTIALS"],
+      "riskScore": 0.1,
+      "geolocation": {
+        "country": "Australia",
+        "region": "New South Wales",
+        "city": "Sydney",
+        "latitude": -33.8688,
+        "longitude": 151.2093,
+        "timezone": "Australia/Sydney"
+      },
+      "deviceFingerprint": "abc123def456",
+      "regulatoryNotificationSent": false,
+      "investigationRequired": false,
+      "retentionPeriod": 2555
+    },
+    {
+      "id": 2,
+      "eventId": "550e8400-e29b-41d4-a716-446655440003",
+      "timestamp": "2025-08-20T14:30:00Z",
+      "eventType": "AI_INTERACTION",
+      "severity": "MEDIUM",
+      "userId": 3,
+      "targetUserId": null,
+      "ipAddress": "203.123.45.67",
+      "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15",
+      "details": "{\"aiProvider\": \"openai\", \"model\": \"gpt-4o\", \"messageLength\": 245, \"responseTime\": 2.3, \"privacyRedacted\": true}",
+      "complianceStandards": "HIPAA,TGA",
+      "environment": "production",
+      "sessionId": "550e8400-e29b-41d4-a716-446655440002",
+      "actionResult": "SUCCESS",
+      "dataCategories": ["PHI", "CHAT_MESSAGES"],
+      "riskScore": 0.3,
+      "geolocation": {
+        "country": "Australia",
+        "region": "New South Wales", 
+        "city": "Sydney",
+        "latitude": -33.8688,
+        "longitude": 151.2093,
+        "timezone": "Australia/Sydney"
+      },
+      "deviceFingerprint": "abc123def456",
+      "regulatoryNotificationSent": false,
+      "investigationRequired": false,
+      "retentionPeriod": 2555
+    }
+  ]
+}

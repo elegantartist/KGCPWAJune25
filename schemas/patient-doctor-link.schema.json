@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://keepgoingcare.com.au/schemas/patient-doctor-link.schema.json",
+  "title": "KGC Patient-Doctor Link Entity",
+  "description": "Assignment relationship between doctors and patients",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "integer",
+      "description": "Primary key identifier",
+      "minimum": 1
+    },
+    "doctorId": {
+      "type": "integer",
+      "description": "Foreign key reference to doctor",
+      "minimum": 1
+    },
+    "patientId": {
+      "type": "integer",
+      "description": "Foreign key reference to patient",
+      "minimum": 1
+    },
+    "assignedDate": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when patient was assigned to doctor"
+    },
+    "active": {
+      "type": "boolean",
+      "description": "Whether the assignment is currently active",
+      "default": true
+    },
+    "notes": {
+      "type": ["string", "null"],
+      "description": "Notes about the doctor-patient relationship",
+      "maxLength": 1000
+    },
+    "lastReviewed": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "Timestamp when the assignment was last reviewed"
+    },
+    "assignmentType": {
+      "type": "string",
+      "description": "Type of care assignment",
+      "enum": ["primary", "consultation", "temporary", "emergency"],
+      "default": "primary"
+    },
+    "caseComplexity": {
+      "type": "string",
+      "description": "Complexity level of the patient case",
+      "enum": ["low", "medium", "high", "critical"],
+      "default": "medium"
+    }
+  },
+  "required": [
+    "id",
+    "doctorId",
+    "patientId", 
+    "assignedDate",
+    "active"
+  ],
+  "additionalProperties": false,
+  "examples": [
+    {
+      "id": 1,
+      "doctorId": 2,
+      "patientId": 3,
+      "assignedDate": "2025-02-01T14:30:00Z",
+      "active": true,
+      "notes": "Patient requires regular monitoring for diabetes management",
+      "lastReviewed": "2025-08-01T10:00:00Z",
+      "assignmentType": "primary",
+      "caseComplexity": "medium"
+    }
+  ]
+}

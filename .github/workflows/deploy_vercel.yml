@@ -1,0 +1,187 @@
+name: Deploy to Vercel
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+jobs:
+  deploy:
+    name: Deploy Web Application
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          
+      - name: Setup PNPM
+        uses: pnpm/action-setup@v2
+        with:
+          version: '8'
+          
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            node_modules
+            ~/.cache/pnpm
+          key: ${{ runner.os }}-deps-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-deps-pnpm-
+            
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        
+      - name: Install Vercel CLI
+        run: pnpm add -g vercel@latest
+        
+      - name: Pull Vercel Environment (Preview)
+        if: github.event_name == 'pull_request'
+        run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+        
+      - name: Pull Vercel Environment (Production)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+        
+      - name: Build project artifacts
+        run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          # Production environment variables for build
+          NODE_ENV: production
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL || 'https://api.keepgoingcare.com' }}
+          VITE_APP_ENV: production
+          VITE_ENABLE_DEBUG: false
+          
+      - name: Deploy to Vercel (Preview)
+        if: github.event_name == 'pull_request'
+        id: deploy-preview
+        run: |
+          DEPLOYMENT_URL=$(vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }})
+          echo "deployment-url=$DEPLOYMENT_URL" >> $GITHUB_OUTPUT
+          echo "## 🚀 Preview Deployment" >> $GITHUB_STEP_SUMMARY
+          echo "**URL:** $DEPLOYMENT_URL" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** Preview" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          
+      - name: Deploy to Vercel (Production)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        id: deploy-production
+        run: |
+          DEPLOYMENT_URL=$(vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})
+          echo "deployment-url=$DEPLOYMENT_URL" >> $GITHUB_OUTPUT
+          echo "## 🚀 Production Deployment" >> $GITHUB_STEP_SUMMARY
+          echo "**URL:** $DEPLOYMENT_URL" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** Production" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          
+      - name: Comment PR with Preview URL
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const deploymentUrl = '${{ steps.deploy-preview.outputs.deployment-url }}';
+            const comment = `
+            ## 🚀 Deployment Preview
+            
+            **Preview URL:** ${deploymentUrl}
+            **Environment:** Preview
+            **Commit:** ${{ github.sha }}
+            
+            ### Healthcare Application Features Available:
+            - 🏥 Patient Dashboard with Daily Self-Scores
+            - 👨‍⚕️ Doctor Interface for Care Plan Directives  
+            - 🤖 AI-Powered Supervisor Agent Chat
+            - 📊 Progress Tracking & Badge System
+            - 🔒 SMS Authentication & Role-Based Access
+            
+            ### Testing Notes:
+            - Preview uses test API endpoints
+            - SMS verification uses sandbox mode
+            - AI responses may be rate-limited
+            
+            *This preview will be available for 7 days*
+            `;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+            
+      - name: Update deployment status
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const state = '${{ job.status }}' === 'success' ? 'success' : 'failure';
+            const deploymentUrl = '${{ steps.deploy-preview.outputs.deployment-url }}' || '${{ steps.deploy-production.outputs.deployment-url }}';
+            const environment = '${{ github.event_name }}' === 'pull_request' ? 'preview' : 'production';
+            
+            github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: context.payload.deployment?.id || 0,
+              state: state,
+              environment_url: deploymentUrl,
+              description: `Deployment to ${environment} ${state === 'success' ? 'succeeded' : 'failed'}`,
+            });
+
+  health-check:
+    name: Post-Deployment Health Check
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: success()
+    
+    steps:
+      - name: Wait for deployment
+        run: sleep 30
+        
+      - name: Health check (Preview)
+        if: github.event_name == 'pull_request'
+        run: |
+          DEPLOYMENT_URL="${{ needs.deploy.outputs.deployment-url }}"
+          if [ -n "$DEPLOYMENT_URL" ]; then
+            # Basic connectivity test
+            curl -f "$DEPLOYMENT_URL" -o /dev/null -s -w "Response: %{http_code}\nTime: %{time_total}s\n" || echo "Health check failed"
+            
+            # Check for essential elements
+            curl -s "$DEPLOYMENT_URL" | grep -q "Keep Going Care" && echo "✅ Title found" || echo "❌ Title missing"
+            curl -s "$DEPLOYMENT_URL" | grep -q "Welcome" && echo "✅ Welcome content found" || echo "❌ Welcome content missing"
+          fi
+          
+      - name: Health check (Production)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          DEPLOYMENT_URL="${{ needs.deploy.outputs.deployment-url }}"
+          if [ -n "$DEPLOYMENT_URL" ]; then
+            # More comprehensive production health check
+            curl -f "$DEPLOYMENT_URL" -o /dev/null -s -w "Response: %{http_code}\nTime: %{time_total}s\n"
+            curl -f "$DEPLOYMENT_URL/api/health" -o /dev/null -s -w "API Health: %{http_code}\n" 2>/dev/null || echo "API health check not available"
+            
+            # Check critical healthcare app elements
+            PAGE_CONTENT=$(curl -s "$DEPLOYMENT_URL")
+            echo "$PAGE_CONTENT" | grep -q "Keep Going Care" && echo "✅ Application title found" || echo "❌ Application title missing"
+            echo "$PAGE_CONTENT" | grep -q "Welcome" && echo "✅ Welcome interface found" || echo "❌ Welcome interface missing"
+            
+            # Check for PWA manifest
+            curl -f "$DEPLOYMENT_URL/manifest.json" -o /dev/null -s && echo "✅ PWA manifest found" || echo "⚠️ PWA manifest missing"
+          fi
+          
+      - name: Update health check status
+        if: always()
+        run: |
+          echo "## 🏥 Healthcare Application Health Check" >> $GITHUB_STEP_SUMMARY
+          echo "**Status:** ${{ job.status == 'success' && '✅ Healthy' || '❌ Issues Detected' }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ github.event_name == 'pull_request' && 'Preview' || 'Production' }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Timestamp:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY

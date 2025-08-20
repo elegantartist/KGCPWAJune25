@@ -1,0 +1,185 @@
+import React from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { BarChart, LineChart, PieChart } from "lucide-react";
+import { 
+  LineChart as RechartsLineChart,
+  Line,
+  BarChart as RechartsBarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart as RechartsPieChart,
+  Pie,
+  Cell,
+  Legend
+} from "recharts";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { cn } from "@/lib/utils";
+
+const HealthSnapshots: React.FC = () => {
+  const isMobile = useIsMobile();
+
+  // Example data for charts
+  const healthProgressData = [
+    { name: 'Jan', mealPlan: 6, exercise: 4, medication: 8 },
+    { name: 'Feb', mealPlan: 7, exercise: 5, medication: 9 },
+    { name: 'Mar', mealPlan: 7, exercise: 6, medication: 9 },
+    { name: 'Apr', mealPlan: 8, exercise: 7, medication: 10 },
+    { name: 'May', mealPlan: 9, exercise: 8, medication: 10 },
+    { name: 'Jun', mealPlan: 9, exercise: 8, medication: 10 },
+  ];
+
+  const weeklyScoreData = [
+    { name: 'Mon', score: 7 },
+    { name: 'Tue', score: 8 },
+    { name: 'Wed', score: 6 },
+    { name: 'Thu', score: 9 },
+    { name: 'Fri', score: 8 },
+    { name: 'Sat', score: 7 },
+    { name: 'Sun', score: 8 },
+  ];
+
+  const activityDistributionData = [
+    { name: 'Meal Planning', value: 35 },
+    { name: 'Exercise', value: 25 },
+    { name: 'Medication', value: 20 },
+    { name: 'Wellness', value: 20 },
+  ];
+
+  const COLORS = ['#2E8BC0', '#2E8BC0', '#2E8BC0', '#a4a4a4'];
+
+  return (
+    <div className="space-y-6">
+      <Card className="bg-[#fdfdfd] border-[#2E8BC0]/20">
+        <CardHeader>
+          <CardTitle className="text-[#676767] flex items-center">
+            <BarChart className="w-6 h-6 text-[#2E8BC0] mr-2" />
+            <span>Health Snapshots</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Tabs defaultValue="progress" className="w-full">
+            <TabsList className="grid w-full grid-cols-3 mb-4">
+              <TabsTrigger value="progress" className="text-[#676767]">Progress Overview</TabsTrigger>
+              <TabsTrigger value="weekly" className="text-[#676767]">Weekly Scores</TabsTrigger>
+              <TabsTrigger value="activities" className="text-[#676767]">Activity Distribution</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="progress">
+              <Card className="border-[#2E8BC0]/20">
+                <CardHeader>
+                  <CardTitle className="text-[#676767] text-lg">Health Progress Over Time</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-[300px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RechartsLineChart
+                        data={healthProgressData}
+                        margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="#2E8BC0" />
+                        <XAxis dataKey="name" stroke="#676767" />
+                        <YAxis stroke="#676767" />
+                        <Tooltip />
+                        <Legend />
+                        <Line 
+                          type="monotone" 
+                          dataKey="mealPlan" 
+                          name="Healthy Meal Plan"
+                          stroke="#2E8BC0" 
+                          strokeWidth={2} 
+                          activeDot={{ r: 8 }} 
+                        />
+                        <Line 
+                          type="monotone" 
+                          dataKey="exercise" 
+                          name="Exercise & Wellness"
+                          stroke="#2E8BC0" 
+                          strokeWidth={2} 
+                        />
+                        <Line 
+                          type="monotone" 
+                          dataKey="medication" 
+                          name="Medication"
+                          stroke="#ff6b6b" 
+                          strokeWidth={2} 
+                        />
+                      </RechartsLineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="weekly">
+              <Card className="border-[#2E8BC0]/20">
+                <CardHeader>
+                  <CardTitle className="text-[#676767] text-lg">Weekly Health Scores</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-[300px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RechartsBarChart
+                        data={weeklyScoreData}
+                        margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="#2E8BC0" />
+                        <XAxis dataKey="name" stroke="#676767" />
+                        <YAxis domain={[0, 10]} stroke="#676767" />
+                        <Tooltip />
+                        <Bar 
+                          dataKey="score" 
+                          name="Daily Score" 
+                          fill="#2E8BC0" 
+                          radius={[4, 4, 0, 0]}
+                        />
+                      </RechartsBarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="activities">
+              <Card className="border-[#2E8BC0]/20">
+                <CardHeader>
+                  <CardTitle className="text-[#676767] text-lg">Activity Distribution</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-[300px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RechartsPieChart>
+                        <Pie
+                          data={activityDistributionData}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          outerRadius={80}
+                          fill="#8884d8"
+                          dataKey="value"
+                          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                        >
+                          {activityDistributionData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Legend />
+                        <Tooltip />
+                      </RechartsPieChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+export default HealthSnapshots;

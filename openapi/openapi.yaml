@@ -1,0 +1,2549 @@
+openapi: 3.1.0
+info:
+  title: KGC Healthcare API
+  description: |
+    Keep Going Care (KGC) Healthcare Platform API
+    
+    A TGA Class I Software as a Medical Device (SaMD) providing AI-powered patient support, 
+    care management, and health tracking capabilities. This API serves a unified Node.js/TypeScript 
+    application with comprehensive admin, doctor, and patient dashboards.
+    
+    **Key Features:**
+    - Hierarchical user management (Admin → Doctors → Patients)
+    - AI-powered health insights and motivational support
+    - Care Plan Directive (CPD) compliance tracking
+    - Daily self-scoring with 24-hour enforcement
+    - Privacy-first design with PII anonymization
+    - Real-time synchronization and offline support
+    
+    **Security:** 
+    - Session-based authentication with RBAC
+    - SMS verification via Twilio
+    - Rate limiting and input validation
+    - HIPAA/TGA compliance with audit logging
+    
+    **AI Integration:**
+    - MCP (Model Context Protocol) architecture
+    - OpenAI GPT-4o and Anthropic Claude 3.7 Sonnet
+    - CBT and MI therapeutic techniques
+    - Emergency keyword detection
+  
+  version: 2.0.0
+  contact:
+    name: Keep Going Care Support
+    email: admin@keepgoingcare.com
+  license:
+    name: Proprietary
+    url: https://keepgoingcare.com/license
+
+servers:
+  - url: https://kgcpwa-june-25-admin1023.replit.app
+    description: Production server
+  - url: http://localhost:3000
+    description: Development server
+
+security:
+  - SessionAuth: []
+
+paths:
+  # ===== AUTHENTICATION & USER MANAGEMENT =====
+  
+  /api/auth/status:
+    get:
+      tags: ["Authentication"]
+      summary: Check authentication status
+      description: Verify current session and return user role/context
+      responses:
+        '200':
+          description: Authentication status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  authenticated:
+                    type: boolean
+                  user:
+                    $ref: '#/components/schemas/User'
+                  role:
+                    type: string
+                    enum: [admin, doctor, patient]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/auth/login:
+    post:
+      tags: ["Authentication"]
+      summary: Authenticate user
+      description: Login with email/phone and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [identifier, password]
+              properties:
+                identifier:
+                  type: string
+                  description: Email address or phone number
+                password:
+                  type: string
+                  format: password
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  user:
+                    $ref: '#/components/schemas/User'
+                  redirectUrl:
+                    type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /api/auth/logout:
+    post:
+      tags: ["Authentication"]
+      summary: Logout user
+      description: Terminate current session
+      responses:
+        '200':
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+
+  /api/auth/sms/send:
+    post:
+      tags: ["Authentication", "SMS"]
+      summary: Send SMS verification code
+      description: Send SMS verification for patient authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phoneNumber]
+              properties:
+                phoneNumber:
+                  type: string
+                  pattern: '^\+61[0-9]{9}$'
+                  description: Australian phone number in international format
+      responses:
+        '200':
+          description: SMS sent successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /api/auth/sms/verify:
+    post:
+      tags: ["Authentication", "SMS"]
+      summary: Verify SMS code
+      description: Verify SMS code for patient authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phoneNumber, code]
+              properties:
+                phoneNumber:
+                  type: string
+                  pattern: '^\+61[0-9]{9}$'
+                code:
+                  type: string
+                  minLength: 6
+                  maxLength: 6
+      responses:
+        '200':
+          description: Verification successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  user:
+                    $ref: '#/components/schemas/User'
+        '400':
+          description: Invalid or expired code
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  # ===== USER MANAGEMENT =====
+  
+  /api/users:
+    get:
+      tags: ["Users"]
+      summary: List users (Admin/Doctor only)
+      description: Retrieve list of users with role-based filtering
+      parameters:
+        - name: role
+          in: query
+          schema:
+            type: string
+            enum: [admin, doctor, patient]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      security:
+        - SessionAuth: []
+      responses:
+        '200':
+          description: Users retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+                  total:
+                    type: integer
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    post:
+      tags: ["Users"]
+      summary: Create new user (Admin only)
+      description: Create new doctor or patient account
+      security:
+        - SessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/users/{userId}:
+    get:
+      tags: ["Users"]
+      summary: Get user by ID
+      description: Retrieve user details (with access controls)
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: User retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    put:
+      tags: ["Users"]
+      summary: Update user
+      description: Update user profile (own profile or admin/doctor access)
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserRequest'
+      responses:
+        '200':
+          description: User updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/users/{userId}/health-metrics:
+    get:
+      tags: ["Health Metrics"]
+      summary: Get user health metrics
+      description: Retrieve health metrics history for a user
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 30
+      responses:
+        '200':
+          description: Health metrics retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/HealthMetric'
+
+    post:
+      tags: ["Health Metrics"]
+      summary: Submit daily health scores
+      description: |
+        Submit daily self-scores with 24-hour enforcement.
+        Only one submission per user per day is allowed.
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateHealthMetricRequest'
+      responses:
+        '201':
+          description: Health metric submitted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthMetric'
+        '429':
+          description: Daily submission limit reached
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Daily scores already submitted today"
+                  detail:
+                    type: string
+                  nextSubmissionDate:
+                    type: string
+                    format: date
+
+  /api/users/{userId}/health-metrics/latest:
+    get:
+      tags: ["Health Metrics"]
+      summary: Get latest health metrics
+      description: Retrieve most recent health metric for a user
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: Latest health metric retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthMetric'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ===== CARE PLAN DIRECTIVES =====
+  
+  /api/care-plan-directives:
+    get:
+      tags: ["Care Plan Directives"]
+      summary: List care plan directives
+      description: Retrieve CPDs with role-based filtering
+      parameters:
+        - name: userId
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+        - name: category
+          in: query
+          schema:
+            type: string
+            enum: [diet, exercise, medication, lifestyle]
+        - name: active
+          in: query
+          schema:
+            type: boolean
+            default: true
+      responses:
+        '200':
+          description: CPDs retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CarePlanDirective'
+
+    post:
+      tags: ["Care Plan Directives"]
+      summary: Create care plan directive (Doctor/Admin only)
+      description: Create new CPD for a patient
+      security:
+        - SessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCarePlanDirectiveRequest'
+      responses:
+        '201':
+          description: CPD created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CarePlanDirective'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/care-plan-directives/{cpdId}:
+    get:
+      tags: ["Care Plan Directives"]
+      summary: Get CPD by ID
+      parameters:
+        - name: cpdId
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: CPD retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CarePlanDirective'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: ["Care Plan Directives"]
+      summary: Update CPD (Doctor/Admin only)
+      description: Update existing care plan directive
+      parameters:
+        - name: cpdId
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCarePlanDirectiveRequest'
+      responses:
+        '200':
+          description: CPD updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CarePlanDirective'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/care-plan-directives/{cpdId}/deactivate:
+    put:
+      tags: ["Care Plan Directives"]
+      summary: Deactivate CPD (Doctor/Admin only)
+      description: Mark care plan directive as inactive
+      parameters:
+        - name: cpdId
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: CPD deactivated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CarePlanDirective'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # ===== AI CHAT & SUPERVISOR AGENT =====
+  
+  /api/supervisor-agent/chat:
+    post:
+      tags: ["AI Chat"]
+      summary: Chat with supervisor agent
+      description: |
+        Interact with the AI supervisor agent for personalized health support.
+        Uses MCP architecture with CBT/MI techniques and privacy protection.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message, userId]
+              properties:
+                message:
+                  type: string
+                  maxLength: 1000
+                  description: User's message to the AI
+                userId:
+                  type: integer
+                  minimum: 1
+                conversationContext:
+                  type: object
+                  description: Optional conversation context
+      responses:
+        '200':
+          description: AI response generated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  response:
+                    type: string
+                    description: AI-generated response
+                  conversationId:
+                    type: string
+                  timestamp:
+                    type: string
+                    format: date-time
+                  emergencyDetected:
+                    type: boolean
+                    description: Whether emergency keywords were detected
+                  featureRecommendations:
+                    type: array
+                    items:
+                      type: string
+                    description: Suggested KGC features
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /api/chat/messages:
+    get:
+      tags: ["AI Chat"]
+      summary: Get chat history
+      description: Retrieve chat message history for a user
+      parameters:
+        - name: userId
+          in: query
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: Chat messages retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messages:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ChatMessage'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+    post:
+      tags: ["AI Chat"]
+      summary: Save chat message
+      description: Store chat message in history
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateChatMessageRequest'
+      responses:
+        '201':
+          description: Message saved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatMessage'
+
+  # ===== MCP TOOLS =====
+  
+  /api/mcp/health-metrics:
+    post:
+      tags: ["MCP Tools"]
+      summary: Health metrics MCP tool
+      description: AI tool for analyzing user health metrics and trends
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MCPHealthMetricsRequest'
+      responses:
+        '200':
+          description: Health metrics analysis completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MCPResponse'
+
+  /api/mcp/inspiration-machine-d:
+    post:
+      tags: ["MCP Tools"]
+      summary: Inspiration Machine D MCP tool
+      description: AI tool for generating cooking videos and dietary inspiration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MCPInspirationRequest'
+      responses:
+        '200':
+          description: Inspiration content generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MCPResponse'
+
+  /api/mcp/care-plan-directives:
+    post:
+      tags: ["MCP Tools"]
+      summary: Care Plan Directives MCP tool
+      description: AI tool for CPD analysis and compliance support
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MCPCarePlanRequest'
+      responses:
+        '200':
+          description: CPD analysis completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MCPResponse'
+
+  /api/mcp/food-database:
+    post:
+      tags: ["MCP Tools"]
+      summary: Food Database MCP tool
+      description: AI tool for Australian food standards and nutrition guidance
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MCPFoodDatabaseRequest'
+      responses:
+        '200':
+          description: Food recommendations generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MCPResponse'
+
+  # ===== PROGRESS TRACKING =====
+  
+  /api/users/{userId}/progress-milestones:
+    get:
+      tags: ["Progress Tracking"]
+      summary: Get progress milestones
+      description: Retrieve user's progress milestones and achievements
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+        - name: category
+          in: query
+          schema:
+            type: string
+            enum: [diet, exercise, medication, lifestyle]
+        - name: completed
+          in: query
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Progress milestones retrieved
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProgressMilestone'
+
+    post:
+      tags: ["Progress Tracking"]
+      summary: Create progress milestone
+      description: Add new progress milestone for user
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProgressMilestoneRequest'
+      responses:
+        '201':
+          description: Milestone created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProgressMilestone'
+
+  /api/users/{userId}/progress-milestones/sync:
+    patch:
+      tags: ["Progress Tracking"]
+      summary: Sync progress milestones
+      description: |
+        Synchronize local milestones with server.
+        Handles offline-first architecture with conflict resolution.
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [localMilestones]
+              properties:
+                localMilestones:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/ProgressMilestone'
+      responses:
+        '200':
+          description: Milestones synchronized successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  synced:
+                    type: object
+                    properties:
+                      created:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ProgressMilestone'
+                      updated:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ProgressMilestone'
+                      unchanged:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ProgressMilestone'
+                  allMilestones:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ProgressMilestone'
+
+  # ===== DOCTOR REPORTS =====
+  
+  /api/doctor/reports:
+    get:
+      tags: ["Doctor Reports"]
+      summary: Get patient progress reports (Doctor/Admin only)
+      description: Retrieve PPRs with filtering and pagination
+      security:
+        - SessionAuth: []
+      parameters:
+        - name: patientId
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Reports retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  reports:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PatientProgressReport'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    post:
+      tags: ["Doctor Reports"]
+      summary: Generate patient progress report (Doctor/Admin only)
+      description: Create comprehensive PPR for specified patient and period
+      security:
+        - SessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePatientProgressReportRequest'
+      responses:
+        '201':
+          description: Report generated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatientProgressReport'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/doctor/reports/{reportId}:
+    get:
+      tags: ["Doctor Reports"]
+      summary: Get specific patient progress report
+      security:
+        - SessionAuth: []
+      parameters:
+        - name: reportId
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: Report retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatientProgressReport'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/doctor/health-snapshots/{patientId}:
+    get:
+      tags: ["Doctor Reports"]
+      summary: Get patient health snapshots
+      description: Retrieve aggregated health data for doctor dashboard
+      security:
+        - SessionAuth: []
+      parameters:
+        - name: patientId
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Health snapshots retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthSnapshots'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # ===== CONTENT & SEARCH =====
+  
+  /api/content/search:
+    post:
+      tags: ["Content Search"]
+      summary: Search health content
+      description: |
+        Search for health-related content using Tavily API.
+        Supports recipes, exercise videos, local services, and general health information.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [query]
+              properties:
+                query:
+                  type: string
+                  maxLength: 500
+                contentType:
+                  type: string
+                  enum: [general, youtube_recipes, ew_support, mbp_wizard]
+                  default: general
+                maxResults:
+                  type: integer
+                  minimum: 1
+                  maximum: 20
+                  default: 5
+                userId:
+                  type: integer
+                  minimum: 1
+                location:
+                  type: string
+                  description: For location-based searches
+                mealType:
+                  type: string
+                  enum: [breakfast, lunch, dinner, snack]
+                dietType:
+                  type: string
+                  description: Dietary preferences or restrictions
+      responses:
+        '200':
+          description: Search results retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  query:
+                    type: string
+                  results:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SearchResult'
+                  answer:
+                    type: string
+                    description: AI-generated summary
+
+  /api/recipes/search:
+    post:
+      tags: ["Content Search"]
+      summary: Search recipes
+      description: Search for recipes with dietary filters and preferences
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecipeSearchRequest'
+      responses:
+        '200':
+          description: Recipes found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  recipes:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Recipe'
+                  query:
+                    type: string
+                  answer:
+                    type: string
+
+  /api/recipes/analyze:
+    post:
+      tags: ["Content Search"]
+      summary: Analyze recipe nutrition
+      description: Get AI-powered nutritional analysis of a recipe
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [recipe]
+              properties:
+                recipe:
+                  $ref: '#/components/schemas/Recipe'
+                userId:
+                  type: integer
+                  minimum: 1
+      responses:
+        '200':
+          description: Recipe analyzed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnhancedRecipe'
+
+  # ===== FEATURE USAGE & ANALYTICS =====
+  
+  /api/users/{userId}/feature-usage:
+    get:
+      tags: ["Analytics"]
+      summary: Get feature usage statistics
+      description: Retrieve user's feature usage data for analytics
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+        - name: feature
+          in: query
+          schema:
+            type: string
+          description: Filter by specific feature name
+      responses:
+        '200':
+          description: Feature usage data retrieved
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FeatureUsage'
+
+    post:
+      tags: ["Analytics"]
+      summary: Record feature usage
+      description: Track when user interacts with specific features
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [featureName]
+              properties:
+                featureName:
+                  type: string
+                  maxLength: 100
+                metadata:
+                  type: object
+                  description: Additional usage context
+      responses:
+        '201':
+          description: Feature usage recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeatureUsage'
+
+  /api/users/{userId}/keep-going-stats:
+    get:
+      tags: ["Analytics"]
+      summary: Get Keep Going button statistics
+      description: Retrieve usage statistics for the Keep Going feature
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: Keep Going statistics retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalUsage:
+                    type: integer
+                    description: Total times Keep Going was used
+                  lastUsed:
+                    type: string
+                    format: date-time
+                    nullable: true
+                  averagePerWeek:
+                    type: number
+                    format: float
+                  usageTrend:
+                    type: string
+                    enum: [increasing, stable, decreasing]
+
+  # ===== ALERTS & NOTIFICATIONS =====
+  
+  /api/doctor/{doctorId}/alerts:
+    get:
+      tags: ["Alerts"]
+      summary: Get doctor alerts (Doctor/Admin only)
+      description: Retrieve patient alerts for a specific doctor
+      security:
+        - SessionAuth: []
+      parameters:
+        - name: doctorId
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [unread, read, resolved]
+            default: unread
+      responses:
+        '200':
+          description: Alerts retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PatientAlert'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/doctor/{doctorId}/alerts/count:
+    get:
+      tags: ["Alerts"]
+      summary: Get unread alert count (Doctor/Admin only)
+      security:
+        - SessionAuth: []
+      parameters:
+        - name: doctorId
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: Alert count retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                    minimum: 0
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/alerts/{alertId}/read:
+    put:
+      tags: ["Alerts"]
+      summary: Mark alert as read
+      security:
+        - SessionAuth: []
+      parameters:
+        - name: alertId
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: Alert marked as read
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatientAlert'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/alerts/{alertId}/resolve:
+    put:
+      tags: ["Alerts"]
+      summary: Resolve alert
+      security:
+        - SessionAuth: []
+      parameters:
+        - name: alertId
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: Alert resolved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatientAlert'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ===== SYSTEM ENDPOINTS =====
+  
+  /api/test-connections:
+    get:
+      tags: ["System"]
+      summary: Test API connections
+      description: Verify connections to external services (OpenAI, database, MCP)
+      responses:
+        '200':
+          description: Connection status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  openai:
+                    $ref: '#/components/schemas/ConnectionStatus'
+                  database:
+                    $ref: '#/components/schemas/ConnectionStatus'
+                  mcp:
+                    $ref: '#/components/schemas/ConnectionStatus'
+
+components:
+  securitySchemes:
+    SessionAuth:
+      type: apiKey
+      in: cookie
+      name: connect.sid
+      description: Session-based authentication using HTTP-only cookies
+
+  schemas:
+    # ===== USER SCHEMAS =====
+    
+    User:
+      type: object
+      required: [id, name, email, uin, roleId]
+      properties:
+        id:
+          type: integer
+          minimum: 1
+          description: Unique user identifier
+        name:
+          type: string
+          maxLength: 255
+          description: Full name
+        email:
+          type: string
+          format: email
+          maxLength: 255
+          description: Email address
+        uin:
+          type: string
+          maxLength: 50
+          description: User Identification Number (KGC-ADM-001, KGC-DOC-001, KGC-PAT-001)
+        roleId:
+          type: integer
+          minimum: 1
+          maximum: 3
+          description: Role ID (1=Admin, 2=Doctor, 3=Patient)
+        phoneNumber:
+          type: string
+          pattern: '^\+61[0-9]{9}$'
+          nullable: true
+          description: Australian phone number
+        medicareNumber:
+          type: string
+          pattern: '^[0-9]{10}$'
+          nullable: true
+          description: 10-digit Medicare number (patients only)
+        ahpraRegistration:
+          type: string
+          pattern: '^[A-Z]{3}[0-9]{10}$'
+          nullable: true
+          description: AHPRA registration (doctors only)
+        active:
+          type: boolean
+          default: true
+        uinSequence:
+          type: integer
+          minimum: 1
+          description: Sequence number for UIN generation
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateUserRequest:
+      type: object
+      required: [name, email, roleId]
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 255
+        email:
+          type: string
+          format: email
+          maxLength: 255
+        roleId:
+          type: integer
+          minimum: 2
+          maximum: 3
+          description: Only doctors (2) and patients (3) can be created
+        phoneNumber:
+          type: string
+          pattern: '^\+61[0-9]{9}$'
+          nullable: true
+        medicareNumber:
+          type: string
+          pattern: '^[0-9]{10}$'
+          nullable: true
+        ahpraRegistration:
+          type: string
+          pattern: '^[A-Z]{3}[0-9]{10}$'
+          nullable: true
+
+    UpdateUserRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 255
+        email:
+          type: string
+          format: email
+          maxLength: 255
+        phoneNumber:
+          type: string
+          pattern: '^\+61[0-9]{9}$'
+          nullable: true
+        medicareNumber:
+          type: string
+          pattern: '^[0-9]{10}$'
+          nullable: true
+        ahpraRegistration:
+          type: string
+          pattern: '^[A-Z]{3}[0-9]{10}$'
+          nullable: true
+        active:
+          type: boolean
+
+    # ===== HEALTH METRICS SCHEMAS =====
+    
+    HealthMetric:
+      type: object
+      required: [id, userId, dietScore, exerciseScore, medicationScore, scoreDate]
+      properties:
+        id:
+          type: integer
+          minimum: 1
+        userId:
+          type: integer
+          minimum: 1
+        dietScore:
+          type: integer
+          minimum: 1
+          maximum: 10
+          description: Daily diet self-score (1-10 scale)
+        exerciseScore:
+          type: integer
+          minimum: 1
+          maximum: 10
+          description: Daily exercise self-score (1-10 scale)
+        medicationScore:
+          type: integer
+          minimum: 1
+          maximum: 10
+          description: Daily medication adherence self-score (1-10 scale)
+        scoreDate:
+          type: string
+          format: date
+          description: Date for which scores were submitted
+        notes:
+          type: string
+          maxLength: 1000
+          nullable: true
+          description: Optional patient notes
+        moodRating:
+          type: integer
+          minimum: 1
+          maximum: 10
+          nullable: true
+          description: Optional mood rating (1-10 scale)
+        sleepHours:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 24
+          nullable: true
+          description: Hours of sleep
+        stressLevel:
+          type: integer
+          minimum: 1
+          maximum: 10
+          nullable: true
+          description: Stress level (1-10 scale)
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateHealthMetricRequest:
+      type: object
+      required: [dietScore, exerciseScore, medicationScore]
+      properties:
+        dietScore:
+          type: integer
+          minimum: 1
+          maximum: 10
+        exerciseScore:
+          type: integer
+          minimum: 1
+          maximum: 10
+        medicationScore:
+          type: integer
+          minimum: 1
+          maximum: 10
+        notes:
+          type: string
+          maxLength: 1000
+        moodRating:
+          type: integer
+          minimum: 1
+          maximum: 10
+        sleepHours:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 24
+        stressLevel:
+          type: integer
+          minimum: 1
+          maximum: 10
+
+    # ===== CARE PLAN DIRECTIVE SCHEMAS =====
+    
+    CarePlanDirective:
+      type: object
+      required: [id, userId, createdById, category, directive, active]
+      properties:
+        id:
+          type: integer
+          minimum: 1
+        userId:
+          type: integer
+          minimum: 1
+          description: Patient ID
+        createdById:
+          type: integer
+          minimum: 1
+          description: Doctor/Admin who created the CPD
+        category:
+          type: string
+          enum: [diet, exercise, medication, lifestyle]
+          description: CPD category
+        directive:
+          type: string
+          maxLength: 2000
+          description: Detailed care plan directive text
+        targetMeasures:
+          type: object
+          nullable: true
+          description: Specific targets and measures (JSON object)
+        priority:
+          type: string
+          enum: [low, medium, high, critical]
+          default: medium
+        active:
+          type: boolean
+          default: true
+        reviewDate:
+          type: string
+          format: date
+          nullable: true
+          description: Next review date
+        complianceRate:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          nullable: true
+          description: Compliance rate (0-1)
+        lastComplianceCheck:
+          type: string
+          format: date-time
+          nullable: true
+        notes:
+          type: string
+          maxLength: 1000
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateCarePlanDirectiveRequest:
+      type: object
+      required: [userId, category, directive]
+      properties:
+        userId:
+          type: integer
+          minimum: 1
+        category:
+          type: string
+          enum: [diet, exercise, medication, lifestyle]
+        directive:
+          type: string
+          minLength: 10
+          maxLength: 2000
+        targetMeasures:
+          type: object
+        priority:
+          type: string
+          enum: [low, medium, high, critical]
+          default: medium
+        reviewDate:
+          type: string
+          format: date
+        notes:
+          type: string
+          maxLength: 1000
+
+    UpdateCarePlanDirectiveRequest:
+      type: object
+      properties:
+        category:
+          type: string
+          enum: [diet, exercise, medication, lifestyle]
+        directive:
+          type: string
+          minLength: 10
+          maxLength: 2000
+        targetMeasures:
+          type: object
+        priority:
+          type: string
+          enum: [low, medium, high, critical]
+        reviewDate:
+          type: string
+          format: date
+        notes:
+          type: string
+          maxLength: 1000
+
+    # ===== CHAT SCHEMAS =====
+    
+    ChatMessage:
+      type: object
+      required: [id, userId, message, sender, timestamp]
+      properties:
+        id:
+          type: integer
+          minimum: 1
+        userId:
+          type: integer
+          minimum: 1
+        message:
+          type: string
+          maxLength: 2000
+          description: Message content
+        sender:
+          type: string
+          enum: [user, assistant]
+          description: Message sender type
+        messageType:
+          type: string
+          enum: [text, recommendation, alert, system]
+          default: text
+        metadata:
+          type: object
+          nullable: true
+          description: Additional message metadata
+        emergencyDetected:
+          type: boolean
+          default: false
+          description: Whether emergency keywords were detected
+        featureRecommendations:
+          type: array
+          items:
+            type: string
+          description: Recommended KGC features
+        sentiment:
+          type: number
+          format: float
+          minimum: -1
+          maximum: 1
+          nullable: true
+          description: Sentiment analysis score (-1 to 1)
+        timestamp:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateChatMessageRequest:
+      type: object
+      required: [userId, message, sender]
+      properties:
+        userId:
+          type: integer
+          minimum: 1
+        message:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        sender:
+          type: string
+          enum: [user, assistant]
+        messageType:
+          type: string
+          enum: [text, recommendation, alert, system]
+          default: text
+        metadata:
+          type: object
+        emergencyDetected:
+          type: boolean
+          default: false
+        featureRecommendations:
+          type: array
+          items:
+            type: string
+        sentiment:
+          type: number
+          format: float
+          minimum: -1
+          maximum: 1
+
+    # ===== PROGRESS TRACKING SCHEMAS =====
+    
+    ProgressMilestone:
+      type: object
+      required: [id, userId, title, category, progress, completed]
+      properties:
+        id:
+          type: integer
+          minimum: 1
+        userId:
+          type: integer
+          minimum: 1
+        title:
+          type: string
+          maxLength: 255
+          description: Milestone title
+        description:
+          type: string
+          maxLength: 1000
+          nullable: true
+          description: Detailed description
+        category:
+          type: string
+          enum: [diet, exercise, medication, lifestyle]
+          description: Milestone category
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: Progress percentage
+        completed:
+          type: boolean
+          default: false
+        targetDate:
+          type: string
+          format: date
+          nullable: true
+          description: Target completion date
+        completedDate:
+          type: string
+          format: date
+          nullable: true
+          description: Actual completion date
+        iconType:
+          type: string
+          maxLength: 50
+          nullable: true
+          description: Icon identifier for UI
+        localUuid:
+          type: string
+          maxLength: 36
+          nullable: true
+          description: Local UUID for offline sync
+        lastSyncedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Last synchronization timestamp
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateProgressMilestoneRequest:
+      type: object
+      required: [title, category]
+      properties:
+        title:
+          type: string
+          minLength: 3
+          maxLength: 255
+        description:
+          type: string
+          maxLength: 1000
+        category:
+          type: string
+          enum: [diet, exercise, medication, lifestyle]
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+          default: 0
+        targetDate:
+          type: string
+          format: date
+        iconType:
+          type: string
+          maxLength: 50
+        localUuid:
+          type: string
+          maxLength: 36
+
+    # ===== DOCTOR REPORT SCHEMAS =====
+    
+    PatientProgressReport:
+      type: object
+      required: [id, patientId, createdById, reportPeriodStartDate, reportPeriodEndDate]
+      properties:
+        id:
+          type: integer
+          minimum: 1
+        patientId:
+          type: integer
+          minimum: 1
+        createdById:
+          type: integer
+          minimum: 1
+          description: Doctor who generated the report
+        reportPeriodStartDate:
+          type: string
+          format: date
+        reportPeriodEndDate:
+          type: string
+          format: date
+        avgMedicationScore:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 10
+          nullable: true
+        avgDietScore:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 10
+          nullable: true
+        avgExerciseScore:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 10
+          nullable: true
+        aiAnalysis:
+          type: string
+          maxLength: 5000
+          nullable: true
+          description: AI-generated analysis
+        aiRecommendations:
+          type: string
+          maxLength: 5000
+          nullable: true
+          description: AI-generated recommendations
+        shared:
+          type: boolean
+          default: false
+          description: Whether report is shared with patient
+        doctorNotes:
+          type: string
+          maxLength: 2000
+          nullable: true
+          description: Doctor's notes
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreatePatientProgressReportRequest:
+      type: object
+      required: [patientId, reportPeriodStartDate, reportPeriodEndDate]
+      properties:
+        patientId:
+          type: integer
+          minimum: 1
+        reportPeriodStartDate:
+          type: string
+          format: date-time
+        reportPeriodEndDate:
+          type: string
+          format: date-time
+        doctorNotes:
+          type: string
+          maxLength: 2000
+
+    HealthSnapshots:
+      type: object
+      properties:
+        healthProgressData:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+                description: Display name (e.g., "Jan 15")
+              date:
+                type: string
+                format: date
+              diet:
+                type: number
+                format: float
+                minimum: 0
+                maximum: 10
+              exercise:
+                type: number
+                format: float
+                minimum: 0
+                maximum: 10
+              medication:
+                type: number
+                format: float
+                minimum: 0
+                maximum: 10
+        healthDistributionData:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+                enum: [Diet, Exercise, Medication]
+              value:
+                type: number
+                format: float
+                minimum: 0
+                maximum: 10
+              fill:
+                type: string
+                description: Color code for charts
+        periodSummary:
+          type: object
+          properties:
+            totalSubmissions:
+              type: integer
+              minimum: 0
+            avgDiet:
+              type: number
+              format: float
+              minimum: 0
+              maximum: 10
+            avgExercise:
+              type: number
+              format: float
+              minimum: 0
+              maximum: 10
+            avgMedication:
+              type: number
+              format: float
+              minimum: 0
+              maximum: 10
+        trendAnalysis:
+          type: object
+          properties:
+            dietTrend:
+              type: string
+              enum: [improving, stable, declining]
+            exerciseTrend:
+              type: string
+              enum: [improving, stable, declining]
+            medicationTrend:
+              type: string
+              enum: [improving, stable, declining]
+        dataAvailable:
+          type: boolean
+
+    # ===== MCP TOOL SCHEMAS =====
+    
+    MCPHealthMetricsRequest:
+      type: object
+      required: [userId, action]
+      properties:
+        userId:
+          type: integer
+          minimum: 1
+        action:
+          type: string
+          enum: [get_latest, analyze_trends, compare_periods, generate_insights]
+        period:
+          type: string
+          enum: [week, month, quarter, year]
+          default: week
+        includeRecommendations:
+          type: boolean
+          default: true
+
+    MCPInspirationRequest:
+      type: object
+      required: [userId, inspirationType]
+      properties:
+        userId:
+          type: integer
+          minimum: 1
+        inspirationType:
+          type: string
+          enum: [cooking_videos, motivational_content, exercise_videos]
+        dietaryPreferences:
+          type: array
+          items:
+            type: string
+        mealType:
+          type: string
+          enum: [breakfast, lunch, dinner, snack]
+        maxResults:
+          type: integer
+          minimum: 1
+          maximum: 10
+          default: 5
+
+    MCPCarePlanRequest:
+      type: object
+      required: [userId, action]
+      properties:
+        userId:
+          type: integer
+          minimum: 1
+        action:
+          type: string
+          enum: [get_status, analyze_compliance, motivational_support, progress_summary]
+        category:
+          type: string
+          enum: [diet, exercise, medication, lifestyle]
+        includeHistory:
+          type: boolean
+          default: false
+
+    MCPFoodDatabaseRequest:
+      type: object
+      required: [userId, action]
+      properties:
+        userId:
+          type: integer
+          minimum: 1
+        action:
+          type: string
+          enum: [search_foods, get_recommendations, analyze_nutrition, check_compliance]
+        query:
+          type: string
+          maxLength: 500
+        includeNutritionalInfo:
+          type: boolean
+          default: true
+        filterByCPD:
+          type: boolean
+          default: true
+          description: Filter results by user's Care Plan Directives
+
+    MCPResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          description: Tool-specific response data
+        recommendations:
+          type: array
+          items:
+            type: string
+          description: AI-generated recommendations
+        emergencyDetected:
+          type: boolean
+          default: false
+        privacyCompliant:
+          type: boolean
+          default: true
+          description: Whether response maintains privacy standards
+        auditLogged:
+          type: boolean
+          default: true
+          description: Whether interaction was logged for compliance
+
+    # ===== SEARCH & CONTENT SCHEMAS =====
+    
+    SearchResult:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 500
+        description:
+          type: string
+          maxLength: 2000
+        url:
+          type: string
+          format: uri
+        thumbnail_url:
+          type: string
+          format: uri
+          nullable: true
+        source_name:
+          type: string
+          maxLength: 255
+        content_type:
+          type: string
+          enum: [article, video, recipe, service, general]
+        score:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          description: Relevance score
+        validation:
+          type: object
+          properties:
+            isValid:
+              type: boolean
+            score:
+              type: number
+              format: float
+              minimum: 0
+              maximum: 1
+            reasons:
+              type: array
+              items:
+                type: string
+
+    Recipe:
+      type: object
+      required: [title, url]
+      properties:
+        title:
+          type: string
+          maxLength: 500
+        description:
+          type: string
+          maxLength: 2000
+        url:
+          type: string
+          format: uri
+        thumbnail_url:
+          type: string
+          format: uri
+          nullable: true
+        source_name:
+          type: string
+          maxLength: 255
+        cuisine_type:
+          type: string
+          maxLength: 100
+        meal_type:
+          type: string
+          enum: [breakfast, lunch, dinner, snack, dessert]
+        prep_time:
+          type: integer
+          minimum: 0
+          description: Preparation time in minutes
+        cook_time:
+          type: integer
+          minimum: 0
+          description: Cooking time in minutes
+        servings:
+          type: integer
+          minimum: 1
+        difficulty_level:
+          type: string
+          enum: [easy, medium, hard]
+        ingredients:
+          type: array
+          items:
+            type: string
+        instructions:
+          type: array
+          items:
+            type: string
+
+    EnhancedRecipe:
+      allOf:
+        - $ref: '#/components/schemas/Recipe'
+        - type: object
+          properties:
+            nutritional_value:
+              type: string
+              maxLength: 1000
+              description: AI-analyzed nutritional information
+            health_score:
+              type: integer
+              minimum: 1
+              maximum: 10
+              description: AI-calculated health score
+            health_benefits:
+              type: array
+              items:
+                type: string
+              description: Identified health benefits
+            calories_estimate:
+              type: string
+              maxLength: 100
+            dietary_tags:
+              type: array
+              items:
+                type: string
+              description: Dietary classifications (vegan, gluten-free, etc.)
+            cpd_alignment:
+              type: object
+              description: How recipe aligns with user's CPDs
+            tips:
+              type: array
+              items:
+                type: string
+              description: AI-generated cooking tips
+
+    RecipeSearchRequest:
+      type: object
+      required: [query]
+      properties:
+        query:
+          type: string
+          maxLength: 500
+        mealType:
+          type: string
+          enum: [breakfast, lunch, dinner, snack]
+        dietaryPreferences:
+          type: array
+          items:
+            type: string
+          description: Dietary preferences (vegetarian, vegan, etc.)
+        cuisineType:
+          type: string
+          maxLength: 100
+        maxPrepTime:
+          type: integer
+          minimum: 0
+          description: Maximum preparation time in minutes
+        difficultyLevel:
+          type: string
+          enum: [easy, medium, hard]
+        ingredients:
+          type: array
+          items:
+            type: string
+          description: Required or preferred ingredients
+        avoidIngredients:
+          type: array
+          items:
+            type: string
+          description: Ingredients to avoid
+        healthFocus:
+          type: boolean
+          default: false
+          description: Prioritize health-focused recipes
+        maxResults:
+          type: integer
+          minimum: 1
+          maximum: 20
+          default: 10
+
+    # ===== ANALYTICS SCHEMAS =====
+    
+    FeatureUsage:
+      type: object
+      required: [id, userId, featureName, usageCount, lastUsed]
+      properties:
+        id:
+          type: integer
+          minimum: 1
+        userId:
+          type: integer
+          minimum: 1
+        featureName:
+          type: string
+          maxLength: 100
+          description: Name of the feature used
+        usageCount:
+          type: integer
+          minimum: 0
+          description: Total usage count
+        lastUsed:
+          type: string
+          format: date-time
+          description: Last usage timestamp
+        metadata:
+          type: object
+          nullable: true
+          description: Additional usage context
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    # ===== ALERT SCHEMAS =====
+    
+    PatientAlert:
+      type: object
+      required: [id, patientId, doctorId, alertType, message, severity]
+      properties:
+        id:
+          type: integer
+          minimum: 1
+        patientId:
+          type: integer
+          minimum: 1
+        doctorId:
+          type: integer
+          minimum: 1
+        alertType:
+          type: string
+          enum: [missed_scores, low_compliance, emergency_keyword, medication_concern, diet_concern]
+        message:
+          type: string
+          maxLength: 1000
+          description: Alert message content
+        severity:
+          type: string
+          enum: [low, medium, high, critical]
+        isRead:
+          type: boolean
+          default: false
+        isResolved:
+          type: boolean
+          default: false
+        metadata:
+          type: object
+          nullable: true
+          description: Additional alert context
+        createdAt:
+          type: string
+          format: date-time
+        readAt:
+          type: string
+          format: date-time
+          nullable: true
+        resolvedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    # ===== UTILITY SCHEMAS =====
+    
+    Pagination:
+      type: object
+      properties:
+        limit:
+          type: integer
+          minimum: 1
+        offset:
+          type: integer
+          minimum: 0
+        total:
+          type: integer
+          minimum: 0
+        hasMore:
+          type: boolean
+
+    ConnectionStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [connected, error, unknown]
+        error:
+          type: string
+          nullable: true
+          description: Error message if connection failed
+
+    # ===== ERROR SCHEMAS =====
+    
+    Error:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+          description: Human-readable error message
+        code:
+          type: string
+          description: Machine-readable error code
+        details:
+          type: object
+          description: Additional error context
+        timestamp:
+          type: string
+          format: date-time
+
+    ValidationError:
+      allOf:
+        - $ref: '#/components/schemas/Error'
+        - type: object
+          properties:
+            errors:
+              type: array
+              items:
+                type: object
+                properties:
+                  field:
+                    type: string
+                  message:
+                    type: string
+                  code:
+                    type: string
+
+  responses:
+    # ===== STANDARD ERROR RESPONSES =====
+    
+    BadRequest:
+      description: Bad Request - Invalid input or request format
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationError'
+
+    Unauthorized:
+      description: Unauthorized - Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            message: "Authentication required"
+            code: "UNAUTHORIZED"
+
+    Forbidden:
+      description: Forbidden - Insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            message: "Insufficient permissions for this operation"
+            code: "FORBIDDEN"
+
+    NotFound:
+      description: Not Found - Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            message: "Resource not found"
+            code: "NOT_FOUND"
+
+    ValidationError:
+      description: Validation Error - Invalid input data
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationError'
+          example:
+            message: "Validation failed"
+            code: "VALIDATION_ERROR"
+            errors:
+              - field: "email"
+                message: "Invalid email format"
+                code: "INVALID_EMAIL"
+
+    RateLimited:
+      description: Too Many Requests - Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            message: "Rate limit exceeded"
+            code: "RATE_LIMITED"
+      headers:
+        Retry-After:
+          description: Seconds to wait before next request
+          schema:
+            type: integer
+
+    InternalServerError:
+      description: Internal Server Error - Unexpected server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            message: "Internal server error"
+            code: "INTERNAL_ERROR"
+
+tags:
+  - name: Authentication
+    description: User authentication and session management
+  - name: Users
+    description: User management and profile operations
+  - name: Health Metrics
+    description: Daily self-score submission and health tracking
+  - name: Care Plan Directives
+    description: Medical care directives and compliance tracking
+  - name: AI Chat
+    description: AI-powered conversation and support
+  - name: MCP Tools
+    description: Model Context Protocol AI tools
+  - name: Progress Tracking
+    description: Patient progress milestones and achievements
+  - name: Doctor Reports
+    description: Patient progress reports and health analytics
+  - name: Content Search
+    description: Health content and recipe search
+  - name: Analytics
+    description: Feature usage and system analytics
+  - name: Alerts
+    description: Patient alert system for doctors
+  - name: SMS
+    description: SMS verification and communication
+  - name: System
+    description: System health and connection testing
+
+x-tagGroups:
+  - name: Core API
+    tags:
+      - Authentication
+      - Users
+      - Health Metrics
+      - Care Plan Directives
+  - name: AI Features
+    tags:
+      - AI Chat
+      - MCP Tools
+      - Content Search
+  - name: Healthcare Management
+    tags:
+      - Progress Tracking
+      - Doctor Reports
+      - Alerts
+  - name: System & Analytics
+    tags:
+      - Analytics
+      - SMS
+      - System

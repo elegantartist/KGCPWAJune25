@@ -1,0 +1,34 @@
+{
+  "compilerOptions": {
+    // Base TypeScript configuration for monorepo
+    "strict": true,
+    "useUnknownInCatchVariables": true,
+    "allowJs": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "incremental": true,
+    "disableSourceOfProjectReferenceRedirect": true,
+    
+    // Module system
+    "module": "ESNext",
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "preserve",
+    
+    // Path mapping (extends in child projects)
+    "baseUrl": ".",
+    "paths": {
+      "@kgc/shared/*": ["./packages/shared/src/*"],
+      "@kgc/types": ["./packages/shared/src/types"],
+      "@kgc/utils": ["./packages/shared/src/utils"],
+      "@kgc/config": ["./packages/shared/src/config"]
+    }
+  },
+  "exclude": ["node_modules", "dist", "build", ".next", "**/*.test.*"]
+}

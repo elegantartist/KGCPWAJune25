@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Keep Going Care - Offline</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+        
+        body {
+            background-color: #f5f7f9;
+            color: #1a202c;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            padding: 2rem 1rem;
+        }
+        
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            text-align: center;
+            background-color: white;
+            border-radius: 0.5rem;
+            padding: 2rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        
+        .logo {
+            font-weight: bold;
+            font-size: 1.5rem;
+            margin-bottom: 1.5rem;
+            color: #38a169;
+        }
+        
+        h1 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        .icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            color: #718096;
+        }
+        
+        p {
+            margin-bottom: 1.5rem;
+            line-height: 1.5;
+            color: #4a5568;
+        }
+        
+        .subtitle {
+            font-size: 1.1rem;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+        }
+        
+        .available-features {
+            text-align: left;
+            margin: 1.5rem 0;
+            list-style-position: inside;
+        }
+        
+        .available-features li {
+            margin-bottom: 0.5rem;
+            padding-left: 1.5rem;
+            position: relative;
+        }
+        
+        .available-features li::before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #38a169;
+        }
+        
+        .button {
+            display: inline-block;
+            background-color: #38a169;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.25rem;
+            font-weight: 500;
+            margin-top: 1rem;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        
+        footer {
+            margin-top: 2rem;
+            font-size: 0.85rem;
+            color: #718096;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">KEEP GOING CARE</div>
+        
+        <div class="icon">📶</div>
+        
+        <h1>You're currently offline</h1>
+        
+        <p>It seems you're not connected to the internet. Some features of Keep Going Care require an internet connection.</p>
+        
+        <div class="subtitle">Available Offline Features:</div>
+        
+        <ul class="available-features">
+            <li>Access to your cached Care Plan Directives</li>
+            <li>View your previously downloaded Food Recommendations</li>
+            <li>Access to your Health Metrics history</li>
+            <li>Basic health guidance from the Supervisor Agent</li>
+        </ul>
+        
+        <p>Connect to the internet to access all features and synchronize your latest data.</p>
+        
+        <button class="button" onclick="window.location.reload()">Try Again</button>
+    </div>
+    
+    <footer>
+        <p>Keep Going Care - Your Personal Health Assistant</p>
+    </footer>
+</body>
+</html>
