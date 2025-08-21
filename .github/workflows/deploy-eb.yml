@@ -1,0 +1,51 @@
+name: Deploy API to Elastic Beanstalk
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'server/**'
+      - '.github/workflows/deploy-eb.yml'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install server deps
+        working-directory: server
+        run: |
+          if [ -f package-lock.json ]; then npm ci; else npm i; fi
+
+      - name: Build server (TypeScript only)
+        working-directory: server
+        run: |
+          if [ -f tsconfig.json ]; then npm run build || true; fi
+
+      - name: Create deployment zip
+        run: |
+          cd server
+          zip -r ../server-deploy.zip . -x "node_modules/*" -x "**/.DS_Store"
+
+      - name: Configure AWS credentials (keys or OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ secrets.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: Deploy to Elastic Beanstalk
+        uses: einaregilsson/beanstalk-deploy@v21
+        with:
+          application_name: ${{ secrets.EB_APP_NAME }}
+          environment_name: ${{ secrets.EB_ENV_NAME }}
+          region: ${{ secrets.AWS_REGION }}
+          version_label: v-${{ github.run_number }}-${{ github.sha }}
+          deployment_package: server-deploy.zip
