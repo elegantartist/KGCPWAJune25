@@ -1,21 +1,7 @@
 {
   "version": 2,
-  "name": "kgc-healthcare",
-  "cleanUrls": true,
-  "trailingSlash": false,
-  "buildCommand": "npm install --legacy-peer-deps && npm run build",
-  "outputDirectory": "dist",
-  "installCommand": "npm install --legacy-peer-deps",
   "framework": "vite",
-  "rewrites": [
-    {
-      "source": "/((?!api/).*)",
-      "destination": "/index.html"
-    }
-  ],
-  "build": {
-    "env": {
-      "NODE_VERSION": "18"
-    }
-  }
+  "installCommand": "cd apps/web && npm ci --legacy-peer-deps",
+  "buildCommand": "cd apps/web && npm run build:client",
+  "outputDirectory": "apps/web/dist"
 }
