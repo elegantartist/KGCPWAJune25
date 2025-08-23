@@ -1,0 +1,64 @@
+Client-Side Implementation for CPD Display Only
+Add State Variables for CPD:
+// Add these state variables to store the Care Plan Directive
+const [carePlanDirective, setCarePlanDirective] = useState<string>("");
+const [loadingCPD, setLoadingCPD] = useState<boolean>(false);
+Fetch the Active CPD on Component Load:
+// Add this useEffect to fetch the Care Plan Directive when the component loads
+useEffect(() => {
+  const fetchCarePlanDirective = async () => {
+    try {
+      setLoadingCPD(true);
+      // Fetch active CPDs for the current user
+      const response = await apiRequest<CarePlanDirective[]>(
+        'GET', 
+        `/api/users/${userId}/care-plan-directives/active`
+      );
+      
+      // Filter for diet-related CPDs
+      const dietCPDs = response.filter(cpd => 
+        cpd.category.toLowerCase() === 'diet' || 
+        cpd.directive.toLowerCase().includes('diet') ||
+        cpd.directive.toLowerCase().includes('meal') ||
+        cpd.directive.toLowerCase().includes('food') ||
+        cpd.directive.toLowerCase().includes('eat')
+      );
+      
+      // Get the most recent diet CPD if available
+      if (dietCPDs.length > 0) {
+        // Sort by updatedAt date (most recent first)
+        dietCPDs.sort((a, b) => 
+          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+        );
+        setCarePlanDirective(dietCPDs[0].directive);
+      }
+    } catch (error) {
+      console.error('Error fetching care plan directives:', error);
+    } finally {
+      setLoadingCPD(false);
+    }
+  };
+  
+  if (userId) {
+    fetchCarePlanDirective();
+  }
+}, [userId]);
+Display the CPD in the UI (Without Affecting Search):
+{/* Add this component just below the page header or above the search form */}
+{carePlanDirective && (
+  <Card className="mb-6 border-primary/30 bg-primary/5">
+    <CardHeader className="pb-2">
+      <CardTitle className="text-lg flex items-center gap-2">
+        <Stethoscope className="h-5 w-5 text-primary" />
+        Doctor's Diet Recommendation
+      </CardTitle>
+    </CardHeader>
+    <CardContent>
+      <p className="text-sm italic">"{carePlanDirective}"</p>
+    </CardContent>
+  </Card>
+)}
+Placement Suggestions
+Place the CPD display component in one of these locations without touching the search functionality:
+
+Directly below the page title/header

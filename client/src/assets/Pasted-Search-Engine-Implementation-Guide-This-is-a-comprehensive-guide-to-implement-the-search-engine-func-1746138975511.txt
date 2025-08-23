@@ -1,0 +1,475 @@
+Search Engine Implementation Guide
+This is a comprehensive guide to implement the search engine functionality from this Repl in your own project. The system uses Tavily for search data and Anthropic's Claude for enhancing results.
+
+1. Required Environment Variables
+ANTHROPIC_API_KEY=your_anthropic_api_key
+TAVILY_API_KEY=your_tavily_api_key
+2. Server-Side Implementation
+File Structure
+server/
+├── data/
+│   └── providers.json       # Initial seed data
+├── lib/
+│   ├── search.ts            # Search enhancement functionality
+│   └── validation.ts        # Request validation schemas
+├── index.ts                 # Express server setup
+└── routes.ts                # API routes
+providers.json
+Create a file at server/data/providers.json with initial seed data:
+
+[
+  {
+    "id": "1",
+    "name": "FitLife Gym Sydney",
+    "type": "Gym",
+    "address": "123 George Street, Sydney CBD, NSW 2000",
+    "phone": "02 9123 4567",
+    "email": "info@fitlifesydney.com.au",
+    "website": "https://fitlifesydney.com.au",
+    "bio": "Premier fitness facility in Sydney CBD offering state-of-the-art equipment and expert training.",
+    "verifications": {
+      "abnVerified": true,
+      "fitnessAustraliaVerified": true,
+      "ausActiveVerified": true,
+      "locationVerified": true
+    }
+  },
+  {
+    "id": "2",
+    "name": "Elite Personal Training",
+    "type": "Personal Trainer",
+    "address": "45 Crown Street, Surry Hills, NSW 2010",
+    "phone": "0412 345 678",
+    "email": "john@elitept.com.au",
+    "bio": "Specialized in strength training and weight loss programs.",
+    "verifications": {
+      "abnVerified": true,
+      "fitnessAustraliaVerified": true,
+      "ausActiveVerified": false,
+      "locationVerified": true
+    }
+  }
+]
+validation.ts
+Create a file at server/lib/validation.ts:
+
+import * as z from "zod";
+export const searchSchema = z.object({
+  location: z.string().min(1),
+});
+search.ts
+Create a file at server/lib/search.ts:
+
+import Anthropic from '@anthropic-ai/sdk';
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+});
+interface TavilySearchResult {
+  title: string;
+  url: string;
+  content: string;
+}
+interface Provider {
+  id: number;
+  name: string;
+  type: string;
+  address: string;
+  phone: string;
+}
+export async function enhanceSearchResults(location: string, providers: Provider[]): Promise<Provider[]> {
+  console.log(`Starting search for location: ${location}`);
+  console.log(`Initial providers count: ${providers.length}`);
+  try {
+    // 1. Get search results from Tavily
+    console.log('Fetching results from Tavily...');
+    const tavilyResponse = await fetch('https://api.tavily.com/search', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.TAVILY_API_KEY}`
+      },
+      body: JSON.stringify({
+        query: `${location} fitness centers gyms trainers`,
+        max_results: 100
+      })
+    });
+    if (!tavilyResponse.ok) {
+      console.error(`Tavily API error: ${tavilyResponse.status} ${tavilyResponse.statusText}`);
+      return providers;
+    }
+    const tavilyData = await tavilyResponse.json();
+    console.log(`Received ${tavilyData.results?.length || 0} results from Tavily`);
+    // 2. Process with Anthropic
+    console.log('Processing results with Anthropic...');
+    const message = await anthropic.messages.create({
+      // the newest Anthropic model is "claude-3-7-sonnet-20250219" which was released February 24, 2025
+      model: 'claude-3-7-sonnet-20250219',
+      max_tokens: 1024,
+      messages: [
+        {
+          role: 'user',
+          content: `Convert these search results into fitness providers near ${location}. Return at least 10 providers as a JSON array:
+[{
+  "id": number,
+  "name": string,
+  "type": string,
+  "address": string,
+  "phone": string
+}]
+Search results: ${JSON.stringify(tavilyData.results)}
+Important: Generate realistic data for missing fields to ensure 10 complete entries.`
+        }
+      ]
+    });
+    const content = message.content[0];
+    if (content.type !== 'text') {
+      console.error('Unexpected response type from Anthropic');
+      return providers;
+    }
+    // 3. Process and validate response
+    try {
+      // Find JSON array in response
+      const match = content.text.match(/\[\s*{[\s\S]*}\s*\]/);
+      if (!match) {
+        console.error('No valid JSON array found in response');
+        return providers;
+      }
+      const parsedResults = JSON.parse(match[0]) as Provider[];
+      console.log(`Parsed ${parsedResults.length} providers from Anthropic response`);
+      // Combine results ensuring minimum 10 providers
+      const combinedResults = [...parsedResults, ...providers];
+      const uniqueResults = Array.from(
+        new Map(combinedResults.map(item => [item.name, item])).values()
+      );
+      console.log(`Final provider count: ${uniqueResults.length}`);
+      return uniqueResults.slice(0, Math.max(10, providers.length));
+    } catch (parseError) {
+      console.error('Error processing Anthropic response:', parseError);
+      return providers;
+    }
+  } catch (error) {
+    console.error('Search enhancement error:', error);
+    return providers;
+  }
+}
+routes.ts
+Create a file at server/routes.ts:
+
+import type { Express } from "express";
+import { createServer, type Server } from "http";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
+import { promises as fs } from "fs";
+import { searchSchema } from "./lib/validation";
+import { enhanceSearchResults } from "./lib/search";
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+if (!process.env.TAVILY_API_KEY) {
+  throw new Error("TAVILY_API_KEY environment variable is required");
+}
+if (!process.env.ANTHROPIC_API_KEY) {
+  throw new Error("ANTHROPIC_API_KEY environment variable is required");
+}
+async function searchProviders(location: string) {
+  try {
+    // Read all providers
+    const providersPath = join(__dirname, "data", "providers.json");
+    const providers = JSON.parse(await fs.readFile(providersPath, "utf-8"));
+    // Enhance results with Tavily and Anthropic
+    const enhancedResults = await enhanceSearchResults(location, providers);
+    return enhancedResults;
+  } catch (error) {
+    console.error('Provider search error:', error);
+    throw new Error('Failed to search providers');
+  }
+}
+export function registerRoutes(app: Express): Server {
+  const httpServer = createServer(app);
+  app.get("/api/providers", async (req, res) => {
+    try {
+      const params = {
+        location: req.query.location as string
+      };
+      const validatedParams = searchSchema.parse(params);
+      const results = await searchProviders(validatedParams.location);
+      res.json(results);
+    } catch (error: any) {
+      console.error('Search error:', error.message);
+      res.status(400).json({ message: error.message || "Invalid search parameters" });
+    }
+  });
+  return httpServer;
+}
+index.ts
+Create a file at server/index.ts:
+
+import express, { type Request, Response, NextFunction } from "express";
+import cors from "cors";
+import { registerRoutes } from "./routes";
+const app = express();
+app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
+app.use(cors());
+// Basic logging middleware
+app.use((req, res, next) => {
+  const start = Date.now();
+  const path = req.path;
+  
+  res.on("finish", () => {
+    const duration = Date.now() - start;
+    if (path.startsWith("/api")) {
+      console.log(`${req.method} ${path} ${res.statusCode} in ${duration}ms`);
+    }
+  });
+  next();
+});
+(async () => {
+  const server = registerRoutes(app);
+  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+    const status = err.status || err.statusCode || 500;
+    const message = err.message || "Internal Server Error";
+    res.status(status).json({ message });
+    console.error(err);
+  });
+  // Serve static files for production if needed
+  
+  const PORT = process.env.PORT || 3000;
+  server.listen(PORT, "0.0.0.0", () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+})();
+3. Client-Side Implementation
+File Structure
+client/src/
+├── components/
+│   ├── ProviderCard.tsx     # Display provider information
+│   └── SearchForm.tsx       # Search form component
+├── lib/
+│   ├── types.ts             # Type definitions
+│   └── validation.ts        # Zod validation schemas
+└── pages/
+    └── Home.tsx             # Main page component
+types.ts
+Create a file at client/src/lib/types.ts:
+
+export interface SearchParams {
+  location: string;
+}
+export interface Provider {
+  id: string;
+  name: string;
+  type: 'Gym' | 'Personal Trainer';
+  address: string;
+  phone?: string;
+}
+validation.ts
+Create a file at client/src/lib/validation.ts:
+
+import * as z from "zod";
+export const searchSchema = z.object({
+  location: z.string().min(1, "Please enter a location"),
+});
+SearchForm.tsx
+Create a file at client/src/components/SearchForm.tsx:
+
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { searchSchema } from "@/lib/validation";
+import { type SearchParams } from "@/lib/types";
+import { 
+  Form, 
+  FormControl, 
+  FormField, 
+  FormItem, 
+  FormLabel, 
+  FormMessage 
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+interface SearchFormProps {
+  onSearch: (params: SearchParams) => void;
+}
+export function SearchForm({ onSearch }: SearchFormProps) {
+  const { toast } = useToast();
+  const form = useForm<SearchParams>({
+    resolver: zodResolver(searchSchema),
+    defaultValues: {
+      location: "",
+    }
+  });
+  function onSubmit(data: SearchParams) {
+    try {
+      onSearch(data);
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to perform search. Please try again."
+      });
+    }
+  }
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <FormField
+          control={form.control}
+          name="location"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Location</FormLabel>
+              <FormControl>
+                <Input 
+                  placeholder="Enter location (e.g. Sydney, Melbourne)" 
+                  {...field}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <Button type="submit" className="w-full">
+          Search Providers
+        </Button>
+      </form>
+    </Form>
+  );
+}
+ProviderCard.tsx
+Create a file at client/src/components/ProviderCard.tsx:
+
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { type Provider } from "@/lib/types";
+import { MapPin, Phone } from "lucide-react";
+interface ProviderCardProps {
+  provider: Provider;
+}
+export function ProviderCard({ provider }: ProviderCardProps) {
+  return (
+    <Card>
+      <CardHeader>
+        <h3 className="text-lg font-semibold">{provider.name}</h3>
+        <p className="text-sm text-muted-foreground">{provider.type}</p>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <MapPin className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm">{provider.address}</span>
+          </div>
+          {provider.phone && (
+            <div className="flex items-center gap-2">
+              <Phone className="h-4 w-4 text-muted-foreground" />
+              <a href={`tel:${provider.phone}`} className="text-sm hover:underline">
+                {provider.phone}
+              </a>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+Home.tsx
+Create a file at client/src/pages/Home.tsx:
+
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { SearchForm } from "@/components/SearchForm";
+import { ProviderCard } from "@/components/ProviderCard";
+import { type Provider, type SearchParams } from "@/lib/types";
+import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+export default function Home() {
+  const [searchParams, setSearchParams] = useState<SearchParams | null>(null);
+  const { data: providers, isLoading } = useQuery<Provider[]>({
+    queryKey: ['/api/providers', searchParams],
+    queryFn: async () => {
+      if (!searchParams) return [];
+      const params = new URLSearchParams({
+        location: searchParams.location,
+      });
+      const response = await fetch(`/api/providers?${params}`);
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message);
+      }
+      return response.json();
+    },
+    enabled: !!searchParams,
+  });
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <header className="bg-white border-b">
+        <div className="max-w-7xl mx-auto px-4 py-6">
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-violet-600 text-transparent bg-clip-text">
+            Find Verified Fitness Providers
+          </h1>
+        </div>
+      </header>
+      <main className="max-w-7xl mx-auto px-4 py-8">
+        <div className="grid gap-8 md:grid-cols-[350px,1fr]">
+          <div>
+            <SearchForm onSearch={setSearchParams} />
+          </div>
+          <div className="space-y-6">
+            {isLoading ? (
+              <div className="space-y-4">
+                {[1,2,3].map((i) => (
+                  <Card key={i} className="p-6">
+                    <div className="space-y-3">
+                      <Skeleton className="h-6 w-1/3" />
+                      <Skeleton className="h-4 w-2/3" />
+                      <Skeleton className="h-4 w-1/2" />
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            ) : providers?.length ? (
+              <div className="space-y-4">
+                {providers.map((provider) => (
+                  <ProviderCard key={provider.id} provider={provider} />
+                ))}
+              </div>
+            ) : providers?.length === 0 ? (
+              <Card className="p-6 text-center text-muted-foreground">
+                No providers found matching your search criteria
+              </Card>
+            ) : (
+              <Card className="p-6 text-center text-muted-foreground">
+                Enter your location above to find verified fitness providers
+              </Card>
+            )}
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
+4. Anthropic Models and Usage
+When using Anthropic Claude models, make sure to use the most up-to-date model. As of now, the latest is:
+
+model: 'claude-3-7-sonnet-20250219' // Released February 24, 2025
+The system uses Claude in the following way:
+
+Takes search results from Tavily API
+Sends those results to Claude with a prompt to:
+Convert search results into fitness providers
+Structure data in a standardized JSON format
+Generate realistic data for missing fields to ensure complete entries
+5. Dependencies
+Make sure to install these dependencies:
+
+npm install @anthropic-ai/sdk zod react-hook-form @tanstack/react-query @hookform/resolvers express cors
+6. API Key Configuration
+You'll need API keys from:
+
+Anthropic: For using Claude AI - Get at https://console.anthropic.com/
+Tavily: For the search API - Get at https://tavily.com/
+Set these as environment variables in your Repl.
+
+Additional Notes
+This implementation uses a combination of static provider data and dynamically generated results from Anthropic to ensure a rich search experience.
+The search is enhanced by Tavily's search API to find relevant fitness providers in the specified location.
+Error handling is implemented throughout the codebase to ensure a robust user experience.
+The UI provides loading states and clear messaging when no results are found.

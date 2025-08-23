@@ -1,0 +1,200 @@
+Core concepts
+0:00
+Hi all, Will here. This week we're  excited to launch the LangMem SDK—a  
+0:04
+library of utilities for helping you build  agents that learn and adapt as you go.
+0:08
+In this video, I will show you how to add  semantic memory to your agents so they can  
+0:12
+remember important facts and other information  that guides the content of their responses.
+0:18
+Semantic memory is all about facts and knowledge.  With LangMem, you can chat with your bot. Your bot  
+What we're building
+0:24
+can save memories for later use, and when you chat  with it again, it can reference those memories.
+0:30
+As you can see, it remembers that I'm  training for a half marathon and that  
+0:34
+I have a current training plan  in place. With every interaction,  
+0:36
+the memory state is updated. Each  memory gains additional context—in  
+0:40
+this case, it now remembers that I'm dealing with  tendonitis and need a modified training regimen.
+0:44
+So, let's create a React agent with semantic  memory. First, we'll review how to make an  
+Basic agent setup
+0:49
+agent link graph. We'll use the prebuilt wrapper  for concision. First, we'll install LangMem.
+0:56
+Then we'll create the agent. We'll give the agent  short-term memory in the form of checkpointing,  
+1:02
+and we'll also provide a long-term memory  store. (Note that it won't have a direct  
+1:07
+connection with the long-term store  yet, so it won't actually use it.)
+1:11
+Now, we'll create the agent  again—this time with a little  
+1:14
+wrapper to make interaction more convenient.
+1:16
+Now that we've created the agent, we can chat  with it. If you continue the conversation  
+1:26
+along the same thread, it will remember  previous context because this is stored  
+1:30
+in the conversation history (i.e., short-term  memory). However, if you start a new thread,  
+1:37
+it won’t remember that information  because it isn’t stored long term.
+1:44
+Now it's time to add memory.  We'll give our agent two tools  
+Memory tool configuration
+1:48
+to interact with the memory store.  One tool is for creating, updating,  
+1:52
+and deleting memories. The other is for searching  the store whenever it needs to recall information.
+2:01
+We will update our long-term memory store by  adding an indexing configuration. This tells  
+2:06
+LangGraph that anytime you save an item  to the store, it will be embedded with a  
+2:10
+vectorizer so that we can later perform  semantic searches over the memories.
+2:14
+We will create our tools by providing  a namespace for the agent to interact  
+2:16
+with the memory store. The namespace tells  LangGraph where to store the memories within  
+2:22
+its underlying long-term memory system. Since  the store is shared across the entire graph,  
+2:28
+if you have multiple agents—or if you want  to save memories pertaining to different  
+2:35
+users—you may want to organize  them under separate namespaces.
+2:41
+After fixing our model name, let's  return to the scenario from before.  
+2:47
+The agent tells us that it has saved  the plan to memory. Let's double-check.
+2:52
+Let's check LangSmith to observe a few  things. First, let's see what the tools  
+Tool interaction analysis
+2:57
+look like from the perspective of the agent.  We have provided two tools: Manage Memory and  
+3:01
+Search Memory. The Search Memory tool allows  it to filter, limit, and offset results, but  
+3:08
+primarily to generate a specific  query for searching its memories.
+3:12
+Here, you can see that it's looking up  "Half Marathon Training Plan" to verify  
+3:15
+that there are no additional memories it  should consult before updating anything.
+3:19
+After searching its memory, the agent then  decides to use the Manage Memory tool. Let's  
+3:26
+check the Manage Memory tool from the  LLM’s perspective. It contains its own  
+3:30
+set of instructions on when it should be used,  allowing the LLM to choose actions for creating,  
+3:36
+updating, or deleting memories. Depending  on the action, it can provide content for  
+3:41
+creations/updates or an ID for updates/deletions.
+3:44
+In this case, the agent has  decided to create a new memory.
+3:46
+If I start a new thread with an ambiguous context  that requires the agent to jog its memory, it  
+3:52
+will perform a search for us. You can confirm in  LangSmith that it indeed searched for this memory.
+3:56
+If you follow the agent's trajectory, you see  that the first message it receives triggers a  
+4:01
+memory search for additional contextual  information. It then uses those results  
+4:05
+to respond, indicating exactly  where we're supposed to be.
+4:08
+If we provide information that conflicts  with old memories or requires an update,  
+4:12
+the agent can again use the Manage Memory tool  to update its memories. In the corresponding  
+4:17
+trace in LangSmith, the LLM first calls  the Search Memory tool to review existing  
+4:21
+memories and then uses the Manage Memory  tool to update that memory accordingly.
+4:26
+It then commits this modified plan to  accommodate the injury and saves it to memory,  
+4:32
+overwriting the previous memory to ensure  that all searchable information remains valid.
+4:37
+Up to this point, the agent has been saving  memories in the same namespace—the "agent  
+Namespace isolation
+4:41
+memories" namespace we created. If your agent  supports multiple users, you'll likely want  
+4:46
+to keep their memories separate to prevent  information leakage between interactions.
+4:51
+To do so, add a template variable to your  namespace. LangMem interprets this as a  
+4:56
+value that needs to be populated at runtime  from your configuration dictionary. We will  
+5:00
+recreate the agent and modify our chat  helper to accommodate a new user ID.
+5:05
+If I first chat as User A, the agent will  save those memories to User A's namespace.  
+5:09
+If I then interact with the same agent as User  B, it will manage memories that don't conflict  
+5:15
+with those of User A. You can check that  there is no overlap by interrogating the  
+5:26
+model from the perspective of User ID 2  or by directly searching the store. Here,  
+5:31
+you can see memories for User A (about  Will training for a half marathon) and  
+5:36
+memories for User B (learning chess and wanting  to improve). Since these are stored in separate  
+5:39
+namespaces, the agent cannot access memories  from one user when configured for another.
+5:44
+If you recall from the agent trace, these  tools don't even require a namespace  
+5:48
+parameter—the agent operates solely  on IDs and content. Behind the scenes,  
+5:54
+the tool reads your configuration and places  memories in the correct location accordingly.
+6:01
+If you're paying attention, you'll notice that  
+6:02
+the agent must actively decide when to  search its memories. Let's change that.
+6:07
+We're going to add an initial search  step that scans memories based on the  
+Search optimization
+6:11
+incoming context before calling the LLM. This  provides the LLM with relevant information  
+6:17
+about the conversation before it makes any  decisions, potentially saving one or two tool  
+6:23
+calls if the necessary context is already present.
+6:25
+What we're going to do is add a memory  search step and then incorporate the  
+6:31
+results into a system prompt so that the LLM  can respond with all the relevant context.
+6:37
+We'll fetch the store from context and use  the content of the most recent message to  
+6:41
+search for relevant memories. This  is a quick heuristic—you might want  
+6:45
+to include context from the last human  message (in case there are other tool  
+6:49
+messages) or more conversational  context when generating the query.
+6:53
+Now that we've created our new  agent, let's run our simulation  
+6:56
+again. This time it ran much faster,  as confirmed by the LangSmith trace.
+6:59
+If you look at the new agent trajectory, you  can see the additional prompt step that returns  
+7:04
+all of the memories (dumped into a string).  In this case, the AI still decided to search  
+7:09
+again for additional memories, which speaks to the  trade-offs of exposing this step; however, it had  
+7:14
+enough information from the default contextual  lookup to potentially respond on the first try.
+7:20
+That's all for today. In this video, we  built an agent that can manually manage  
+Summary
+7:24
+its own semantic memory. This allows it  to store important facts and use them in  
+7:29
+later conversations. For more information  about other memory types and the conceptual  
+7:34
+framing behind LangMem, check out our  concept videos or the LangMem docs.
+7:39
+See you next time.

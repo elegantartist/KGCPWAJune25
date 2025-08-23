@@ -1,0 +1,175 @@
+Memory architectures overview
+0:00
+Hi all, Will here. This week we are  excited to launch the LangMem SDK—a  
+0:04
+library of utilities to help you build  agents that learn and adapt as they go.
+0:08
+As part of the release, we wanted to  review the high-level concepts driving  
+0:12
+the development of the library, as well as  share a mental framework you can use to more  
+0:16
+effectively leverage memory to build  more reliable and personalized agents.
+0:20
+Memory is a broad concept, and we believe  that rather than building a generic,  
+Implementation principles
+0:24
+general-purpose memory layer,  most successful AI applications  
+0:28
+today will benefit from leveraging domain  specificity to accomplish concrete goals.
+0:33
+If you think about the specific capabilities  and knowledge your agent needs in order to  
+0:37
+successfully accomplish its tasks, you can  typically map these onto distinct memory types.
+0:43
+One analogy I find useful is thinking about  how computers represent information. Computers  
+0:48
+typically distinguish between data, which  is static or dynamic information, and code,  
+Memory types
+0:53
+which consists of instructions and procedures.  We can think of agent memory in similar terms.
+0:59
+**Semantic memory** acts as the data  store. It stores important knowledge,  
+1:03
+relationships, entities, and other  information that is useful to ground  
+1:07
+the responses the agent might have  to the user. **Procedural memory**,  
+1:11
+on the other hand, acts more like  code. It encodes the rules, behaviors,  
+1:16
+and other information needed for the agent to  know how to respond and act in a given situation.
+1:22
+**Episodic memory** sits somewhere in between  the two. It stores information about past  
+1:26
+events in the form of few-shot examples.  These examples instruct the agent how to  
+1:30
+respond—similar to procedural memory—based  on prior attempts, while also encoding a lot  
+1:36
+of information about what the agent did  in the past, similar to semantic memory.
+1:40
+Taken together, semantic, procedural,  and episodic memories tell the agent  
+1:45
+both what to do and how to act in a given  situation. If implemented effectively,  
+1:51
+these combine with the language model's  underlying reasoning abilities and your  
+1:55
+own code to accomplish whatever task  you might need in your application.
+1:59
+Let's go a step further by grounding  each of these memory types with examples.
+Semantic memory ("What")
+2:04
+Semantic memory encodes facts, knowledge,  
+2:08
+and relationships into some underlying  storage. This is typically what most people  
+2:13
+think of when they consider long-term  memory. People often jump straight to  
+2:17
+knowledge graphs or vector databases—both of  which are valid ways to store information.
+2:23
+In our experience, we’ve seen two  representations be the most common:  
+2:27
+**collections** and **profiles**.
+2:28
+- **Collections:** These refer  to storing memories as distinct  
+2:31
+records in some sort of database. In  the context of LangMem and LangGraph,  
+2:35
+these are typically stored in LangGraph’s  long-term memory storage layer—the base  
+2:39
+store. New memories are formed by extracting new  records in the database. Each memory can either  
+2:44
+be an unstructured string or take on some level  of structure based on the schema you provide.  
+2:50
+These schemas can model the specific domain  of your application if you find that useful.  
+2:54
+Memories are consolidated and synthesized  either by taking existing memories and using  
+2:59
+them to inform new ones or by updating existing  records. These collections can be unbounded and  
+3:10
+are typically searched using vector search,  full-text search, or a combination of both.
+3:14
+For example, LangMem created a semantic memory  manager that, when passed a list of messages  
+3:20
+from a conversation, extracted the following  memories: we learned that the user prefers  
+3:25
+“Lex” (short for Alex) and appreciates  a casual and witty communication style.  
+3:30
+We also learned specific information about  Lex—such as his proficiency in Python programming  
+3:34
+and his competitive speedcubing—and additional  personality traits that may be recalled later.
+3:47
+- **Profiles:** A profile compresses all  the information into a particular schema or  
+3:54
+a one-pager about a particular user. These are  common in user-facing chatbots where you have  
+4:00
+specific details such as a user’s name, age,  friends, or other key details. New memories  
+4:08
+are formed by continuously updating this  single representation. This approach helps  
+4:13
+reduce irrelevant content, though it may also  result in the loss of information that wasn’t  
+4:22
+modeled in the profile. A pragmatic use case  for profiles is that they’re easy to render  
+4:29
+in a UI. If you have a user-facing chatbot, the  agent can display what it knows about the user,  
+4:36
+and the user can collaborate on  the memory. For example, if the  
+4:39
+agent assumes you prefer your name to be  “Tom” but you actually prefer “Thomas,”  
+4:44
+you can directly modify the profile, and the  agent will immediately update its behavior.
+Procedural memory ("How")
+4:48
+Procedural memory tells the agent how to respond.  In our experience, this typically takes the form  
+4:54
+of a subset of the system prompt in your LLM.  This prompt fragment can encode user preferences,  
+5:00
+core agent behavior, and other conditionals and  rules that the agent should know to accomplish  
+5:05
+its task. A common example is the response  style: if you ask ChatGPT today to draft a  
+5:13
+blog post about memory, the output might  not reflect your preferred style. Rather  
+5:19
+than manually writing and restarting the  system prompt for every new conversation,  
+5:26
+the agent should learn over time  that you prefer a particular voice.
+5:29
+A simpler example is having it remember that  you prefer writing with proper TypeScript rather  
+5:36
+than raw JavaScript, or that you favor front-end  development over back-end. It can even infer that,  
+5:43
+since you are now an expert in AI, it doesn't  need to rehash all the beginner-level content  
+5:48
+before diving into advanced concepts. LangMem  exposes this through prompt optimization,  
+5:56
+which is designed to learn online from feedback  or natural conversational examples. We go into  
+6:03
+more detail in our walkthrough on how to use  the prompt optimizers in a separate video.
+Episodic memory
+6:09
+Episodic memory stores information from past  experiences. It encodes both how the agent  
+6:14
+should respond and what happened in the past.  This usually relies on feedback—either from  
+6:20
+explicit user signals, such as a thumbs up, or  from auto-evaluation by analyzing interactions  
+6:26
+and recognizing successful outcomes. The agent can  save the trajectory of the input along with the  
+6:32
+expected output to the store. In future rounds,  it can fetch these memories semantically based  
+6:37
+on similarities, thereby achieving similarly good  behavior and avoiding divergence on hard examples.
+6:43
+In conclusion, memory is an exciting topic  and a core component in building adaptive,  
+Conclusion
+6:48
+personalized, and self-improving  agents. For the foreseeable future,  
+6:52
+we believe that most successful applications  of memory will be application-specific.  
+6:56
+Engineers who start by thinking about  the type of information an agent needs  
+7:01
+to learn in order to know what to do and  how to act will find the most success.
+7:06
+While this video is purely conceptual,  
+7:08
+we encourage you to check out the LangMem  docs as well as our other videos on how to  
+7:13
+apply LangMem and these memory concepts in your  agents. Thank you again, and see you next time.
