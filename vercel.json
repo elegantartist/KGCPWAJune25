@@ -3,5 +3,5 @@
   "framework": "vite",
   "installCommand": "npm ci --legacy-peer-deps",
   "buildCommand": "npm run build:client",
-  "outputDirectory": "dist"
+  "outputDirectory": "dist/public"
 }
