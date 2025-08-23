@@ -3,9 +3,9 @@
   "name": "kgc-healthcare",
   "cleanUrls": true,
   "trailingSlash": false,
-  "buildCommand": "npm run build",
+  "buildCommand": "npm install --legacy-peer-deps && npm run build",
   "outputDirectory": "dist",
-  "installCommand": "npm install",
+  "installCommand": "npm install --legacy-peer-deps",
   "framework": "vite",
   "rewrites": [
     {
