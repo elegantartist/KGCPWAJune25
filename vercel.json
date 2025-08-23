@@ -2,6 +2,6 @@
   "version": 2,
   "framework": "vite",
   "installCommand": "npm ci --legacy-peer-deps",
-  "buildCommand": "npm run build:client && rm -rf public && mkdir -p public && cp -R dist/public/. public/",
-  "outputDirectory": "public"
+  "buildCommand": "npm run build:client",
+  "outputDirectory": "dist"
 }
