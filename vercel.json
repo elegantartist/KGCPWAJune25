@@ -3,5 +3,11 @@
   "framework": "vite",
   "installCommand": "npm ci --legacy-peer-deps",
   "buildCommand": "npm run build:client",
-  "outputDirectory": "dist"
+  "outputDirectory": "dist",
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "http://Kgc-api-env-1.eba-6fu3y3mp.us-east-1.elasticbeanstalk.com/api/:path*"
+    }
+  ]
 }
