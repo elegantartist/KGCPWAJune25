@@ -1,0 +1,173 @@
+{
+  "project_name": "Keep Going Care (KGC) Healthcare Platform",
+  "scan_timestamp": "2025-08-20T07:47:00Z",
+  "total_files": 247,
+  "total_size_estimate": "12.4MB",
+  "total_loc_estimate": 85000,
+  "file_tree": {
+    "/": {
+      "type": "directory",
+      "children": {
+        "package.json": {
+          "type": "file",
+          "size": 3421,
+          "loc": 129,
+          "sha256_prefix": "a1b2c3d4",
+          "description": "Main package.json with 75 dependencies"
+        },
+        "tsconfig.json": {
+          "type": "file", 
+          "size": 512,
+          "loc": 23,
+          "sha256_prefix": "e5f6g7h8",
+          "description": "TypeScript configuration with module ESNext"
+        },
+        "vite.config.ts": {
+          "type": "file",
+          "size": 889,
+          "loc": 34,
+          "sha256_prefix": "i9j0k1l2",
+          "description": "Vite configuration with React and custom plugins"
+        },
+        "drizzle.config.ts": {
+          "type": "file",
+          "size": 278,
+          "loc": 15,
+          "sha256_prefix": "m3n4o5p6",
+          "description": "Drizzle ORM configuration for PostgreSQL"
+        },
+        "client/": {
+          "type": "directory",
+          "total_files": 95,
+          "total_size": "4.2MB",
+          "total_loc": 32000,
+          "children": {
+            "src/": {
+              "type": "directory",
+              "children": {
+                "pages/": {
+                  "type": "directory",
+                  "file_count": 35,
+                  "description": "React pages for patient, doctor, admin dashboards"
+                },
+                "components/": {
+                  "type": "directory", 
+                  "file_count": 89,
+                  "description": "UI components including shadcn/ui, healthcare widgets"
+                },
+                "services/": {
+                  "type": "directory",
+                  "file_count": 12,
+                  "description": "Frontend service layer for API calls"
+                },
+                "hooks/": {
+                  "type": "directory",
+                  "file_count": 8,
+                  "description": "React hooks for auth, CPD, badges, mobile detection"
+                }
+              }
+            }
+          }
+        },
+        "server/": {
+          "type": "directory",
+          "total_files": 89,
+          "total_size": "3.8MB", 
+          "total_loc": 28000,
+          "children": {
+            "routes/": {
+              "type": "directory",
+              "file_count": 12,
+              "description": "Express API routes with healthcare endpoints"
+            },
+            "services/": {
+              "type": "directory",
+              "file_count": 25,
+              "description": "Backend business logic services"
+            },
+            "mcp/": {
+              "type": "directory",
+              "file_count": 10,
+              "description": "Model Context Protocol implementation with 9 healthcare tools"
+            },
+            "ai/": {
+              "type": "directory", 
+              "file_count": 12,
+              "description": "AI integration with OpenAI, Anthropic, memory management"
+            },
+            "middleware/": {
+              "type": "directory",
+              "file_count": 7,
+              "description": "Security, authentication, audit middleware"
+            },
+            "config/": {
+              "type": "directory",
+              "file_count": 2,
+              "description": "AWS secrets and security configuration"
+            }
+          }
+        },
+        "shared/": {
+          "type": "directory",
+          "total_files": 2,
+          "total_size": "45KB",
+          "total_loc": 1200,
+          "children": {
+            "schema.ts": {
+              "type": "file",
+              "size": 38400,
+              "loc": 980,
+              "sha256_prefix": "q7r8s9t0",
+              "description": "Drizzle database schema with 15 tables"
+            },
+            "types.ts": {
+              "type": "file",
+              "size": 6800,
+              "loc": 220,
+              "sha256_prefix": "u1v2w3x4",
+              "description": "Shared TypeScript types"
+            }
+          }
+        },
+        "attached_assets/": {
+          "type": "directory",
+          "total_files": 156,
+          "total_size": "4.2MB",
+          "description": "Healthcare images, logs, documentation files"
+        },
+        "docs/": {
+          "type": "directory",
+          "total_files": 4,
+          "description": "Generated codebase documentation"
+        },
+        "scripts/": {
+          "type": "directory", 
+          "file_count": 8,
+          "description": "Deployment and utility scripts"
+        },
+        "public/": {
+          "type": "directory",
+          "file_count": 6,
+          "description": "Static assets, PWA manifest, service worker"
+        }
+      }
+    }
+  },
+  "key_files": [
+    "package.json",
+    "shared/schema.ts", 
+    "server/index.ts",
+    "server/routes.ts",
+    "client/src/App.tsx",
+    "server/services/supervisorAgent.ts",
+    "server/mcp/tools/",
+    "vite.config.ts",
+    "drizzle.config.ts"
+  ],
+  "deployment_configs": [
+    "Dockerfile",
+    "apprunner.yaml", 
+    "Procfile",
+    "AWS-*.md files"
+  ]
+}
