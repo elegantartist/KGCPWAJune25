@@ -1,8 +1,10 @@
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 import express from "express";
 import cors from "cors";
 import session from "express-session";
 import bodyParser from "body-parser";
-import path from "path";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
