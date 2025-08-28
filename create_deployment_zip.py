@@ -6,7 +6,7 @@ from pathlib import Path
 
 def create_deployment_zip():
     source_dir = Path("clean-aws-deploy")
-    zip_path = Path("kgc-healthcare-BUILD-COMPLETE.zip")
+    zip_path = Path("kgc-api-eb.zip")
     
     # Remove existing zip if it exists
     if zip_path.exists():
