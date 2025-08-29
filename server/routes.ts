@@ -184,6 +184,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(200).send("pong");
   });
 
+  // Health check endpoint for Google Cloud Run and monitoring
+  app.get("/api/health", async (req, res) => {
+    const health = {
+      status: "healthy",
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      environment: process.env.NODE_ENV || "development",
+      version: "2.0.0",
+      services: {
+        database: false,
+        openai: false,
+        anthropic: false,
+        sendgrid: false,
+        twilio: false,
+        tavily: false
+      }
+    };
+
+    // Check database connectivity
+    try {
+      await db.execute(sql`SELECT 1`);
+      health.services.database = true;
+    } catch (error) {
+      console.error("Health check - Database error:", error);
+    }
+
+    // Check API keys existence (not validity)
+    health.services.openai = !!process.env.OPENAI_API_KEY;
+    health.services.anthropic = !!process.env.ANTHROPIC_API_KEY;
+    health.services.sendgrid = !!process.env.SENDGRID_API_KEY;
+    health.services.twilio = !!process.env.TWILIO_ACCOUNT_SID;
+    health.services.tavily = !!process.env.TAVILY_API_KEY;
+
+    // Determine overall health status
+    const criticalServices = ["database"];
+    const criticalHealthy = criticalServices.every(service => health.services[service]);
+    
+    if (!criticalHealthy) {
+      health.status = "unhealthy";
+      return res.status(503).json(health);
+    }
+
+    return res.json(health);
+  });
+
   // Configure Express Session with Redis for production and MemoryStore for development
   const NODE_ENV = process.env.NODE_ENV || 'development';
   const { VerificationCodeStorageService } = await import('./services/verificationCodeStorageService');
@@ -2109,6 +2154,158 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(500).json({ 
         message: "Failed to search for cooking videos. Please check if API keys are configured."
       });
+    }
+  });
+
+  // Search for exercise and wellness videos from YouTube
+  app.post("/api/exercise-wellness/videos", async (req, res) => {
+    try {
+      // Extract userId and filters from request
+      const userId = req.body.userId ? parseInt(req.body.userId as string) : 1; // Default to demo user
+      
+      // Record feature usage
+      await storage.recordFeatureUsage(userId, "exercise_wellness_video_search");
+      
+      // Extract filters from request
+      const filters = {
+        category: req.body.category || 'exercise', // Default to 'exercise'
+        intensity: req.body.intensity,
+        duration: req.body.duration,
+        tags: Array.isArray(req.body.tags) ? req.body.tags : [],
+        useCPDs: req.body.useCPDs === true,
+        additionalContext: req.body.additionalContext
+      };
+      
+      console.log(`Searching for ${filters.category} videos with filters:`, {
+        intensity: filters.intensity,
+        duration: filters.duration,
+        tags: filters.tags
+      });
+      
+      // Get user CPDs if usesCPDs is true
+      let userCPDs = null;
+      try {
+        if (filters.useCPDs) {
+          const userCpds = await storage.getUserCpds(userId);
+          if (userCpds && userCpds.length > 0) {
+            // Get the most recent CPD
+            userCPDs = userCpds[0].content;
+            console.log("Found user CPDs for exercise/wellness search");
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching care plan directives:", error);
+        // Continue without CPDs
+      }
+      
+      // Search for exercise/wellness videos
+      const videoResults = await searchExerciseWellnessVideos(
+        filters.category as 'exercise' | 'wellness',
+        {
+          intensity: filters.intensity as 'low' | 'moderate' | 'high',
+          duration: filters.duration as 'short' | 'medium' | 'long',
+          tags: filters.tags
+        }
+      );
+      
+      // Check if we found any results
+      if (videoResults.videos.length === 0) {
+        return res.status(404).json({ 
+          message: "No videos found matching your criteria. Try broadening your search."
+        });
+      }
+      
+      console.log(`Found ${videoResults.videos.length} initial ${filters.category} videos`);
+      
+      // Map the results to match the VideoResult interface expected by the frontend
+      // and ensure all videos have valid videoId
+      let videos = videoResults.videos
+        .filter(result => result.videoId) // Ensure all results have a valid videoId
+        .map(result => ({
+          title: result.title,
+          url: result.url,
+          content: result.content || result.description || 'No description available',
+          description: result.description || result.content || 'No description available',
+          image: result.thumbnail_url || result.image || `https://img.youtube.com/vi/${result.videoId}/mqdefault.jpg`,
+          thumbnail_url: result.thumbnail_url || result.image || `https://img.youtube.com/vi/${result.videoId}/mqdefault.jpg`,
+          videoId: result.videoId,
+          source_name: result.source_name || 'YouTube',
+          category: filters.category,
+          tags: result.tags || [],
+          intensity: result.intensity,
+          duration: result.duration
+        }));
+
+      console.log(`Selected ${videos.length} best ${filters.category} videos after combining results`);
+      
+      return res.json({ 
+        videos: videos.slice(0, 10), // Return top 10 results
+        query: videoResults.query,
+        answer: videoResults.answer
+      });
+    } catch (error) {
+      console.error(`Error searching exercise/wellness videos:`, error);
+      return res.status(500).json({ 
+        message: "Failed to search for videos. Please check if API keys are configured."
+      });
+    }
+  });
+
+  // Exercise & Weight Support (E&W Support) search - finds fitness services within a radius
+  app.post("/api/ew-support/search", async (req, res) => {
+    try {
+      // Validate request body
+      if (!req.body.location) {
+        return res.status(400).json({ message: "Location is required" });
+      }
+      
+      if (!req.body.serviceType) {
+        return res.status(400).json({ message: "Service type is required" });
+      }
+      
+      const location = req.body.location as string;
+      const serviceType = req.body.serviceType as string;
+      const userId = req.body.userId ? parseInt(req.body.userId as string) : 1;
+      const targetResults = req.body.targetResults ? parseInt(req.body.targetResults as string) : 5;
+      
+      // Record the interaction
+      await storage.recordContentInteraction({
+        userId,
+        contentType: "ew_support",
+        contentUrl: `location_search:${serviceType}_in_${location}`,
+        interactionType: "search"
+      });
+      
+      // Execute the location-based search with radius expansion
+      const searchResults = await searchHealthContent(location, serviceType, targetResults);
+      
+      // If no results
+      if (searchResults.results.length === 0) {
+        return res.status(404).json({ 
+          message: `No ${serviceType} services found near ${location}. Please try a different location or service type.` 
+        });
+      }
+      
+      // Validate the results against user's CPDs
+      const validatedResults = await Promise.all(
+        searchResults.results.map(async (result) => {
+          return {
+            ...result,
+            validation: { isValid: true, score: 1.0, reasons: [] }
+          };
+        })
+      );
+      
+      return res.json({
+        query: searchResults.query,
+        location: location,
+        serviceType: serviceType,
+        results: validatedResults,
+        answer: searchResults.answer
+      });
+    } catch (error) {
+      console.error("E&W Support search error:", error);
+      return res.status(500).json({ message: "Failed to search for fitness services" });
     }
   });
 

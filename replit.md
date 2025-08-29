@@ -58,6 +58,14 @@ Contact information: All user contact data must be real and human-provided (no a
 - **TypeScript**: Type safety across the entire application.
 
 ## Recent Changes
+- January 15, 2025: GOOGLE CLOUD RUN DEPLOYMENT PREPARATION
+  * EXERCISE & WELLNESS FIXED: Restored `/api/exercise-wellness/videos` endpoint for E&W video search functionality
+  * E&W SUPPORT FIXED: Restored `/api/ew-support/search` endpoint for location-based fitness services search
+  * TAVILY INTEGRATION CONFIRMED: All Inspiration Machine features delivering AI-curated results as designed
+  * GOOGLE CLOUD DEPLOYMENT: Created comprehensive deployment script and documentation for Cloud Run
+  * DOCKERFILE UPDATED: Fixed TypeScript execution with tsx for production deployment
+  * SECRETS MANAGEMENT: Configured Google Secret Manager integration for HIPAA-compliant credential storage
+  * DEPLOYMENT AUTOMATION: One-command deployment script with health checks and monitoring setup
 - August 29, 2025: COMPLETE SYSTEM RESTORATION WITH ENHANCED SECURITY
   * API KEYS UPDATED: SendGrid (SG.SGHSa...), OpenAI (sk-proj-ugGj...), Anthropic (updated) all working
   * ANTHROPIC MODEL UPGRADE: Updated from deprecated claude-3-sonnet-20240229 to claude-3-5-sonnet-20241022
