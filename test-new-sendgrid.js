@@ -1,4 +1,4 @@
-const sgMail = require('@sendgrid/mail');
+import sgMail from '@sendgrid/mail';
 
 // Test script for new SendGrid setup
 console.log('🧪 Testing SendGrid Configuration for KGC');

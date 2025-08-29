@@ -11,26 +11,6 @@ const router = Router();
  */
 // Support both legacy and new route names for compatibility
 router.post('/send-pin', async (req, res) => {
-  // DEVELOPMENT BYPASS: If SendGrid is failing, return success with debug info
-  const isDevelopment = process.env.NODE_ENV !== 'production' || process.env.REPL_ID;
-  
-  if (isDevelopment) {
-    console.log('📧 [DEV MODE] Bypassing SendGrid for email auth - returning mock success');
-    const { email } = req.body;
-    
-    // Store a fixed PIN for development  
-    const fixedPin = '123456';
-    
-    // Simple in-memory storage for development
-    if (!global.devPins) global.devPins = new Map();
-    global.devPins.set(email, fixedPin);
-    
-    return res.json({ 
-      success: true, 
-      message: `Development mode: PIN sent to ${email}. Use PIN: ${fixedPin}`,
-      devMode: true 
-    });
-  }
   try {
     let { email, dashboardType } = req.body;
 
