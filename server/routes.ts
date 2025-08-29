@@ -2108,6 +2108,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Submit a patient self-score (CRITICAL ENDPOINT)
+  app.post("/api/patient-scores", async (req, res) => {
+    try {
+      const { patientId, scoreDate, exerciseSelfScore, mealPlanSelfScore, medicationSelfScore, notes } = req.body;
+      
+      // Validate inputs
+      if (!patientId || (exerciseSelfScore === undefined && mealPlanSelfScore === undefined && medicationSelfScore === undefined)) {
+        return res.status(400).json({ message: 'Missing required fields' });
+      }
+      
+      // Check if a score for this date already exists
+      const existingScores = await db.select().from(patientScores)
+        .where(and(
+          eq(patientScores.patientId, patientId),
+          eq(patientScores.scoreDate, new Date(scoreDate || new Date()))
+        ));
+      
+      let result;
+      if (existingScores.length > 0) {
+        // Update existing score
+        result = await db.update(patientScores)
+          .set({
+            exerciseSelfScore: exerciseSelfScore !== undefined ? exerciseSelfScore : existingScores[0].exerciseSelfScore,
+            mealPlanSelfScore: mealPlanSelfScore !== undefined ? mealPlanSelfScore : existingScores[0].mealPlanSelfScore,
+            medicationSelfScore: medicationSelfScore !== undefined ? medicationSelfScore : existingScores[0].medicationSelfScore,
+            notes: notes || existingScores[0].notes
+          })
+          .where(eq(patientScores.id, existingScores[0].id))
+          .returning();
+      } else {
+        // Create new score record
+        result = await db.insert(patientScores)
+          .values({
+            patientId,
+            scoreDate: new Date(scoreDate || new Date()),
+            exerciseSelfScore,
+            mealPlanSelfScore,
+            medicationSelfScore,
+            notes
+          })
+          .returning();
+      }
+      
+      res.status(201).json(result[0]);
+    } catch (error) {
+      console.error('Error saving patient score:', error);
+      res.status(500).json({ message: 'Failed to save patient score' });
+    }
+  });
+
   // Register Supervisor Agent routes
   const { setupSupervisorAgentRoutes } = await import('./routes/supervisorAgent');
   setupSupervisorAgentRoutes(app);

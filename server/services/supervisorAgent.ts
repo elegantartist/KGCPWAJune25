@@ -646,18 +646,35 @@ AVAILABLE KGC FEATURES - When asked about features, provide this exact informati
    */
   private async incrementFeatureUsage(patientId: number, featureName: string): Promise<void> {
     try {
-      await db.insert(featureUsage).values({
-        userId: patientId,
-        featureName,
-        usageCount: 1,
-        lastUsed: new Date()
-      }).onConflictDoUpdate({
-        target: [featureUsage.userId, featureUsage.featureName],
-        set: {
-          usageCount: sql`${featureUsage.usageCount} + 1`,
+      // Use a safer approach without onConflictDoUpdate to avoid constraint errors
+      const existing = await db.select()
+        .from(featureUsage)
+        .where(and(
+          eq(featureUsage.userId, patientId),
+          eq(featureUsage.featureName, featureName)
+        ))
+        .limit(1);
+
+      if (existing.length > 0) {
+        // Update existing record
+        await db.update(featureUsage)
+          .set({
+            usageCount: existing[0].usageCount + 1,
+            lastUsed: new Date()
+          })
+          .where(and(
+            eq(featureUsage.userId, patientId),
+            eq(featureUsage.featureName, featureName)
+          ));
+      } else {
+        // Insert new record
+        await db.insert(featureUsage).values({
+          userId: patientId,
+          featureName,
+          usageCount: 1,
           lastUsed: new Date()
-        }
-      });
+        });
+      }
     } catch (error) {
       console.error('Error tracking feature usage:', error);
     }
