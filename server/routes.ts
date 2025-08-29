@@ -2108,5 +2108,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Register Supervisor Agent routes
+  const { setupSupervisorAgentRoutes } = await import('./routes/supervisorAgent');
+  setupSupervisorAgentRoutes(app);
+
+  console.log('🔧 All routes have been registered successfully');
+
   return app;
 }
