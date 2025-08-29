@@ -2149,10 +2149,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const sanitizedNotes = notes ? notes.toString().slice(0, 500) : null;
       
       // Check if a score for this date already exists
+      const targetDate = scoreDate ? new Date(scoreDate) : new Date();
+      const dateString = targetDate.toISOString().split('T')[0]; // Convert to YYYY-MM-DD format
+      
       const existingScores = await db.select().from(patientScores)
         .where(and(
           eq(patientScores.patientId, parsedPatientId),
-          eq(patientScores.scoreDate, new Date(scoreDate || new Date()))
+          eq(patientScores.scoreDate, dateString)
         ));
       
       let result;
@@ -2172,7 +2175,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         result = await db.insert(patientScores)
           .values({
             patientId: parsedPatientId,
-            scoreDate: new Date(scoreDate || new Date()),
+            scoreDate: dateString, // Use the formatted date string
             exerciseSelfScore,
             mealPlanSelfScore,
             medicationSelfScore,
