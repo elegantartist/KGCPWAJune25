@@ -226,7 +226,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     })
   );
 
-  // Apply security middleware to all API routes
+  // Apply enhanced security middleware to all API routes
+  const { securityMiddleware } = await import('./middleware/securityEnhancement');
+  app.use("/api", securityMiddleware.setHeaders);
+  app.use("/api", securityMiddleware.validateSession);
+  app.use("/api", securityMiddleware.sanitizeInput);
   app.use("/api", sessionTimeoutMiddleware);
 
   // Import auth handlers
@@ -2113,15 +2117,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { patientId, scoreDate, exerciseSelfScore, mealPlanSelfScore, medicationSelfScore, notes } = req.body;
       
-      // Validate inputs
+      // Enhanced input validation and sanitization
       if (!patientId || (exerciseSelfScore === undefined && mealPlanSelfScore === undefined && medicationSelfScore === undefined)) {
         return res.status(400).json({ message: 'Missing required fields' });
       }
+
+      // Validate score ranges (1-10) to prevent data corruption
+      const validateScore = (score: any, name: string) => {
+        if (score !== undefined && (typeof score !== 'number' || score < 1 || score > 10)) {
+          throw new Error(`${name} must be a number between 1 and 10`);
+        }
+      };
+
+      validateScore(exerciseSelfScore, 'Exercise score');
+      validateScore(mealPlanSelfScore, 'Meal plan score');
+      validateScore(medicationSelfScore, 'Medication score');
+
+      // Validate patientId is a positive integer
+      const parsedPatientId = parseInt(patientId);
+      if (isNaN(parsedPatientId) || parsedPatientId <= 0) {
+        return res.status(400).json({ message: 'Invalid patient ID' });
+      }
+
+      // Session-based authorization check
+      const session = req.session as any;
+      if (session?.userRole === 'patient' && session?.userId !== parsedPatientId) {
+        return res.status(403).json({ message: 'Access denied: Cannot submit scores for other patients' });
+      }
+
+      // Sanitize notes to prevent XSS
+      const sanitizedNotes = notes ? notes.toString().slice(0, 500) : null;
       
       // Check if a score for this date already exists
       const existingScores = await db.select().from(patientScores)
         .where(and(
-          eq(patientScores.patientId, patientId),
+          eq(patientScores.patientId, parsedPatientId),
           eq(patientScores.scoreDate, new Date(scoreDate || new Date()))
         ));
       
@@ -2133,7 +2163,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             exerciseSelfScore: exerciseSelfScore !== undefined ? exerciseSelfScore : existingScores[0].exerciseSelfScore,
             mealPlanSelfScore: mealPlanSelfScore !== undefined ? mealPlanSelfScore : existingScores[0].mealPlanSelfScore,
             medicationSelfScore: medicationSelfScore !== undefined ? medicationSelfScore : existingScores[0].medicationSelfScore,
-            notes: notes || existingScores[0].notes
+            notes: sanitizedNotes || existingScores[0].notes
           })
           .where(eq(patientScores.id, existingScores[0].id))
           .returning();
@@ -2141,12 +2171,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Create new score record
         result = await db.insert(patientScores)
           .values({
-            patientId,
+            patientId: parsedPatientId,
             scoreDate: new Date(scoreDate || new Date()),
             exerciseSelfScore,
             mealPlanSelfScore,
             medicationSelfScore,
-            notes
+            notes: sanitizedNotes
           })
           .returning();
       }

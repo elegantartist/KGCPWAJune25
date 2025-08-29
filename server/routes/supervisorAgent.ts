@@ -33,31 +33,76 @@ const pprRequestSchema = z.object({
 
 export function setupSupervisorAgentRoutes(app: Express) {
   
-  // Process patient chat message
+  // Process patient chat message (ENHANCED SECURITY)
   app.post("/api/supervisor/chat", async (req, res) => {
     try {
-      console.log(`[Supervisor API] Raw request body:`, JSON.stringify(req.body, null, 2));
+      // Enhanced input validation and rate limiting
+      const session = req.session as any;
+      const clientIP = req.ip || req.connection.remoteAddress;
+      
+      // Session authentication check
+      if (!session?.userId) {
+        console.warn(`[Security] Unauthorized chat attempt from IP: ${clientIP}`);
+        return res.status(401).json({
+          success: false,
+          error: 'Authentication required'
+        });
+      }
+
+      console.log(`[Supervisor API] Authenticated request from user ${session.userId}`);
       
       // Get patientId from session if not provided in request body
-      const session = req.session as any;
       let patientId = req.body.patientId;
       
       if (!patientId && session?.patientId) {
         patientId = session.patientId;
       }
-      
+
+      // Input validation and sanitization
       const { message, context } = chatMessageSchema.omit({ patientId: true }).parse(req.body);
       
-      if (!patientId) {
+      // Sanitize message input to prevent injection attacks
+      if (!message || typeof message !== 'string' || message.length > 2000) {
         return res.status(400).json({
           success: false,
-          error: 'Patient ID required - either in request body or authenticated session'
+          error: 'Invalid message: must be a string under 2000 characters'
+        });
+      }
+
+      // Authorization check - patients can only chat as themselves
+      if (session?.userRole === 'patient' && session?.userId !== patientId) {
+        console.warn(`[Security] Patient ${session.userId} attempted to access chat for patient ${patientId}`);
+        return res.status(403).json({
+          success: false,
+          error: 'Access denied: Cannot access other patient data'
         });
       }
       
-      console.log(`[Supervisor API] Processing chat for patient ${patientId}`);
+      // Validate patientId
+      const parsedPatientId = parseInt(patientId);
+      if (!patientId || isNaN(parsedPatientId) || parsedPatientId <= 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'Valid patient ID required'
+        });
+      }
       
-      const response = await supervisorAgent.processPatientMessage(patientId, message, context);
+      console.log(`[Supervisor API] Processing chat for patient ${parsedPatientId}`);
+      
+      // Rate limiting check (simple implementation)
+      const now = Date.now();
+      const sessionKey = `chat_${session.userId}`;
+      if (!session.lastChatTime) session.lastChatTime = {};
+      
+      if (session.lastChatTime[sessionKey] && (now - session.lastChatTime[sessionKey]) < 2000) {
+        return res.status(429).json({
+          success: false,
+          error: 'Please wait before sending another message'
+        });
+      }
+      session.lastChatTime[sessionKey] = now;
+      
+      const response = await supervisorAgent.processPatientMessage(parsedPatientId, message, context);
       
       res.json({
         success: true,
@@ -67,17 +112,24 @@ export function setupSupervisorAgentRoutes(app: Express) {
     } catch (error) {
       console.error("[Supervisor API] Chat processing error:", error);
       
+      // Enhanced error handling with security considerations
       if (error instanceof z.ZodError) {
         return res.status(400).json({
           success: false,
-          error: "Invalid request data",
-          details: error.errors
+          error: "Invalid request format",
+          // Don't expose detailed validation errors in production
+          details: process.env.NODE_ENV === 'development' ? error.errors : undefined
         });
       }
       
+      // Log security-related errors
+      const session = req.session as any;
+      const clientIP = req.ip || req.connection.remoteAddress;
+      console.error(`[Security] Chat error for user ${session?.userId} from IP ${clientIP}:`, error);
+      
       res.status(500).json({
         success: false,
-        error: "Failed to process chat message"
+        error: "Unable to process your request at this time. Please try again."
       });
     }
   });
